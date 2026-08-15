@@ -1,0 +1,31 @@
+下一步计划：
+添加一个添加item的方法，提交使用json
+
+
+{
+    基本属性：{type、name、overview .... 基本属性}
+    
+    link_items:[{
+        item的关联属性：{PeopleType = Column("PeopleType", SQLEnum(PersonType, name="person_type_enum", create_type=False), nullable=True, comment="人物类型 - 仅 Person 类型使用")
+            PeopleRole = Column("PeopleRole", Text, nullable=True, comment="角色 - 人物在媒体项中的角色名称（仅 Person 类型使用）")
+            SourceId = Column("SourceId", Text, nullable=True, comment="来源 ID - 关联来源的标识（仅 Source 类型使用）")
+            SourceLink = Column("SourceLink", Text, nullable=True, comment="来源链接 - 关联来源的链接或路径（仅 Source 类型使用）") 
+        }
+        item:{.....}
+}]
+    link_files:[
+        {files的关联属性， file的信息}
+    ]
+}
+
+
+
+
+
+
+
+
+
+
+
+
