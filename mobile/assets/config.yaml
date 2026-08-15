@@ -1,0 +1,21 @@
+# ============================================================
+# Flutter 移动端应用配置文件
+# ============================================================
+
+# 布局配置
+layout:
+  # 横竖屏布局切换的宽高比阈值
+  # 当屏幕宽高比 (width/height) 大于此值时使用横屏布局
+  # 默认 1.25 对应 5:4 比例
+  landscape_threshold: 1.25
+
+# API 配置
+api:
+  base_url: "http://localhost:8000"
+  connect_timeout_seconds: 15
+  receive_timeout_seconds: 30
+
+# 缓存配置
+cache:
+  max_image_cache_mb: 200
+  max_api_cache_mb: 50
