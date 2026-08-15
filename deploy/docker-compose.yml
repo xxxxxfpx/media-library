@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../deploy/Dockerfile
+    image: media-library-backend:latest
+    container_name: media-library-backend
+    restart: unless-stopped
+    environment:
+      # 生产环境通过 .env 文件或宿主机环境注入敏感配置
+      CONFIG_PATH: /app/config/local.yaml
+    volumes:
+      # 本地配置覆盖（含凭据）
+      - ../backend/config:/app/config:ro
+      # 运行时数据持久化
+      - ../backend/data:/app/data
+      # 密钥文件
+      - ../backend/secrets:/app/secrets:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    image: nginx:alpine
+    container_name: media-library-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    volumes:
+      - ../frontend/dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3000:80"

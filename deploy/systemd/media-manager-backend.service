@@ -1,0 +1,24 @@
+[Unit]
+Description=Media Library Backend (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/media-library/backend
+Environment=CONFIG_PATH=/opt/media-library/backend/config/local.yaml
+Environment=SECRETS_PATH=/opt/media-library/backend/secrets/config.yaml
+ExecStart=/opt/media-library/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+User=medialib
+Group=medialib
+
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/media-library/backend/data
+
+[Install]
+WantedBy=multi-user.target
