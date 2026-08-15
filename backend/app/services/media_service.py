@@ -1,0 +1,711 @@
+"""媒体业务逻辑服务层"""
+
+from collections import defaultdict
+from typing import Optional, List, Dict, Any
+
+from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
+from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata
+from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
+
+
+def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
+    if not types_str:
+        return None
+    result = []
+    for t in types_str.split(","):
+        t = t.strip()
+        if t:
+            try:
+                result.append(MediaType(t))
+            except ValueError:
+                pass
+    return result if result else None
+
+
+async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[LinkItem]]:
+    if not item_ids:
+        return {}
+    # 优化方案：两步查询，避免 SQLite 优化器选择以 MediaItems 为驱动表导致的性能问题
+    # 第一步：先获取 ItemLinks（以 ItemId 为索引过滤）
+    links_result = await db.execute(
+        select(ItemLinks).where(ItemLinks.ItemId.in_(item_ids))
+    )
+    links = links_result.scalars().all()
+    if not links:
+        return {}
+    # 第二步：获取关联的 MediaItems
+    linked_item_ids = list(set([link.LinkedItemId for link in links]))
+    media_result = await db.execute(
+        select(MediaItem).where(MediaItem.Id.in_(linked_item_ids), MediaItem.IsDeleted == False)
+    )
+    media_map = {m.Id: m for m in media_result.scalars().all()}
+    # 组合结果
+    grouped = defaultdict(list)
+    for link in links:
+        linked_item = media_map.get(link.LinkedItemId)
+        if linked_item:
+            grouped[link.ItemId].append((link, linked_item))
+    return {item_id: serialize_links(links_list) for item_id, links_list in grouped.items()}
+
+
+async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[FileInfo]]:
+    if not item_ids:
+        return {}
+    result = await db.execute(
+        select(File, FileLink)
+        .join(FileLink, FileLink.FileId == File.Id)
+        .where(FileLink.ItemId.in_(item_ids))
+    )
+    grouped = defaultdict(list)
+    for file, file_link in result:
+        grouped[file_link.ItemId].append((file, file_link))
+    return {item_id: serialize_files(files) for item_id, files in grouped.items()}
+
+
+async def fetch_userdata_batch(db: AsyncSession, item_ids: List[int], user_id: Optional[int]) -> Dict[int, Optional[UserDataInfo]]:
+    if not item_ids or user_id is None:
+        return {}
+    result = await db.execute(
+        select(UserData)
+        .where(UserData.ItemId.in_(item_ids), UserData.UserId == user_id)
+    )
+    return {ud.ItemId: serialize_userdata(ud) for ud in result.scalars().all()}
+
+
+async def fetch_alias_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[AliasItem]]:
+    if not item_ids:
+        return {}
+    result = await db.execute(
+        select(Alias)
+        .where(Alias.ItemId.in_(item_ids))
+    )
+    grouped = defaultdict(list)
+    for alias in result.scalars().all():
+        grouped[alias.ItemId].append(alias)
+    return {item_id: serialize_alias(aliases) for item_id, aliases in grouped.items()}
+
+
+async def fetch_has_children_batch(db: AsyncSession, item_ids: List[int]) -> set[int]:
+    """批量查询哪些 item 有子项（作为 LinkedItemId 出现在 ItemLinks 中）"""
+    if not item_ids:
+        return set()
+    result = await db.execute(
+        select(ItemLinks.LinkedItemId).distinct().where(
+            ItemLinks.LinkedItemId.in_(item_ids),
+            ItemLinks.ItemId != ItemLinks.LinkedItemId,  # 排除自关联
+        )
+    )
+    return {row[0] for row in result.all()}
+
+
+async def get_media_list(
+    db: AsyncSession,
+    user_id: int,
+    types: Optional[str] = None,
+    favorite: bool = False,
+    has_playback: bool = False,
+    has_rating: bool = False,
+    sort_by: str = "date_created",
+    limit: int = 50,
+    offset: int = 0,
+    item_ids: Optional[str] = None,
+    linked_item_ids: Optional[str] = None,
+    search: Optional[str] = None,
+) -> dict:
+    query = select(MediaItem).where(MediaItem.IsDeleted == False)
+    total_query = select(func.count()).select_from(MediaItem).where(MediaItem.IsDeleted == False)
+
+    has_user_filter = favorite or has_playback or has_rating
+    if has_user_filter:
+        query = query.join(UserData, MediaItem.Id == UserData.ItemId).where(
+            UserData.UserId == user_id
+        )
+        total_query = total_query.join(UserData, MediaItem.Id == UserData.ItemId).where(
+            UserData.UserId == user_id
+        )
+        if favorite:
+            query = query.where(UserData.FavoritedAt.isnot(None))
+            total_query = total_query.where(UserData.FavoritedAt.isnot(None))
+        if has_playback:
+            query = query.where(UserData.LastPlayedAt.isnot(None))
+            total_query = total_query.where(UserData.LastPlayedAt.isnot(None))
+        if has_rating:
+            query = query.where(UserData.Rating.isnot(None))
+            total_query = total_query.where(UserData.Rating.isnot(None))
+
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.outerjoin(Alias, MediaItem.Id == Alias.ItemId)
+        total_query = total_query.outerjoin(Alias, MediaItem.Id == Alias.ItemId)
+        search_condition = or_(
+            MediaItem.Name.ilike(search_pattern),
+            MediaItem.Overview.ilike(search_pattern),
+            MediaItem.Tagline.ilike(search_pattern),
+            Alias.Name.ilike(search_pattern),
+        )
+        query = query.where(search_condition)
+        total_query = total_query.where(search_condition)
+
+    type_list = parse_types(types)
+    if type_list and item_ids:
+        id_list = [int(id.strip()) for id in item_ids.split(",") if id.strip().isdigit()]
+        if id_list:
+            query = query.where(
+                MediaItem.Id.in_(id_list),
+                MediaItem.Type.in_(type_list)
+            )
+            total_query = total_query.where(
+                MediaItem.Id.in_(id_list),
+                MediaItem.Type.in_(type_list)
+            )
+    else:
+        if type_list:
+            query = query.where(MediaItem.Type.in_(type_list))
+            total_query = total_query.where(MediaItem.Type.in_(type_list))
+
+        if item_ids:
+            id_list = [int(id.strip()) for id in item_ids.split(",") if id.strip().isdigit()]
+            if id_list:
+                query = query.where(MediaItem.Id.in_(id_list))
+                total_query = total_query.where(MediaItem.Id.in_(id_list))
+
+    has_linked_ids = False
+    if linked_item_ids:
+        linked_ids = [int(id.strip()) for id in linked_item_ids.split(",") if id.strip().isdigit()]
+        has_linked_ids = len(linked_ids) > 0
+        if linked_ids:
+            if sort_by == "order":
+                # 使用 ItemLinks.Order 排序
+                query = query.join(ItemLinks, MediaItem.Id == ItemLinks.ItemId).where(ItemLinks.LinkedItemId.in_(linked_ids))
+                total_query = total_query.join(ItemLinks, MediaItem.Id == ItemLinks.ItemId).where(ItemLinks.LinkedItemId.in_(linked_ids))
+                if type_list:
+                    query = query.where(MediaItem.Type.in_(type_list))
+                    total_query = total_query.where(MediaItem.Type.in_(type_list))
+            else:
+                subq = select(ItemLinks.ItemId).where(ItemLinks.LinkedItemId.in_(linked_ids))
+                if type_list:
+                    query = query.where(
+                        MediaItem.Id.in_(subq),
+                        MediaItem.Type.in_(type_list)
+                    )
+                    total_query = total_query.where(
+                        MediaItem.Id.in_(subq),
+                        MediaItem.Type.in_(type_list)
+                    )
+                else:
+                    query = query.where(MediaItem.Id.in_(subq))
+                    total_query = total_query.where(MediaItem.Id.in_(subq))
+
+    sort_mapping = {
+        "date_created": MediaItem.DateCreated,
+        "name": MediaItem.Name,
+        "community_rating": MediaItem.CommunityRating,
+        "critic_rating": MediaItem.CriticRating,
+    }
+    if has_user_filter:
+        sort_mapping["favorited_at"] = UserData.FavoritedAt
+        sort_mapping["last_played"] = UserData.LastPlayedAt
+        sort_mapping["user_rating"] = UserData.Rating
+    
+    if sort_by == "order" and has_linked_ids:
+        # 使用 ItemLinks.Order 升序排列
+        query = query.order_by(ItemLinks.Order.asc()).limit(limit).offset(offset)
+    else:
+        order_col = sort_mapping.get(sort_by, MediaItem.DateCreated)
+        query = query.order_by(order_col.desc()).limit(limit).offset(offset)
+
+    total_result = await db.execute(total_query)
+    total = total_result.scalar() or 0
+
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    item_ids_list = [item.Id for item in items]
+
+    links_map = await fetch_links_batch(db, item_ids_list)
+    files_map = await fetch_files_batch(db, item_ids_list)
+    userdata_map = await fetch_userdata_batch(db, item_ids_list, user_id)
+    alias_map = await fetch_alias_batch(db, item_ids_list)
+    has_children_set = await fetch_has_children_batch(db, item_ids_list)
+
+    media_list = []
+    for item in items:
+        entry = MediaItemResponse(
+            id=item.Id,
+            name=item.Name,
+            type=item.Type.value if item.Type else None,
+            overview=item.Overview,
+            tagline=item.Tagline,
+            premiere_date=item.PremiereDate.isoformat() if item.PremiereDate else None,
+            end_date=item.EndDate.isoformat() if item.EndDate else None,
+            official_rating=item.OfficialRating,
+            community_rating=item.CommunityRating,
+            critic_rating=item.CriticRating,
+            date_created=item.DateCreated.isoformat() if item.DateCreated else None,
+            date_modified=item.DateModified.isoformat() if item.DateModified else None,
+            links=links_map.get(item.Id, []),
+            files=files_map.get(item.Id, []),
+            userdata=userdata_map.get(item.Id, None),
+            alias=alias_map.get(item.Id, []),
+            has_children=item.Id in has_children_set,
+        )
+        media_list.append(entry)
+
+    return {
+        "items": media_list,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
+async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
+    result = await db.execute(
+        select(MediaItem).where(MediaItem.Id == id, MediaItem.IsDeleted == False)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        return None
+
+    links_result = await db.execute(
+        select(ItemLinks, MediaItem)
+        .join(MediaItem, ItemLinks.LinkedItemId == MediaItem.Id)
+        .where(ItemLinks.ItemId == id, MediaItem.IsDeleted == False)
+    )
+    link_rows = links_result.all()
+    linked_item_ids = [m.Id for _, m in link_rows]
+    primary_images_map = {}
+    if linked_item_ids:
+        img_result = await db.execute(
+            select(FileLink.ItemId, FileLink.FileId)
+            .where(
+                FileLink.ItemId.in_(linked_item_ids),
+                FileLink.ImageType.isnot(None)
+            )
+        )
+        for item_id, file_id in img_result.all():
+            if item_id not in primary_images_map:
+                primary_images_map[item_id] = str(file_id)
+    links = serialize_links(link_rows, primary_images_map)
+
+    files_result = await db.execute(
+        select(File, FileLink)
+        .join(FileLink, FileLink.FileId == File.Id)
+        .where(FileLink.ItemId == id)
+    )
+    files = serialize_files(files_result)
+
+    userdata = None
+    if user_id is not None:
+        ud_result = await db.execute(
+            select(UserData)
+            .where(UserData.ItemId == id, UserData.UserId == user_id)
+        )
+        userdata = serialize_userdata(ud_result.scalar_one_or_none())
+
+    alias_result = await db.execute(
+        select(Alias).where(Alias.ItemId == id)
+    )
+    alias = serialize_alias(alias_result.scalars().all())
+
+    has_children = await db.execute(
+        select(True).where(
+            select(ItemLinks).where(ItemLinks.LinkedItemId == id).exists()
+        )
+    )
+    has_children_val = has_children.scalar() is True
+
+    return MediaItemResponse(
+        id=item.Id,
+        name=item.Name,
+        type=item.Type.value if item.Type else None,
+        overview=item.Overview,
+        tagline=item.Tagline,
+        premiere_date=item.PremiereDate.isoformat() if item.PremiereDate else None,
+        end_date=item.EndDate.isoformat() if item.EndDate else None,
+        official_rating=item.OfficialRating,
+        community_rating=item.CommunityRating,
+        critic_rating=item.CriticRating,
+        date_created=item.DateCreated.isoformat() if item.DateCreated else None,
+        date_modified=item.DateModified.isoformat() if item.DateModified else None,
+        links=links,
+        files=files,
+        userdata=userdata,
+        alias=alias,
+        has_children=has_children_val,
+    )
+
+
+def _check_graph_connectivity(item_ids: set[str], item_links: list | None) -> list[str]:
+    """
+    检查图是否连通，返回孤立的 temp_id 列表
+
+    找出所有连通分量，分量大小为 1 且 degree=0 的节点视为孤立节点
+
+    规则：
+    - 空 item_ids: 无孤立节点
+    - 空的 item_links 或 None: 如果只有1个节点则连通，否则所有节点都孤立
+    """
+    if not item_ids:
+        return []
+
+    if not item_links:
+        if len(item_ids) == 1:
+            return []
+        return list(item_ids)
+
+    graph: dict[str, set[str]] = {tid: set() for tid in item_ids}
+    for link in item_links:
+        if link.link in graph and link.linked in graph:
+            graph[link.link].add(link.linked)
+            graph[link.linked].add(link.link)
+
+    unvisited = set(item_ids)
+    isolated = []
+
+    while unvisited:
+        start = next(iter(unvisited))
+        visited = set()
+        queue = [start]
+
+        while queue:
+            node = queue.pop(0)
+            if node in visited:
+                continue
+            visited.add(node)
+            for neighbor in graph[node]:
+                if neighbor not in visited:
+                    queue.append(neighbor)
+
+        unvisited -= visited
+
+        if len(visited) == 1:
+            node = next(iter(visited))
+            if len(graph[node]) == 0:
+                isolated.append(node)
+
+    return isolated
+
+
+async def create_media_batch(
+    db: AsyncSession,
+    data: "MediaBatchCreate",
+    strict_graph: bool = True,
+) -> dict:
+    """
+    批量创建媒体项及关联数据
+
+    流程：
+    1. 先创建所有 items（MediaItem），建立 temp_id → real_id 映射
+    2. 再创建所有 files（File），更新映射
+    3. 创建 item_links（ItemLinks）
+    4. 创建 file_links（FileLinks）
+
+    重复处理：source_name + source_id 存在则更新已设置字段
+
+    参数：
+        strict_graph: 是否要求传入的 items 图是连通的。默认 True（严格模式），
+                      所有 items 必须通过 item_links 互相连通
+    """
+    from app.schemas.create import MediaBatchCreate
+    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus, DisplayOrder
+    from datetime import datetime, timezone
+    import json
+
+    # 日期解析辅助函数
+    def parse_datetime(val):
+        if val is None:
+            return None
+        if isinstance(val, datetime):
+            return val
+        if isinstance(val, str):
+            # 尝试解析 ISO 格式日期
+            try:
+                return datetime.fromisoformat(val.replace('Z', '+00:00'))
+            except ValueError:
+                return None
+        return None
+
+    # JSON 序列化辅助函数
+    def to_json(val):
+        if val is None:
+            return None
+        if isinstance(val, list):
+            return json.dumps(val, ensure_ascii=False)
+        return val
+
+    # temp_id → real_id 映射
+    item_temp_to_id: dict[str, int] = {}
+    file_temp_to_id: dict[str, int] = {}
+
+    now = datetime.now(timezone.utc)
+
+    # 0. 图连通性检查（strict_graph 模式）
+    if strict_graph and data.items and len(data.items) > 0:
+        item_ids = {item.temp_id for item in data.items}
+        isolated = _check_graph_connectivity(item_ids, data.item_links)
+        if isolated:
+            raise ValueError(
+                f"strict_graph=True 要求所有 items 连通，但发现孤立节点: {isolated}。"
+                "请确保通过 item_links 将所有媒体项连接起来，或使用 strict_graph=False 禁用此检查。"
+            )
+
+    # 获取或创建 source_name 对应的 source item（用于唯一性判定）
+    source_name = data.source_name
+    source_item_result = await db.execute(
+        select(MediaItem.Id).where(
+            MediaItem.Name == source_name,
+            MediaItem.Type == MediaType.Source,
+            MediaItem.IsDeleted == False
+        )
+    )
+    source_item_id = source_item_result.scalar_one_or_none()
+
+    # 如果 source item 不存在，则创建
+    if source_item_id is None:
+        source_item = MediaItem(
+            Type=MediaType.Source,
+            Name=source_name,
+        )
+        db.add(source_item)
+        await db.flush()
+        source_item_id = source_item.Id
+
+    # 1. 创建或查找 Items
+    for item_data in data.items:
+        attrs = item_data.attrs
+        source_info = item_data.source_info
+
+        # 查找是否已存在相同的 source_name + source_id + item.type
+        source_id = source_info.source_id if source_info and source_info.is_set("source_id") else None
+        item_type = attrs.type if attrs.is_set("type") else None
+
+        # 通过 ItemLinks 查找 source 关联的 item
+        # 唯一性判定：source_name（source item的name）+ source_id + item.type
+        existing_item_id = None
+        if source_id and source_item_id and item_type:
+            result = await db.execute(
+                select(ItemLinks.ItemId).where(
+                    ItemLinks.LinkedItemId == source_item_id,
+                    ItemLinks.SourceId == source_id,
+                    ItemLinks.ItemId.in_(
+                        select(MediaItem.Id).where(
+                            MediaItem.Type == item_type,
+                            MediaItem.IsDeleted == False
+                        )
+                    )
+                ).limit(1)
+            )
+            existing_item_id = result.scalar_one_or_none()
+
+        if existing_item_id:
+            # 更新现有 item
+            result = await db.execute(
+                select(MediaItem).where(MediaItem.Id == existing_item_id)
+            )
+            item = result.scalar_one()
+            if attrs.is_set("name"):
+                item.Name = attrs.name
+            if attrs.is_set("overview"):
+                item.Overview = attrs.overview
+            if attrs.is_set("tagline"):
+                item.Tagline = attrs.tagline
+            if attrs.is_set("community_rating"):
+                item.CommunityRating = attrs.community_rating
+            item.DateModified = now
+            db.add(item)
+            await db.flush()
+            item_temp_to_id[item_data.temp_id] = existing_item_id
+        else:
+            # 创建新 item
+            item = MediaItem(
+                Type=MediaType(attrs.type) if attrs.is_set("type") else MediaType.Source,
+                Name=attrs.name if attrs.is_set("name") else None,
+                Overview=attrs.overview if attrs.is_set("overview") else None,
+                Tagline=attrs.tagline if attrs.is_set("tagline") else None,
+                OfficialRating=attrs.official_rating if attrs.is_set("official_rating") else None,
+                CommunityRating=attrs.community_rating if attrs.is_set("community_rating") else None,
+                CriticRating=attrs.critic_rating if attrs.is_set("critic_rating") else None,
+                PremiereDate=parse_datetime(attrs.premiere_date) if attrs.is_set("premiere_date") else None,
+                EndDate=parse_datetime(attrs.end_date) if attrs.is_set("end_date") else None,
+                ProductionLocations=to_json(attrs.production_locations) if attrs.is_set("production_locations") else None,
+                RemoteTrailers=to_json(attrs.remote_trailers) if attrs.is_set("remote_trailers") else None,
+                Status=ItemStatus(attrs.status) if attrs.status and attrs.is_set("status") else None,
+                DisplayOrder=DisplayOrder(attrs.display_order) if attrs.display_order and attrs.is_set("display_order") else None,
+                PreferredMetadataLanguage=attrs.preferred_metadata_language if attrs.is_set("preferred_metadata_language") else None,
+                PreferredMetadataCountryCode=attrs.preferred_metadata_country_code if attrs.is_set("preferred_metadata_country_code") else None,
+            )
+            db.add(item)
+            await db.flush()
+            item_temp_to_id[item_data.temp_id] = item.Id
+
+            # 创建 source 关联（如果提供了 source_id）
+            if source_id:
+                source_link = source_info.source_link if source_info and source_info.is_set("source_link") else None
+                # 对于 source item，LinkedItemId 指向自己；对于其他 item，LinkedItemId 指向 source
+                link_to_id = item.Id if item_type == MediaType.Source else source_item_id
+                source_link = ItemLinks(
+                    ItemId=item.Id,
+                    LinkedItemId=link_to_id,
+                    SourceId=source_id,
+                    SourceLink=source_link,
+                )
+                db.add(source_link)
+                try:
+                    await db.flush()
+                except IntegrityError:
+                    await db.rollback()
+                    # 并发场景：另一个请求已创建相同 source_name + source_id + item_type
+                    # 重新查找已存在的 item 并复用其 id
+                    result = await db.execute(
+                        select(ItemLinks.ItemId).where(
+                            ItemLinks.LinkedItemId == source_item_id,
+                            ItemLinks.SourceId == source_id,
+                            ItemLinks.ItemId.in_(
+                                select(MediaItem.Id).where(
+                                    MediaItem.Type == item_type,
+                                    MediaItem.IsDeleted == False
+                                )
+                            )
+                        ).limit(1)
+                    )
+                    existing = result.scalar_one_or_none()
+                    if existing:
+                        # 删除刚创建的重复 MediaItem，复用已有的
+                        await db.delete(item)
+                        await db.flush()
+                        item_temp_to_id[item_data.temp_id] = existing
+                        continue
+                    raise
+
+    # 2. 创建 Files
+    for file_data in data.files:
+        attrs = file_data.attrs
+        file = File(
+            Name=attrs.name if attrs.is_set("name") else None,
+            Path=attrs.path if attrs.is_set("path") else None,
+            Type=FileType(attrs.type) if attrs.is_set("type") else FileType.Other,
+            Size=attrs.size if attrs.is_set("size") else None,
+            Etag=attrs.etag if attrs.is_set("etag") else None,
+            FFmpeg=to_json(attrs.ffmpeg),
+        )
+        db.add(file)
+        await db.flush()
+        file_temp_to_id[file_data.temp_id] = file.Id
+
+    # 3. 创建 ItemLinks
+    for link_data in data.item_links:
+        link_item_id = item_temp_to_id.get(link_data.link)
+        linked_item_id = item_temp_to_id.get(link_data.linked)
+
+        if link_item_id and linked_item_id:
+            # 检查是否已存在相同关联
+            existing = await db.execute(
+                select(ItemLinks).where(
+                    ItemLinks.ItemId == link_item_id,
+                    ItemLinks.LinkedItemId == linked_item_id,
+                )
+            )
+            existing_link = existing.scalar_one_or_none()
+
+            if existing_link:
+                if link_data.is_set("people_type"):
+                    existing_link.PeopleType = PersonType(link_data.people_type) if link_data.people_type else None
+                if link_data.is_set("people_role"):
+                    existing_link.PeopleRole = link_data.people_role
+                existing_link.UpdatedAt = now
+                db.add(existing_link)
+            else:
+                new_link = ItemLinks(
+                    ItemId=link_item_id,
+                    LinkedItemId=linked_item_id,
+                    PeopleType=PersonType(link_data.people_type) if link_data.people_type and link_data.is_set("people_type") else None,
+                    PeopleRole=link_data.people_role if link_data.is_set("people_role") else None,
+                )
+                db.add(new_link)
+
+    # 4. 创建 FileLinks
+    for file_link_data in data.file_links:
+        item_id = item_temp_to_id.get(file_link_data.item)
+        file_id = file_temp_to_id.get(file_link_data.file)
+
+        if item_id and file_id:
+            # 检查是否已存在相同关联
+            existing = await db.execute(
+                select(FileLink).where(
+                    FileLink.ItemId == item_id,
+                    FileLink.FileId == file_id,
+                )
+            )
+            existing_fl = existing.scalar_one_or_none()
+
+            if existing_fl:
+                if file_link_data.is_set("image_type"):
+                    existing_fl.ImageType = ImageType(file_link_data.image_type) if file_link_data.image_type else None
+                if file_link_data.is_set("image_index"):
+                    existing_fl.ImageIndex = file_link_data.image_index
+                if file_link_data.is_set("chapter_index"):
+                    existing_fl.ChapterIndex = file_link_data.chapter_index
+                if file_link_data.is_set("chapter_name"):
+                    existing_fl.ChapterName = file_link_data.chapter_name
+                if file_link_data.is_set("start_position_ticks"):
+                    existing_fl.StartPositionTicks = file_link_data.start_position_ticks
+                if file_link_data.is_set("marker_type"):
+                    existing_fl.MarkerType = file_link_data.marker_type
+                existing_fl.UpdatedAt = now
+                db.add(existing_fl)
+            else:
+                new_fl = FileLink(
+                    ItemId=item_id,
+                    FileId=file_id,
+                    ImageType=ImageType(file_link_data.image_type) if file_link_data.image_type and file_link_data.is_set("image_type") else None,
+                    ImageIndex=file_link_data.image_index if file_link_data.is_set("image_index") else 0,
+                    ChapterIndex=file_link_data.chapter_index if file_link_data.is_set("chapter_index") else None,
+                    ChapterName=file_link_data.chapter_name if file_link_data.is_set("chapter_name") else None,
+                    StartPositionTicks=file_link_data.start_position_ticks if file_link_data.is_set("start_position_ticks") else None,
+                    MarkerType=file_link_data.marker_type if file_link_data.is_set("marker_type") else None,
+                )
+                db.add(new_fl)
+
+    await db.commit()
+
+    return {
+        "items": {temp_id: real_id for temp_id, real_id in item_temp_to_id.items()},
+        "files": {temp_id: real_id for temp_id, real_id in file_temp_to_id.items()},
+    }
+
+
+async def get_media_stats(db: AsyncSession) -> dict:
+    # 统计 File 类型（视频、音频、图片等）
+    from database.models import FileType
+    result = await db.execute(
+        select(File.Type, func.count())
+        .group_by(File.Type)
+    )
+    file_counts = {row[0]: row[1] for row in result.all()}
+
+    # 统计 MediaItem 类型
+    result = await db.execute(
+        select(MediaItem.Type, func.count())
+        .where(MediaItem.IsDeleted == False)
+        .group_by(MediaItem.Type)
+    )
+    media_counts = {row[0]: row[1] for row in result.all()}
+
+    return {
+        # File 类型统计（首页卡片用）
+        "video_count": file_counts.get(FileType.Video, 0),
+        "audio_count": file_counts.get(FileType.Audio, 0),
+        "image_count": file_counts.get(FileType.Image, 0),
+        "subtitle_count": file_counts.get(FileType.Subtitle, 0),
+        # MediaItem 类型统计
+        "movie_count": media_counts.get(MediaType.Movie, 0),
+        "series_count": media_counts.get(MediaType.Series, 0),
+        "episode_count": media_counts.get(MediaType.Episode, 0),
+        "book_count": media_counts.get(MediaType.Book, 0),
+        "source_count": media_counts.get(MediaType.Source, 0),
+    }

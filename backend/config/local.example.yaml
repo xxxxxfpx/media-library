@@ -1,0 +1,24 @@
+# ============================================================
+# 本地开发覆盖配置示例
+# 复制为 backend/config/local.yaml 后按需修改。
+# local.yaml 仅用于本地开发，已被 .gitignore 忽略，不会提交。
+# ============================================================
+
+# 数据库配置
+database:
+  type: sqlite  # sqlite 或 postgresql
+  sqlite_path: ./data/database/local_media.db
+
+# 应用配置
+app:
+  debug: true
+  admin:
+    username: admin
+    password: "admin123"
+
+# 123云盘 WebDAV 配置
+# 敏感凭据请放入 backend/secrets/config.yaml（同样被 gitignore 忽略）
+cloud_auth:
+  username: ""
+  password: ""
+  prefix: "/🗂️ 整理/Emby"

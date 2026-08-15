@@ -1,0 +1,49 @@
+# ============================================================
+# 媒体管理系统配置文件
+# 包含数据库连接配置和应用程序基础配置
+# ============================================================
+
+# 数据库配置
+database:
+  # 使用 SQLite 测试，未来可改为 PostgreSQL
+  type: sqlite  # sqlite 或 postgresql
+  # PostgreSQL 连接配置（未来使用）
+  host: localhost
+  port: 5432
+  database: media_db
+  username: postgres
+  password: ""
+  # SQLite 配置
+  sqlite_path: ./data/database/media.db
+
+# 应用配置
+app:
+  name: "Media Management System"
+  version: "1.0.0"
+  debug: true
+  secret_key: ""
+  # 管理员配置
+  admin:
+    username: admin
+    password: ""
+  # 服务器配置
+  host: "127.0.0.1"
+  port: 8000
+  # 磁盘监控路径
+  disk_path: "C:\\"  # Windows, Linux 使用 "/"
+
+# JWT 配置
+jwt:
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 7
+
+# 存储配置
+storage:
+  base_path: "./media_storage"
+
+# 123云盘 WebDAV 配置
+cloud_auth:
+  username: ""
+  password: ""
+  prefix: "/🗂️ 整理/Emby"

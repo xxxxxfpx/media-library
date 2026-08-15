@@ -1,0 +1,15 @@
+sync_interval_seconds: 60
+hero_media_card:
+  disable_click: true
+  disable_favorite: true
+  hide_type_badge: true
+  hide_rating_badge: true
+  hide_overlay: false
+  hide_card_info: true
+list_media_card:
+  disable_click: false
+  disable_favorite: false
+  hide_type_badge: false
+  hide_rating_badge: false
+  hide_overlay: false
+  hide_card_info: false
