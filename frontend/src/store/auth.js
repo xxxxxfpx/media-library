@@ -6,7 +6,7 @@ import { ref, computed } from 'vue'
 import { authAPI } from '@/api'
 
 export function useAuthStore() {
-  const token = ref(localStorage.getItem('access_token') || '')
+  const token = ref(sessionStorage.getItem('access_token') || '')
   const userInfo = ref(null)
   const isLoading = ref(false)
 
@@ -19,8 +19,8 @@ export function useAuthStore() {
       const response = await authAPI.login(username, password)
 
       token.value = response.access_token
-      localStorage.setItem('access_token', response.access_token)
-      localStorage.setItem('refresh_token', response.refresh_token)
+      sessionStorage.setItem('access_token', response.access_token)
+      sessionStorage.setItem('refresh_token', response.refresh_token)
 
       await fetchUserInfo()
       return { success: true }
@@ -31,11 +31,11 @@ export function useAuthStore() {
     }
   }
 
-  function logout() {
+  async function logout() {
     token.value = ''
     userInfo.value = null
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    sessionStorage.removeItem('access_token')
+    sessionStorage.removeItem('refresh_token')
   }
 
   async function fetchUserInfo() {

@@ -4,6 +4,7 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
 import { authAPI } from '@/api'
+import { useAppStore } from '@/store'
 
 const routes = [
   {
@@ -74,7 +75,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, from, next) => {
-  const token = localStorage.getItem('access_token')
+  const token = sessionStorage.getItem('access_token')
 
   if (to.meta.requiresAuth && !token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
@@ -86,10 +87,15 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // 检查管理员权限
+  // 检查管理员权限：优先使用 store 缓存，避免每次导航都请求用户信息
   if (to.meta.requiresAdmin && token) {
+    const store = useAppStore()
     try {
-      const userInfo = await authAPI.getInfo()
+      let userInfo = store.userInfo
+      if (!userInfo) {
+        userInfo = await authAPI.getInfo()
+        store.userInfo = userInfo
+      }
       if (!userInfo.is_admin) {
         next({ name: 'Home' })
         return

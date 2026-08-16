@@ -115,6 +115,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store'
+import { authAPI } from '@/api'
 import {
   VideoCamera, HomeFilled, Star, Clock, Setting, Monitor, Tools,
   Sunny, Moon, ArrowDown, SwitchButton, Fold, Expand
@@ -142,6 +143,7 @@ const pageTitle = computed(() => {
 
 function handleCommand(command) {
   if (command === 'logout') {
+    authAPI.logout().catch(() => {})
     store.logout()
     router.push('/login')
   } else if (command === 'settings') {

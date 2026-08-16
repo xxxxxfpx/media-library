@@ -26,7 +26,6 @@ export const useAppStore = defineStore('app', () => {
     // 主题
     theme: theme.theme,
     userSetting: theme.userSetting,
-    fetchSetting: theme.fetchSetting,
     setTheme: theme.setTheme,
     toggleTheme: theme.toggleTheme,
 
