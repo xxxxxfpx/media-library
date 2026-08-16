@@ -127,6 +127,8 @@ class FileLink(Base):
         Index("idx_file_links_item", "ItemId"),
         Index("idx_file_links_file", "FileId"),
         Index("idx_file_links_chapter", "ItemId", "ChapterIndex"),
+        Index("idx_file_links_item_file", "ItemId", "FileId"),
+        Index("idx_file_links_item_image_type", "ItemId", "ImageType"),
     )
 
     Item = relationship("MediaItem", back_populates="FileLinks")

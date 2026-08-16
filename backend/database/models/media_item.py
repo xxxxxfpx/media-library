@@ -18,10 +18,10 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Set
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, Enum as SQLEnum, Float, ForeignKey, Index, Integer, String, Text, func
+    BigInteger, Boolean, Column, DateTime, Enum as SQLEnum, Float, Index, Integer, String, Text, func
 )
 from sqlalchemy import event
-from sqlalchemy.orm import backref, relationship
+from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from .base import Base
@@ -49,20 +49,16 @@ class MediaItem(Base):
         MediaType.AggregateFolder,
         MediaType.BoxSet,
         MediaType.Playlist,
-        MediaType.PhotoAlbum,
-        MediaType.MusicAlbum,
-        MediaType.MusicArtist,
         MediaType.Season,
         MediaType.Series,
         MediaType.Genre,
         MediaType.Studio,
-        MediaType.MusicGenre,
         MediaType.Person,
     }
 
     Id = Column("Id", Integer, primary_key=True, autoincrement=True, comment="主键 - 自增整数 ID")
     Type = Column("Type", SQLEnum(MediaType, name="media_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, comment="媒体项类型")
-    Name = Column("Name", Text, nullable=True, comment="名称 - 显示名称")
+    Name = Column("Name", String(500), nullable=True, comment="名称 - 显示名称")
 
     Overview = Column("Overview", Text, nullable=True, comment="简介 - 内容描述")
     Tagline = Column("Tagline", Text, nullable=True, comment="标语 - 宣传标语")
@@ -78,8 +74,6 @@ class MediaItem(Base):
     Status = Column("Status", SQLEnum(ItemStatus, name="item_status_enum", create_type=False), nullable=True, comment="状态")
 
     ChannelNumber = Column("ChannelNumber", String(50), nullable=True, comment="频道号")
-
-    AlbumId = Column("AlbumId", Integer, ForeignKey("MediaItems.Id", ondelete="CASCADE"), nullable=True, comment="专辑 ID")
 
     ProductionLocations = Column("ProductionLocations", Text, nullable=True, comment="制作地点 - JSON 数组")
     RemoteTrailers = Column("RemoteTrailers", Text, nullable=True, comment="远程预告片 - JSON 数组")
@@ -112,15 +106,6 @@ class MediaItem(Base):
     PreferredMetadataCountryCode = Column("PreferredMetadataCountryCode", String(10), nullable=True, comment="首选元数据国家代码")
     LockedFields = Column("LockedFields", Text, nullable=True, comment="锁定字段 - JSON 数组")
 
-    AlbumRel = relationship(
-        "MediaItem",
-        remote_side=[Id],
-        foreign_keys=[AlbumId],
-        backref=backref("AlbumItems", lazy="select", viewonly=True),
-        lazy="raise",
-        viewonly=True,
-    )
-
     Links = relationship("ItemLinks", back_populates="Item", cascade="all, delete-orphan", foreign_keys="ItemLinks.ItemId")
     LinkedItems = relationship("ItemLinks", back_populates="LinkedItem", cascade="all", foreign_keys="ItemLinks.LinkedItemId")
     UserDataItems = relationship("UserData", back_populates="Item", cascade="all, delete-orphan", foreign_keys="UserData.ItemId")
@@ -133,6 +118,8 @@ class MediaItem(Base):
         Index("idx_media_items_premiere_date", "PremiereDate"),
         Index("idx_media_items_community_rating", "CommunityRating"),
         Index("idx_media_items_is_deleted", "IsDeleted"),
+        Index("idx_media_items_type_is_deleted", "Type", "IsDeleted"),
+        Index("idx_media_items_type_is_deleted_created", "Type", "IsDeleted", "DateCreated"),
     )
 
 

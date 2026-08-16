@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
 from database.core import get_db_session
 from app.api.deps import get_user_id, get_admin_id
-from app.services.media_service import get_media_list, get_media_info, get_media_stats, create_media_batch
+from app.services.media_service import get_media_list_cached, get_media_info, get_media_info_cached, get_media_stats, create_media_batch, invalidate_response_cache
 from app.schemas.media import MediaListResponse, MediaItemResponse, MediaStatsResponse
 from app.schemas.create import MediaBatchCreate
 
@@ -30,10 +30,11 @@ async def get_list(
     item_ids: Optional[str] = Query(None, description="媒体ID列表，逗号分隔"),
     linked_item_ids: Optional[str] = Query(None, description="关联媒体ID列表，逗号分隔"),
     search: Optional[str] = Query(None, description="搜索关键词，匹配名称、简介、标语、别名"),
+    cursor: Optional[str] = Query(None, description="keyset 游标（上一页返回的 next_cursor），用于高效翻页"),
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
-    return await get_media_list(
+    return await get_media_list_cached(
         db=db,
         user_id=user_id,
         types=types,
@@ -46,6 +47,7 @@ async def get_list(
         item_ids=item_ids,
         linked_item_ids=linked_item_ids,
         search=search,
+        cursor=cursor,
     )
 
 
@@ -55,7 +57,7 @@ async def get_info(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):
-    result = await get_media_info(db, id, user_id)
+    result = await get_media_info_cached(db, id, user_id)
     if not result:
         raise HTTPException(status_code=404, detail="媒体不存在")
     return result
@@ -78,6 +80,8 @@ async def create_batch(
 ):
     """批量创建媒体项及关联数据（需要管理员权限）"""
     try:
-        return await create_media_batch(db, data, strict_graph=strict_graph)
+        result = await create_media_batch(db, data, strict_graph=strict_graph)
+        invalidate_response_cache()
+        return result
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=422, detail=str(e))

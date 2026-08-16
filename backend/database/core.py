@@ -19,6 +19,7 @@ Database Core - 数据库核心配置
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy import event, text
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -55,17 +56,38 @@ if config.app.debug:
     sql_logger.addHandler(rotating_handler)
 
 # ==================== 引擎配置 ====================
-engine = create_async_engine(
-    DATABASE_URL,
-    echo=config.app.debug,
-    future=True,
-    pool_size=32,
-    max_overflow=0,
-    pool_timeout=30,
-    pool_recycle=3600,
-    pool_pre_ping=True,
-    connect_args={"check_same_thread": False},
-)
+if config.database.type == "sqlite":
+    # SQLite 单写者模型：小连接池即可，WAL 支持多读并发
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=config.app.debug,
+        future=True,
+        pool_size=5,
+        max_overflow=5,
+        pool_timeout=30,
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        """SQLite 连接级 PRAGMA：WAL 提升读写并发，busy_timeout 避免锁冲突"""
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+else:
+    engine = create_async_engine(
+        DATABASE_URL,
+        echo=config.app.debug,
+        future=True,
+        pool_size=32,
+        max_overflow=0,
+        pool_timeout=30,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+    )
 
 # ==================== 会话工厂 ====================
 AsyncSessionLocal = async_sessionmaker(
@@ -116,7 +138,42 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 from database.models.base import Base
 
 
+async def _ensure_fts5(conn) -> None:
+    """SQLite 下创建 FTS5 trigram 虚拟表与同步触发器（幂等，与 alembic fts_search 迁移一致）"""
+    if config.database.type != "sqlite":
+        return
+    await conn.execute(text("""
+        CREATE VIRTUAL TABLE IF NOT EXISTS media_item_fts USING fts5(
+            Name, Overview, Tagline,
+            content='MediaItems', content_rowid='Id',
+            tokenize='trigram'
+        )
+    """))
+    await conn.execute(text("""
+        CREATE TRIGGER IF NOT EXISTS media_item_fts_ai AFTER INSERT ON MediaItems BEGIN
+            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
+            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
+        END
+    """))
+    await conn.execute(text("""
+        CREATE TRIGGER IF NOT EXISTS media_item_fts_ad AFTER DELETE ON MediaItems BEGIN
+            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
+            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
+        END
+    """))
+    await conn.execute(text("""
+        CREATE TRIGGER IF NOT EXISTS media_item_fts_au AFTER UPDATE ON MediaItems BEGIN
+            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
+            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
+            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
+            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
+        END
+    """))
+    await conn.execute(text("INSERT INTO media_item_fts(media_item_fts) VALUES('rebuild')"))
+
+
 async def init_db():
     """初始化数据库 - 异步方式创建表"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await _ensure_fts5(conn)

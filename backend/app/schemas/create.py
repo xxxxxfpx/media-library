@@ -31,7 +31,6 @@ class ItemBaseAttrs(BaseModel):
     community_rating: Optional[float] = None
     critic_rating: Optional[float] = None
     status: Optional[str] = None
-    display_order: Optional[str] = None
     production_locations: Optional[list] = None
     remote_trailers: Optional[list] = None
     preferred_metadata_language: Optional[str] = None

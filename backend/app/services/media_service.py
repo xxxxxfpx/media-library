@@ -3,13 +3,14 @@
 from collections import defaultdict
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
 from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata
 from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
+from config import config as _app_config
 
 
 def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
@@ -55,13 +56,29 @@ async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
 async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[FileInfo]]:
     if not item_ids:
         return {}
+    # 显式列选择：避开 FFmpeg 大 JSON 字段，列表页不需要完整探针数据
     result = await db.execute(
-        select(File, FileLink)
+        select(
+            File.Id, File.Name, File.SortName, File.Path, File.Size,
+            File.Type, File.Etag,
+            FileLink.ItemId, FileLink.FileId, FileLink.ImageType, FileLink.ImageIndex,
+            FileLink.ChapterIndex, FileLink.ChapterName, FileLink.StartPositionTicks, FileLink.MarkerType,
+        )
         .join(FileLink, FileLink.FileId == File.Id)
         .where(FileLink.ItemId.in_(item_ids))
     )
     grouped = defaultdict(list)
-    for file, file_link in result:
+    for row in result:
+        file = File(
+            Id=row.Id, Name=row.Name, SortName=row.SortName, Path=row.Path, Size=row.Size,
+            Type=row.Type, Etag=row.Etag,
+        )
+        file_link = FileLink(
+            ItemId=row.ItemId, FileId=row.FileId, ImageType=row.ImageType,
+            ImageIndex=row.ImageIndex, ChapterIndex=row.ChapterIndex,
+            ChapterName=row.ChapterName, StartPositionTicks=row.StartPositionTicks,
+            MarkerType=row.MarkerType,
+        )
         grouped[file_link.ItemId].append((file, file_link))
     return {item_id: serialize_files(files) for item_id, files in grouped.items()}
 
@@ -102,6 +119,117 @@ async def fetch_has_children_batch(db: AsyncSession, item_ids: List[int]) -> set
     return {row[0] for row in result.all()}
 
 
+# ==================== 搜索优化 ====================
+# SQLite 使用 FTS5 trigram 虚拟表（media_item_fts），PostgreSQL 使用 pg_trgm GIN 索引。
+# trigram 要求关键词 >= 3 字符才能命中索引；短词（常见中文 2 字词）回退 LIKE。
+
+_FTS_MIN_LENGTH = 3
+_fts_available: bool | None = None
+
+
+# ==================== 响应缓存 ====================
+# get_media_info / get_media_list 的 diskcache 缓存（TTL 30s），仅生产（debug=False）启用，
+# 避免每次请求重复查询数据库。写操作（create_media_batch）成功后主动失效。
+
+_response_cache = None
+_response_cache_dir = None
+
+
+def _get_response_cache():
+    """惰性初始化响应缓存（diskcache，与 stats 缓存同机制）"""
+    global _response_cache, _response_cache_dir
+    if _response_cache is None:
+        import os
+        import diskcache
+        _response_cache_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "cache", "media_response",
+        )
+        os.makedirs(_response_cache_dir, exist_ok=True)
+        _response_cache = diskcache.Cache(_response_cache_dir)
+    return _response_cache
+
+
+def _cache_enabled() -> bool:
+    """生产模式启用缓存；debug（开发/测试）禁用保证数据一致性"""
+    return not _app_config.app.debug
+
+
+async def _cache_get(key: str):
+    if not _cache_enabled():
+        return None
+    return _get_response_cache().get(key)
+
+
+async def _cache_set(key: str, value, expire: int = 30) -> None:
+    if not _cache_enabled():
+        return
+    _get_response_cache().set(key, value, expire=expire)
+
+
+def invalidate_response_cache() -> None:
+    """媒体数据变更后失效全部响应缓存"""
+    global _response_cache
+    if _response_cache is None:
+        return
+    _response_cache.clear()
+
+
+async def _is_fts_available(db: AsyncSession) -> bool:
+    """检测当前 SQLite 连接是否已有 FTS5 虚拟表（惰性缓存，避免每次搜索都查 sqlite_master）"""
+    global _fts_available
+    if _app_config.database.type != "sqlite":
+        return False
+    if _fts_available is None:
+        result = await db.execute(
+            text("SELECT name FROM sqlite_master WHERE type='table' AND name='media_item_fts'")
+        )
+        _fts_available = result.scalar() is not None
+    return _fts_available
+
+
+def _escape_fts_phrase(term: str) -> str:
+    """转义 FTS5 短语：双引号内包裹 + 内部引号翻倍，避免语法注入"""
+    escaped = term.replace('"', '""')
+    return f'"{escaped}"'
+
+
+async def _search_condition(db: AsyncSession, search: str):
+    """
+    构造搜索过滤条件。
+
+    - SQLite + FTS 可用且关键词 >= 3 字符：Name/Overview/Tagline 走 FTS5 MATCH，
+      Alias 仍走 LIKE（别名索引已建 B-tree，前缀场景可用）。
+    - 其余场景回退 LIKE（兼容短词与 PostgreSQL）。
+    """
+    pattern = f"%{search}%"
+
+    if len(search.strip()) >= _FTS_MIN_LENGTH and await _is_fts_available(db):
+        try:
+            fts_phrase = _escape_fts_phrase(search.strip())
+            fts_match = select(MediaItem.Id).where(
+                MediaItem.Id.in_(
+                    select(text("rowid"))
+                    .select_from(text("media_item_fts"))
+                    .where(text("media_item_fts MATCH :term"))
+                ).params(term=fts_phrase)
+            )
+            return or_(
+                MediaItem.Id.in_(fts_match),
+                Alias.Name.ilike(pattern),
+            )
+        except Exception:
+            # FTS 查询失败（如版本/表结构异常）回退 LIKE
+            pass
+
+    return or_(
+        MediaItem.Name.ilike(pattern),
+        MediaItem.Overview.ilike(pattern),
+        MediaItem.Tagline.ilike(pattern),
+        Alias.Name.ilike(pattern),
+    )
+
+
 async def get_media_list(
     db: AsyncSession,
     user_id: int,
@@ -115,6 +243,7 @@ async def get_media_list(
     item_ids: Optional[str] = None,
     linked_item_ids: Optional[str] = None,
     search: Optional[str] = None,
+    cursor: Optional[str] = None,
 ) -> dict:
     query = select(MediaItem).where(MediaItem.IsDeleted == False)
     total_query = select(func.count()).select_from(MediaItem).where(MediaItem.IsDeleted == False)
@@ -138,15 +267,9 @@ async def get_media_list(
             total_query = total_query.where(UserData.Rating.isnot(None))
 
     if search:
-        search_pattern = f"%{search}%"
+        search_condition = await _search_condition(db, search)
         query = query.outerjoin(Alias, MediaItem.Id == Alias.ItemId)
         total_query = total_query.outerjoin(Alias, MediaItem.Id == Alias.ItemId)
-        search_condition = or_(
-            MediaItem.Name.ilike(search_pattern),
-            MediaItem.Overview.ilike(search_pattern),
-            MediaItem.Tagline.ilike(search_pattern),
-            Alias.Name.ilike(search_pattern),
-        )
         query = query.where(search_condition)
         total_query = total_query.where(search_condition)
 
@@ -210,19 +333,71 @@ async def get_media_list(
         sort_mapping["favorited_at"] = UserData.FavoritedAt
         sort_mapping["last_played"] = UserData.LastPlayedAt
         sort_mapping["user_rating"] = UserData.Rating
-    
+
+    # ---------- 分页 ----------
+    # 优先使用 keyset（游标）分页：仅 date_created / order 排序支持；
+    # 其余排序回退到 offset 分页，保持向后兼容。
+    cursor_enabled = cursor is not None and (sort_by == "date_created" or (sort_by == "order" and has_linked_ids))
+
     if sort_by == "order" and has_linked_ids:
-        # 使用 ItemLinks.Order 升序排列
-        query = query.order_by(ItemLinks.Order.asc()).limit(limit).offset(offset)
+        # 使用 ItemLinks.Order 升序排列（select 元组以获取 Order 用于生成游标）
+        query = query.add_columns(ItemLinks.Order)
+        query = query.order_by(ItemLinks.Order.asc(), ItemLinks.Id.asc())
+        if cursor_enabled:
+            try:
+                c_order, c_item_id = cursor.split("|", 1)
+                c_order = int(c_order)
+                c_item_id = int(c_item_id)
+            except (ValueError, AttributeError):
+                cursor_enabled = False
+            else:
+                # 键集谓词：(Order > c_order) OR (Order == c_order AND Id > c_item_id)
+                query = query.where(
+                    or_(
+                        ItemLinks.Order > c_order,
+                        (ItemLinks.Order == c_order) & (ItemLinks.Id > c_item_id),
+                    )
+                )
+        if not cursor_enabled:
+            query = query.limit(limit).offset(offset)
+        else:
+            query = query.limit(limit)
     else:
         order_col = sort_mapping.get(sort_by, MediaItem.DateCreated)
-        query = query.order_by(order_col.desc()).limit(limit).offset(offset)
+        # 统一加 Id 作为次排序键，保证稳定排序
+        query = query.order_by(order_col.desc(), MediaItem.Id.desc())
+        if cursor_enabled:
+            from datetime import datetime, timezone
+            try:
+                c_dt, c_id = cursor.split("|", 1)
+                c_dt = datetime.fromisoformat(c_dt.replace(" ", "T").replace("Z", "+00:00"))
+                c_id = int(c_id)
+            except (ValueError, AttributeError):
+                cursor_enabled = False
+            else:
+                # 键集谓词：(DateCreated < c_dt) OR (DateCreated == c_dt AND Id < c_id)
+                query = query.where(
+                    or_(
+                        order_col < c_dt,
+                        (order_col == c_dt) & (MediaItem.Id < c_id),
+                    )
+                )
+        if not cursor_enabled:
+            query = query.limit(limit).offset(offset)
+        else:
+            query = query.limit(limit)
 
     total_result = await db.execute(total_query)
     total = total_result.scalar() or 0
 
     result = await db.execute(query)
-    items = result.scalars().all()
+    if sort_by == "order" and has_linked_ids:
+        rows = result.all()
+        items = [r[0] for r in rows]
+        order_map = {r[0].Id: r[1] for r in rows}
+    else:
+        items = result.scalars().all()
+        order_map = None
 
     item_ids_list = [item.Id for item in items]
 
@@ -255,12 +430,74 @@ async def get_media_list(
         )
         media_list.append(entry)
 
+    # keyset 下一页游标（仅 date_created / order 排序生成）
+    # 注意：游标时间格式用空格分隔（与 SQLite 存储格式一致），避免字符串比较歧义
+    next_cursor = None
+    if items:
+        last = items[-1]
+        if sort_by == "order" and has_linked_ids and order_map is not None:
+            next_cursor = f"{order_map.get(last.Id) or 0}|{last.Id}"
+        else:
+            next_cursor = f"{last.DateCreated.strftime('%Y-%m-%d %H:%M:%S.%f')}|{last.Id}"
+
     return {
         "items": media_list,
         "total": total,
         "limit": limit,
         "offset": offset,
+        "next_cursor": next_cursor,
     }
+
+
+async def get_media_list_cached(
+    db: AsyncSession,
+    user_id: int,
+    types: Optional[str] = None,
+    favorite: bool = False,
+    has_playback: bool = False,
+    has_rating: bool = False,
+    sort_by: str = "date_created",
+    limit: int = 50,
+    offset: int = 0,
+    item_ids: Optional[str] = None,
+    linked_item_ids: Optional[str] = None,
+    search: Optional[str] = None,
+    cursor: Optional[str] = None,
+) -> dict:
+    """带缓存的媒体列表。
+
+    仅缓存无用户过滤（非 favorite/has_playback/has_rating）的查询；
+    用户个性化查询每次实时计算，避免串数据。
+    """
+    if favorite or has_playback or has_rating or search or item_ids:
+        return await get_media_list(
+            db=db, user_id=user_id, types=types, favorite=favorite,
+            has_playback=has_playback, has_rating=has_rating, sort_by=sort_by,
+            limit=limit, offset=offset, item_ids=item_ids,
+            linked_item_ids=linked_item_ids, search=search, cursor=cursor,
+        )
+
+    cache_key = (f"media_list_{user_id}_{types or ''}_{sort_by}_{limit}_{offset}_"
+                 f"{linked_item_ids or ''}_{cursor or ''}")
+    cached = await _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = await get_media_list(
+        db=db, user_id=user_id, types=types, favorite=favorite,
+        has_playback=has_playback, has_rating=has_rating, sort_by=sort_by,
+        limit=limit, offset=offset, item_ids=item_ids,
+        linked_item_ids=linked_item_ids, search=search, cursor=cursor,
+    )
+    # 序列化为纯 dict 再缓存（避免 Pydantic 模型进 diskcache 的 pickle 兼容问题）
+    await _cache_set(cache_key, {
+        "items": [item.model_dump() for item in result["items"]],
+        "total": result["total"],
+        "limit": result["limit"],
+        "offset": result["offset"],
+        "next_cursor": result["next_cursor"],
+    }, expire=30)
+    return result
 
 
 async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
@@ -340,6 +577,18 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
     )
 
 
+async def get_media_info_cached(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
+    """带缓存的媒体详情（供 API 层调用）"""
+    cache_key = f"media_info_{id}_{user_id}"
+    cached = await _cache_get(cache_key)
+    if cached is not None:
+        return MediaItemResponse(**cached)
+    response = await get_media_info(db, id, user_id)
+    if response is not None:
+        await _cache_set(cache_key, response.model_dump(), expire=30)
+    return response
+
+
 def _check_graph_connectivity(item_ids: set[str], item_links: list | None) -> list[str]:
     """
     检查图是否连通，返回孤立的 temp_id 列表
@@ -412,7 +661,7 @@ async def create_media_batch(
                       所有 items 必须通过 item_links 互相连通
     """
     from app.schemas.create import MediaBatchCreate
-    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus, DisplayOrder
+    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus
     from datetime import datetime, timezone
     import json
 
@@ -535,7 +784,6 @@ async def create_media_batch(
                 ProductionLocations=to_json(attrs.production_locations) if attrs.is_set("production_locations") else None,
                 RemoteTrailers=to_json(attrs.remote_trailers) if attrs.is_set("remote_trailers") else None,
                 Status=ItemStatus(attrs.status) if attrs.status and attrs.is_set("status") else None,
-                DisplayOrder=DisplayOrder(attrs.display_order) if attrs.display_order and attrs.is_set("display_order") else None,
                 PreferredMetadataLanguage=attrs.preferred_metadata_language if attrs.is_set("preferred_metadata_language") else None,
                 PreferredMetadataCountryCode=attrs.preferred_metadata_country_code if attrs.is_set("preferred_metadata_country_code") else None,
             )
@@ -679,14 +927,42 @@ async def create_media_batch(
     }
 
 
+_stats_cache_dir = None
+_stats_cache = None
+
+
+def _get_stats_cache():
+    """惰性初始化统计缓存（diskcache，与 file_url 缓存同机制）"""
+    global _stats_cache_dir, _stats_cache
+    if _stats_cache is None:
+        import os
+        import diskcache
+        _stats_cache_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "data", "cache", "media_stats",
+        )
+        os.makedirs(_stats_cache_dir, exist_ok=True)
+        _stats_cache = diskcache.Cache(_stats_cache_dir)
+    return _stats_cache
+
+
 async def get_media_stats(db: AsyncSession) -> dict:
+    # 统计结果缓存 60s，避免首页每次全表 group by；
+    # debug 模式（开发/测试）禁用缓存，保证数据一致性
+    from config import config as _config
+    if not _config.app.debug:
+        cache = _get_stats_cache()
+        cached = cache.get("media_stats")
+        if cached is not None:
+            return cached
+
     # 统计 File 类型（视频、音频、图片等）
-    from database.models import FileType
     result = await db.execute(
         select(File.Type, func.count())
         .group_by(File.Type)
     )
-    file_counts = {row[0]: row[1] for row in result.all()}
+    # key 转为枚举值字符串（兼容已精简的枚举）
+    file_counts = {row[0].value if hasattr(row[0], "value") else row[0]: row[1] for row in result.all()}
 
     # 统计 MediaItem 类型
     result = await db.execute(
@@ -694,18 +970,22 @@ async def get_media_stats(db: AsyncSession) -> dict:
         .where(MediaItem.IsDeleted == False)
         .group_by(MediaItem.Type)
     )
-    media_counts = {row[0]: row[1] for row in result.all()}
+    media_counts = {row[0].value if hasattr(row[0], "value") else row[0]: row[1] for row in result.all()}
 
-    return {
+    stats = {
         # File 类型统计（首页卡片用）
-        "video_count": file_counts.get(FileType.Video, 0),
-        "audio_count": file_counts.get(FileType.Audio, 0),
-        "image_count": file_counts.get(FileType.Image, 0),
-        "subtitle_count": file_counts.get(FileType.Subtitle, 0),
+        "video_count": file_counts.get("Video", 0),
+        # 音乐/电子书卡片保留字段（视频库恒为 0，兼容现有前端）
+        "audio_count": file_counts.get("Audio", 0),
+        "image_count": file_counts.get("Image", 0),
+        "subtitle_count": file_counts.get("Subtitle", 0),
         # MediaItem 类型统计
-        "movie_count": media_counts.get(MediaType.Movie, 0),
-        "series_count": media_counts.get(MediaType.Series, 0),
-        "episode_count": media_counts.get(MediaType.Episode, 0),
-        "book_count": media_counts.get(MediaType.Book, 0),
-        "source_count": media_counts.get(MediaType.Source, 0),
+        "movie_count": media_counts.get("Movie", 0),
+        "series_count": media_counts.get("Series", 0),
+        "episode_count": media_counts.get("Episode", 0),
+        "book_count": media_counts.get("Book", 0),
+        "source_count": media_counts.get("Source", 0),
     }
+    if not _config.app.debug:
+        cache.set("media_stats", stats, expire=60)
+    return stats
