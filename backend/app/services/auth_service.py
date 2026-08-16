@@ -3,6 +3,7 @@
 """
 
 import hashlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import jwt, JWTError
@@ -23,7 +24,7 @@ class AuthService:
         """创建访问令牌"""
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=config.jwt.access_token_expire_minutes))
-        to_encode.update({"exp": expire, "type": "access"})
+        to_encode.update({"exp": expire, "type": "access", "jti": uuid.uuid4().hex})
         return jwt.encode(to_encode, config.app.secret_key, algorithm=config.jwt.algorithm)
 
     @staticmethod
@@ -31,7 +32,7 @@ class AuthService:
         """创建刷新令牌"""
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + timedelta(days=config.jwt.refresh_token_expire_days)
-        to_encode.update({"exp": expire, "type": "refresh"})
+        to_encode.update({"exp": expire, "type": "refresh", "jti": uuid.uuid4().hex})
         return jwt.encode(to_encode, config.app.secret_key, algorithm=config.jwt.algorithm)
 
     @staticmethod

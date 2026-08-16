@@ -6,10 +6,43 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.auth_service import AuthService
+from app.services.token_denylist import is_token_revoked
 from database.models import User
 from database.core import get_db_session
 
 security = HTTPBearer(auto_error=False)
+
+
+def _validate_payload(payload) -> None:
+    """校验令牌载荷并检查 denylist（登出后立即失效）"""
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的认证凭证",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的令牌类型",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if is_token_revoked(payload.get("jti")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="令牌已失效",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的令牌载荷",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def get_user_id(
@@ -25,29 +58,9 @@ async def get_user_id(
     token = credentials.credentials
 
     payload = AuthService.decode_token(token)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证凭证",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    _validate_payload(payload)
 
-    if payload.get("type") != "access":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的令牌类型",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的令牌载荷",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return int(user_id)
+    return int(payload["sub"])
 
 
 async def get_current_user(
@@ -81,6 +94,8 @@ async def get_optional_user_id(
     payload = AuthService.decode_token(token)
     if not payload or payload.get("type") != "access":
         return None
+    if is_token_revoked(payload.get("jti")):
+        return None
     user_id = payload.get("sub")
     if not user_id:
         return None
@@ -90,6 +105,7 @@ async def get_optional_user_id(
 async def get_user_id_from_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     token: Optional[str] = Query(None, description="访问令牌（兼容无 Header 的媒体加载场景）"),
+    db: AsyncSession = Depends(get_db_session),
 ) -> int:
     """从 Bearer 请求头或 token 查询参数校验令牌，返回 user_id
 
@@ -110,22 +126,25 @@ async def get_user_id_from_token(
         )
 
     payload = AuthService.decode_token(raw)
-    if not payload or payload.get("type") != "access":
+    _validate_payload(payload)
+
+    user_id = int(payload["sub"])
+
+    # 校验用户仍存在且激活：已删除/禁用用户的媒体 URL 立即失效
+    user = await AuthService.get_user_by_id(db, user_id)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证凭证",
+            detail="用户不存在",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    user_id = payload.get("sub")
-    if not user_id:
+    if not user.IsActive:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的令牌载荷",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="用户已被禁用",
         )
 
-    return int(user_id)
+    return user_id
 
 
 async def get_current_admin(

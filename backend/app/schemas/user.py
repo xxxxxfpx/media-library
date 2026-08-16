@@ -33,3 +33,9 @@ class UpdateUserDataRequest(BaseModel):
 
     def is_set(self, field: str) -> bool:
         return field in self.model_fields_set
+
+
+class ChangePasswordRequest(BaseModel):
+    """修改密码请求"""
+    old_password: str = Field(..., description="旧密码")
+    new_password: str = Field(..., min_length=6, description="新密码（至少 6 位）")

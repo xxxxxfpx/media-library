@@ -1,30 +1,51 @@
 """用户 API 接口"""
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
+from fastapi.security import HTTPAuthorizationCredentials
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.auth import LoginRequest, LoginResponse, RefreshTokenRequest
-from app.schemas.user import UserInfo, UpdateUserDataRequest
+from app.schemas.user import UserInfo, UpdateUserDataRequest, ChangePasswordRequest
 from app.schemas.setting import UserSettings, UpdateUserSettingsRequest
 from app.services.auth_service import AuthService
 from app.services.media_service import get_media_list
-from app.services.user_service import update_userdata, get_user_setting, update_user_setting
-from app.api.deps import get_current_user, get_user_id
+from app.services.user_service import update_userdata, get_user_setting, update_user_setting, change_password
+from app.services.rate_limiter import is_login_blocked, record_login_failure, reset_login_failures
+from app.services.token_denylist import revoke_token, _payload_exp_ttl
+from app.api.deps import get_current_user, get_user_id, security as app_deps_security
 from database.models import User
 from database.core import get_db_session
 
 router = APIRouter(prefix="/api/user", tags=["用户"])
 
 
+def _client_ip(request: Request) -> str:
+    """提取客户端 IP（兼容反代转发）"""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db_session)):
-    user = await AuthService.authenticate_user(db, request.username, request.password)
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db_session)):
+    ip = _client_ip(request)
+    if is_login_blocked(ip, body.username):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登录尝试过于频繁，请稍后再试",
+        )
+
+    user = await AuthService.authenticate_user(db, body.username, body.password)
     if not user:
+        record_login_failure(ip, body.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
+
+    reset_login_failures(ip, body.username)
 
     access_token = AuthService.create_access_token(data={"sub": str(user.Id)})
     refresh_token = AuthService.create_refresh_token(data={"sub": str(user.Id)})
@@ -80,8 +101,34 @@ async def get_user_info(user_id: int = Depends(get_user_id), current_user: User 
 
 
 @router.post("/logout")
-async def logout(user_id: int = Depends(get_user_id), current_user: User = Depends(get_current_user)):
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(app_deps_security),
+    user_id: int = Depends(get_user_id),
+    current_user: User = Depends(get_current_user),
+):
+    """登出：将当前访问令牌加入 denylist，立即失效"""
+    token = credentials.credentials
+    payload = AuthService.decode_token(token)
+    if payload:
+        revoke_token(payload.get("jti"), _payload_exp_ttl(payload.get("exp")))
+
     return {"message": "登出成功"}
+
+
+@router.post("/change-password")
+async def api_change_password(
+    body: ChangePasswordRequest,
+    user_id: int = Depends(get_user_id),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """修改当前用户密码"""
+    try:
+        await change_password(db, user_id, body.old_password, body.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # 修改密码后撤销当前令牌，强制重新登录
+    return {"message": "密码修改成功，请重新登录"}
 
 
 @router.post("/userdata")
