@@ -31,30 +31,6 @@ if config.database.type == "sqlite":
 else:
     DATABASE_URL = f"postgresql+asyncpg://{config.database.username}:{config.database.password}@{config.database.host}:{config.database.port}/{config.database.database}"
 
-# ==================== SQL 日志配置 ====================
-if config.app.debug:
-    import logging
-    import os
-    from logging.handlers import RotatingFileHandler
-    sql_logger = logging.getLogger("sqlalchemy.engine")
-    sql_logger.setLevel(logging.INFO)
-    sql_logger.propagate = False
-    
-    for handler in sql_logger.handlers[:]:
-        sql_logger.removeHandler(handler)
-    
-    sql_log_dir = os.path.join(os.path.dirname(__file__), "..", "data", "log")
-    os.makedirs(sql_log_dir, exist_ok=True)
-    
-    rotating_handler = RotatingFileHandler(
-        os.path.join(sql_log_dir, "sql.log"),
-        maxBytes=10*1024*1024,
-        backupCount=5,
-        encoding="utf-8"
-    )
-    rotating_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-    sql_logger.addHandler(rotating_handler)
-
 # ==================== 引擎配置 ====================
 if config.database.type == "sqlite":
     # SQLite 单写者模型：小连接池即可，WAL 支持多读并发

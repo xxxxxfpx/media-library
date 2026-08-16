@@ -5,7 +5,6 @@ import os
 import random
 import logging
 import time
-from logging.handlers import RotatingFileHandler
 from urllib.parse import quote
 import diskcache
 
@@ -22,31 +21,8 @@ from app.schemas.media import FileInfoDetail
 from config import config
 
 logger = logging.getLogger(__name__)
-
-# 独立的 file_data 追踪日志
-_file_data_log_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-    "data", "log", "file_data.log"
-)
-os.makedirs(os.path.dirname(_file_data_log_path), exist_ok=True)
 _file_data_logger = logging.getLogger("file_data.trace")
-_file_data_logger.setLevel(logging.DEBUG)
-_file_data_logger.propagate = False
-
-class _FileIDFilter(logging.Filter):
-    """自动注入 file_id，缺失时默认为 '-'"""
-    def filter(self, record):
-        if not hasattr(record, 'file_id'):
-            record.file_id = '-'
-        return True
-
-_handler = RotatingFileHandler(_file_data_log_path, maxBytes=50 * 1024 * 1024, backupCount=3, encoding="utf-8")
-_handler.setFormatter(logging.Formatter(
-    "[%(asctime)s.%(msecs)03d] [%(levelname)s] [file_id=%(file_id)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-))
-_handler.addFilter(_FileIDFilter())
-_file_data_logger.addHandler(_handler)
+_http_logger = logging.getLogger("app.http")
 
 _cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "cache", "file_url")
 os.makedirs(_cache_dir, exist_ok=True)
@@ -54,13 +30,28 @@ _url_cache = diskcache.Cache(_cache_dir)
 
 _http_client: httpx.AsyncClient | None = None
 
+def _log_http_request(request):
+    """出站请求钩子：记录调用目标（继承当前 request_id）"""
+    _http_logger.info("HTTP 出站 | %s %s", request.method, request.url)
+
+
+def _log_http_response(response):
+    """出站响应钩子：记录状态与耗时"""
+    _http_logger.info(
+        "HTTP 出站完成 | %s %s status=%s 耗时=%.0fms",
+        response.request.method, response.request.url,
+        response.status_code, response.elapsed.total_seconds() * 1000,
+    )
+
+
 def get_http_client() -> httpx.AsyncClient:
     """获取或创建全局 HTTP 客户端（连接复用）"""
     global _http_client
     if _http_client is None:
         _http_client = httpx.AsyncClient(
             timeout=30.0,
-            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100)
+            limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+            event_hooks={"request": [_log_http_request], "response": [_log_http_response]},
         )
     return _http_client
 

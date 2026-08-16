@@ -9,9 +9,11 @@ curl http://localhost:8000/health
 
 ## 日志
 
-- 应用日志：标准输出（uvicorn）
-- SQL 日志：`backend/data/log/sql.log`（`app.debug=true` 时开启）
-- 文件数据追踪：`backend/data/log/file_data.log`
+- 应用日志：`backend/data/log/app.log`（Rotating 50MB×3）与控制台；级别随 `app.debug` 联动，可用 `logging.level` 显式覆盖
+- 每个请求生成 `request_id`（响应头 `X-Request-ID`），通过 `rg "req_id=<id>" backend/data/log/app.log` 还原单请求全链路（含 DB/出站调用）；与请求无关的上下文记为 `req_id=-`
+- SQL 日志：`app.debug=true` 时随 `sqlalchemy.engine` 输出到 `app.log`（含 `req_id`），生产（INFO）不记录 SQL
+- 文件数据追踪：`backend/data/log/file_data.log`（含 `file_id` 维度）
+- 登录成功/失败、限流、批量创建等安全与写操作均有审计打点
 
 ## 运行时数据
 

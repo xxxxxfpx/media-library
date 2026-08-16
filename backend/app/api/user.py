@@ -1,5 +1,7 @@
 """用户 API 接口"""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
@@ -19,6 +21,8 @@ from database.core import get_db_session
 
 router = APIRouter(prefix="/api/user", tags=["用户"])
 
+logger = logging.getLogger(__name__)
+
 
 def _client_ip(request: Request) -> str:
     """提取客户端 IP（兼容反代转发）"""
@@ -32,6 +36,7 @@ def _client_ip(request: Request) -> str:
 async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db_session)):
     ip = _client_ip(request)
     if is_login_blocked(ip, body.username):
+        logger.warning("登录失败: 限流拦截 | ip=%s username=%s", ip, body.username)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="登录尝试过于频繁，请稍后再试",
@@ -40,12 +45,14 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
     user = await AuthService.authenticate_user(db, body.username, body.password)
     if not user:
         record_login_failure(ip, body.username)
+        logger.warning("登录失败: 用户名或密码错误 | ip=%s username=%s", ip, body.username)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户名或密码错误"
         )
 
     reset_login_failures(ip, body.username)
+    logger.info("登录成功 | user_id=%s username=%s ip=%s", user.Id, user.Name, ip)
 
     access_token = AuthService.create_access_token(data={"sub": str(user.Id)})
     refresh_token = AuthService.create_refresh_token(data={"sub": str(user.Id)})
@@ -60,6 +67,7 @@ async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends
 async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends(get_db_session)):
     payload = AuthService.decode_token(request.refresh_token)
     if not payload or payload.get("type") != "refresh":
+        logger.warning("刷新令牌失败: 无效令牌")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的刷新令牌"
@@ -67,6 +75,7 @@ async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends
 
     user_id = payload.get("sub")
     if not user_id:
+        logger.warning("刷新令牌失败: 载荷缺少 sub")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效的令牌载荷"
@@ -74,6 +83,7 @@ async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends
 
     user = await AuthService.get_user_by_id(db, int(user_id))
     if not user or not user.IsActive:
+        logger.warning("刷新令牌失败: 用户不存在或已禁用 | user_id=%s", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="用户不存在或已禁用"
@@ -81,6 +91,7 @@ async def refresh_token(request: RefreshTokenRequest, db: AsyncSession = Depends
 
     access_token = AuthService.create_access_token(data={"sub": str(user.Id)})
     refresh_token = AuthService.create_refresh_token(data={"sub": str(user.Id)})
+    logger.info("刷新令牌成功 | user_id=%s", user.Id)
 
     return LoginResponse(
         access_token=access_token,
@@ -111,6 +122,7 @@ async def logout(
     payload = AuthService.decode_token(token)
     if payload:
         revoke_token(payload.get("jti"), _payload_exp_ttl(payload.get("exp")))
+    logger.info("登出 | user_id=%s", user_id)
 
     return {"message": "登出成功"}
 
@@ -126,7 +138,9 @@ async def api_change_password(
     try:
         await change_password(db, user_id, body.old_password, body.new_password)
     except ValueError as e:
+        logger.warning("修改密码失败: %s | user_id=%s", e, user_id)
         raise HTTPException(status_code=400, detail=str(e))
+    logger.info("修改密码成功 | user_id=%s", user_id)
     # 修改密码后撤销当前令牌，强制重新登录
     return {"message": "密码修改成功，请重新登录"}
 

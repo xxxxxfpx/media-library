@@ -1,5 +1,7 @@
 """媒体业务逻辑服务层"""
 
+import logging
+import time
 from collections import defaultdict
 from typing import Optional, List, Dict, Any
 
@@ -11,6 +13,8 @@ from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserDat
 from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata
 from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
 from config import config as _app_config
+
+logger = logging.getLogger(__name__)
 
 
 def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
@@ -660,6 +664,7 @@ async def create_media_batch(
         strict_graph: 是否要求传入的 items 图是连通的。默认 True（严格模式），
                       所有 items 必须通过 item_links 互相连通
     """
+    _t0 = time.perf_counter()
     from app.schemas.create import MediaBatchCreate
     from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus
     from datetime import datetime, timezone
@@ -920,6 +925,13 @@ async def create_media_batch(
                 db.add(new_fl)
 
     await db.commit()
+
+    logger.info(
+        "批量创建媒体完成 | source=%s items=%d files=%d item_links=%d file_links=%d 耗时=%.0fms",
+        (source_name or "")[:40], len(item_temp_to_id), len(file_temp_to_id),
+        len(data.item_links), len(data.file_links),
+        (time.perf_counter() - _t0) * 1000,
+    )
 
     return {
         "items": {temp_id: real_id for temp_id, real_id in item_temp_to_id.items()},

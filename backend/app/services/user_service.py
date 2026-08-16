@@ -65,6 +65,7 @@ async def update_userdata(
     user_data.UpdatedAt = datetime.datetime.now(datetime.timezone.utc)
     await db.commit()
 
+    logger.info("更新用户数据 | user_id=%s item_id=%s", user_id, request.item_id)
     return {"message": "更新成功", "item_id": request.item_id}
 
 
@@ -83,7 +84,8 @@ async def update_user_setting(db: AsyncSession, user_id: int, setting: UpdateUse
     
     user.Setting = current_settings
     await db.commit()
-    
+    logger.info("更新用户设置 | user_id=%s 字段数=%s", user_id, len(update_dict))
+
     return UserSettings(**current_settings)
 
 
@@ -98,3 +100,4 @@ async def change_password(db: AsyncSession, user_id: int, old_password: str, new
         raise ValueError("新密码长度至少 6 位")
     user.set_password(new_password)
     await db.commit()
+    logger.info("修改密码成功 | user_id=%s", user_id)

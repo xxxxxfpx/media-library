@@ -4,20 +4,23 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 
-from database.core import AsyncSessionLocal, init_db
-from app.api.user import router as user_router
-from app.api.media import router as media_router
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from app.api.file import router as file_router
+from app.api.media import router as media_router
 from app.api.system import router as system_router
+from app.api.user import router as user_router
+from app.logging_config import RequestLogMiddleware, get_request_id, setup_logging
 from app.services.auth_service import AuthService
 from config import get_config
+from database.core import AsyncSessionLocal, init_db
 
 config = get_config()
 logger = logging.getLogger(__name__)
+setup_logging(config)
 
 start_time = datetime.now()
 
@@ -31,6 +34,8 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(
             "app.secret_key 未配置，拒绝启动。请在 secrets/config.yaml 中配置安全随机密钥。"
         )
+    # 二次应用日志配置：覆盖 uvicorn 在应用导入后注入的默认 dictConfig
+    setup_logging(config)
     if config.app.debug:
         logger.warning("debug 模式已开启，仅限开发环境使用")
     if not config.app.admin_password:
@@ -82,6 +87,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestLogMiddleware)
 
 
 app.include_router(user_router)
@@ -99,8 +105,13 @@ async def health_check():
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理"""
-    logger.error(f"未处理异常: {exc}", exc_info=True)
+    rid = request.scope.get("request_id") or get_request_id()
+    logger.error(
+        "未处理异常: %s | method=%s path=%s req_id=%s",
+        exc, request.method, request.url.path, rid, exc_info=True,
+    )
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc) if config.app.debug else "服务器内部错误"}
+        content={"detail": str(exc) if config.app.debug else "服务器内部错误"},
+        headers={"X-Request-ID": rid},
     )

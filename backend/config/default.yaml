@@ -47,3 +47,17 @@ cloud_auth:
   username: ""
   password: ""
   prefix: "/🗂️ 整理/Emby"
+
+# 日志配置
+logging:
+  # 日志级别：DEBUG / INFO / WARNING / ERROR。留空则自动联动 app.debug
+  # （debug=true → DEBUG，否则 → INFO）
+  level: ""
+  # 是否写文件日志
+  file_enabled: true
+  # 应用日志文件路径（相对 backend 运行目录）
+  file_path: "data/log/app.log"
+  # 单个日志文件最大字节数（默认 50MB）
+  rotate_max_bytes: 52428800
+  # 轮转保留备份数
+  backup_count: 3

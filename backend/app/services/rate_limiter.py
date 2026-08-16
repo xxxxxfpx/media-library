@@ -6,8 +6,11 @@
 
 import time
 import threading
+import logging
 from collections import deque
 from typing import Dict, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class SlidingWindowLimiter:
@@ -62,7 +65,10 @@ def record_login_failure(ip: str, username: str) -> None:
 
 
 def is_login_blocked(ip: str, username: str) -> bool:
-    return _login_limiter.is_blocked(login_failure_key(ip, username))
+    blocked = _login_limiter.is_blocked(login_failure_key(ip, username))
+    if blocked:
+        logger.warning("登录限流触发 | ip=%s username=%s", ip, username)
+    return blocked
 
 
 def reset_login_failures(ip: str, username: str) -> None:

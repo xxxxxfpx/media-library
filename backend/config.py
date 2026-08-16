@@ -59,6 +59,15 @@ class CloudAuthConfig:
         return token
 
 
+@dataclass
+class LoggingConfig:
+    level: Optional[str] = None
+    file_enabled: bool = True
+    file_path: str = "data/log/app.log"
+    rotate_max_bytes: int = 50 * 1024 * 1024
+    backup_count: int = 3
+
+
 def _merge_secret_config(data: dict) -> dict:
     """Merge local secrets over the selected non-sensitive config."""
     secrets_path = os.environ.get(
@@ -86,6 +95,7 @@ class Config:
         self.app = AppConfig()
         self.jwt = JWTConfig()
         self.cloud_auth = CloudAuthConfig()
+        self.logging = LoggingConfig()
         self.remote_database = {}
         self._load_config()
 
@@ -161,6 +171,16 @@ class Config:
                     username=ca.get('username', self.cloud_auth.username),
                     password=ca.get('password', self.cloud_auth.password),
                     prefix=ca.get('prefix', self.cloud_auth.prefix),
+                )
+
+            if 'logging' in data:
+                lg = data['logging']
+                self.logging = LoggingConfig(
+                    level=lg.get('level') or None,
+                    file_enabled=lg.get('file_enabled', self.logging.file_enabled),
+                    file_path=lg.get('file_path', self.logging.file_path),
+                    rotate_max_bytes=lg.get('rotate_max_bytes', self.logging.rotate_max_bytes),
+                    backup_count=lg.get('backup_count', self.logging.backup_count),
                 )
 
             if 'remote_database' in data:
