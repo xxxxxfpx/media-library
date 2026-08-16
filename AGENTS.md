@@ -30,7 +30,7 @@ fix(auth): 修复刷新令牌校验
 ## 配置与密钥
 
 - 配置加载优先级：`CONFIG_PATH` 环境变量 → `ENV=development` 时的 `backend/env.yaml` → `backend/config/local.yaml` → `backend/config/default.yaml`。
-- 敏感配置在 `backend/secrets/config.yaml`（gitignored，含真实 `secret_key`、admin 密码、`cloud_auth`、`remote_database`），会合并到所选配置之上；模板为 `backend/secrets/config.example.yaml`，可用 `SECRETS_PATH` 覆盖路径。
+- 敏感配置在 `secrets/config.yaml`（gitignored，含真实 `secret_key`、admin 密码、`cloud_auth`、`remote_database`），会合并到所选配置之上；模板为 `secrets/config.example.yaml`，可用 `SECRETS_PATH` 覆盖路径。
 - **启动守卫**：`app.main` lifespan 在 `app.secret_key` 为空时直接 `raise RuntimeError`——未配置密钥则拒绝启动。
 - 测试能启动是因为 `tests/conftest.py` 设 `CONFIG_PATH=backend/env.yaml`，且 secrets 合并提供了非空 `secret_key`。
 - 生产 CORS 用 `CORS_ORIGINS` 环境变量（逗号分隔）指定，默认仅 localhost:5173/8000。
@@ -45,7 +45,7 @@ fix(auth): 修复刷新令牌校验
 - `backend/app/` — FastAPI 应用，路由在 `app/api/`，服务逻辑在 `app/services/`；路由薄、逻辑在 service，依赖用 `app/api/deps.py` 的 `get_db_session`
 - `backend/database/` — SQLAlchemy async 模型与引擎；Alembic 迁移在 `database/alembic/`（`alembic.ini` 同目录）
 - `backend/config/` — 配置（`default.yaml` 默认、`local.yaml` 本地覆盖、`setting.yaml` UI 卡牌配置）
-- `backend/secrets/` — 敏感凭据（仅 `config.example.yaml` 提交）
+- `secrets/` — 敏感凭据（仅 `config.example.yaml` 提交）
 - `backend/scripts/` — 数据校验/迁移脚本（checks / migrations / tools / legacy）
 - `frontend/` — Vue 3 + Vite 前端，API 代理到 `localhost:8000`
 - `mobile/` — Flutter 移动端
@@ -54,13 +54,17 @@ fix(auth): 修复刷新令牌校验
 ## 数据库
 
 - 默认 SQLite（`backend/data/database/media.db`），通过 `database/core.py` 的 async engine 访问
+- **SQLite 已启用 WAL + `busy_timeout=5000` + `foreign_keys=ON`**（`core.py` 连接事件监听设置）；连接池按库型分流（SQLite 5+5，PG 32）
 - 生产可切换 PostgreSQL（`config/local.yaml` 中 `database.type: postgresql`）
-- `requirements.txt` 含 `psycopg2-binary`，供 Alembic 同步引擎迁移 PG 使用
+- `requirements.txt` 含 `psycopg2-binary`（供 Alembic 同步引擎迁移 PG 用）与 `alembic`
+- **视频化精简**：`MediaType`/`FileType` 枚举已删音乐/照片/书籍/频道等类型，`MediaItems.AlbumId` 列已移除（迁移 `video_only_schema`）
+- **列表分页**：`/api/media/list` 支持 `cursor` 参数（keyset 分页，`next_cursor` 返回）；不传时走 `offset` 兼容。keyset 仅对 `date_created`/`order` 排序生效
+- **stats 缓存**：`get_media_stats` 在 debug=false（生产）时缓存 60s，debug 模式不缓存保证测试一致性
 
 ## 测试状态（重要）
 
-- **基线为 39 failed / 46 passed，属既存测试债**，非近期改动引入；CI 后端 job（`pytest -q`）目前会红。
-- 改动后若失败数超过 39，才需要排查回归。
+- **基线为 85 passed / 0 failed**（2026-08-16 修复全部 37 个失败测试后）。此前基线为 37 failed / 48 passed（既存测试债）。
+- CI 后端 job（`pytest -q`）应保持绿灯；改动后若出现失败需排查回归。
 
 ## 数据验证/修复脚本
 

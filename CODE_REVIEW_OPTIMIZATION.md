@@ -3,7 +3,7 @@
 > 审阅标准：低耦合、无历史遗留、高内聚、生产级、高复用、规则统一、无BUG  
 > 审阅范围：后端 (FastAPI)、前端 (Vue 3)、数据库模型、配置、Git 历史  
 > 审阅日期：2026-04-29  
-> 最后更新：2026-04-29
+> 最后更新：2026-08-16
 
 ---
 
@@ -85,7 +85,7 @@
 | # | 问题 | 位置 | 状态 | 说明 |
 |---|------|------|------|------|
 | C-4 | **类型标签/图标映射重复三处** | MediaGrid vs mediaTypes.js | ✅ 已完成 | `TYPE_OPTIONS` 集中到 mediaTypes.js，MediaGrid 删除本地硬编码并导入使用 |
-| C-5 | **ICON_COMPONENT_MAP 重复两处** | MediaDetailDrawer vs Media.vue | ⏳ 待处理 | 未在本次处理范围 |
+| C-5 | **ICON_COMPONENT_MAP 重复两处** | MediaDetailDrawer vs Media.vue | ✅ 已完成 | 统一导出到 constants/mediaTypes.js 的 ICON_COMPONENT_MAP，提供 getTypeIcon 工具，MediaDetailDrawer/Media/MediaCard/MediaGrid 全部复用 |
 | C-6 | **收藏切换逻辑重复三处** | MediaCard、Media.vue、useFavorite.js | ✅ 已完成 | 删除 useFavorite.js（未被使用），MediaCard 和 Media.vue 各自保留实现 |
 | C-7 | **FFmpeg 解析逻辑重复两处** | Media.vue vs VideoPlayer.vue | ✅ 已完成 | 提取为 utils/format.js 中的 parseFFmpegInfo + formatTime 工具方法 |
 | C-8 | **Primary 图片 URL 获取重复四处** | MediaCard、SeasonCard、EpisodeCard、MediaDetailDrawer | ✅ 已完成 | 统一使用 utils/url.js 的 getPrimaryImageUrl |
@@ -133,14 +133,14 @@
 
 | # | 问题 | 位置 | 状态 | 说明 |
 |---|------|------|------|------|
-| F-1 | **Home.vue 字段名不匹配** | Home.vue | ⏳ 待处理 | 未在本次处理范围 |
-| F-2 | **Settings 每次变更立即保存** | Settings.vue | ⏳ 待处理 | 未在本次处理范围 |
-| F-3 | **路由守卫每次访问管理页都请求用户信息** | router/index.js | ⏳ 待处理 | 未在本次处理范围 |
-| F-4 | **Token 存 localStorage** | http.js | ⏳ 待处理 | 未在本次处理范围 |
-| F-5 | **MediaGrid 搜索无防抖** | MediaGrid.vue | ⏳ 待处理 | 未在本次处理范围 |
-| F-6 | **MediaGrid 不取消过期请求** | MediaGrid.vue | ⏳ 待处理 | 未在本次处理范围 |
-| F-7 | **VideoPlayer 缓冲检测使用 setInterval** | VideoPlayer.vue | ⏳ 待处理 | 未在本次处理范围 |
-| F-8 | **密码修改功能未实现** | Settings.vue | ⏳ 待处理 | 未在本次处理范围 |
+| F-1 | **Home.vue 字段名不匹配** | Home.vue | ✅ 已完成 | 字段一致（book_count）；视频化精简后隐藏恒为 0 的音乐/电子书卡片 |
+| F-2 | **Settings 每次变更立即保存** | Settings.vue | ✅ 已完成 | 引入 300ms 防抖，连续变更仅保存一次 |
+| F-3 | **路由守卫每次访问管理页都请求用户信息** | router/index.js | ✅ 已完成 | 优先使用 auth store 缓存的 userInfo，仅在缓存缺失时才调用 getInfo |
+| F-4 | **Token 存 localStorage** | http.js | ✅ 已完成 | 改为 sessionStorage 降低 XSS 持久化风险；保持 Authorization/query 方案兼容浏览器 `<img>` 与 Flutter |
+| F-5 | **MediaGrid 搜索无防抖** | MediaGrid.vue | ✅ 已完成 | 搜索 300ms 防抖 |
+| F-6 | **MediaGrid 不取消过期请求** | MediaGrid.vue | ✅ 已完成 | fetchData/searchData 统一使用 AbortController 取消过期请求，保留 searchId 守卫 |
+| F-7 | **VideoPlayer 缓冲检测使用 setInterval** | VideoPlayer.vue | ✅ 已完成 | 缓冲检测已基于 timeupdate 事件（seek 场景保留 200ms 轮询） |
+| F-8 | **密码修改功能未实现** | Settings.vue | ✅ 已完成 | 后端新增 POST /api/user/change-password，前端实现修改密码对话框 |
 
 ---
 
@@ -161,12 +161,12 @@
 
 | # | 问题 | 位置 | 状态 | 说明 |
 |---|------|------|------|------|
-| P-1 | **搜索使用 ILIKE 前缀通配符** | media_service.py | ⏳ 待处理 | 未在本次处理范围 |
+| P-1 | **搜索使用 ILIKE 前缀通配符** | media_service.py | ✅ 已完成 | SQLite 用 FTS5 trigram 虚拟表（≥3 字符走 MATCH，短词回退 LIKE），PG 用 pg_trgm GIN 索引加速 ILIKE |
 | P-2 | **列表查询有限多次查询** | media_service.py | ⏭️ 跳过 | 主查询后 4 次独立批量查询（links、files、userdata、alias），非 N+1 问题，是有限次数的批量查询，当前数据量下性能可接受 |
-| P-3 | **无服务端缓存** | 全局 | ⏳ 待处理 | 未在本次处理范围 |
+| P-3 | **无服务端缓存** | 全局 | ✅ 已完成 | get_media_info / get_media_list（非用户过滤）增加 diskcache TTL 缓存（30s，debug 禁用），batch 写入后失效 |
 | P-4 | **diskcache 文件 URL 缓存** | file.py | ⏭️ 跳过 | 见下方详细说明 |
-| P-5 | **前端 UI 配置每次页面加载都请求** | App.vue | ⏳ 待处理 | 未在本次处理范围 |
-| P-6 | **系统信息 5 秒轮询** | System.vue | ⏳ 待处理 | 未在本次处理范围 |
+| P-5 | **前端 UI 配置每次页面加载都请求** | App.vue | ✅ 已完成 | 移除 theme.js 未使用的 fetchSetting 死代码，路由守卫缓存 userInfo，App 仅挂载时获取一次 |
+| P-6 | **系统信息 5 秒轮询** | System.vue | ✅ 已完成 | 页面隐藏时暂停轮询（visibilitychange），可见时恢复并立即刷新 |
 
 ---
 
@@ -174,9 +174,9 @@
 
 | 状态 | 数量 | 编号 |
 |------|------|------|
-| ✅ 已完成 | 22 | R-1, A-1, A-2, A-5, A-7, C-4, C-6, C-7, C-8, C-9, C-10, C-11, C-12, C-13, C-14, C-15, C-16, D-5, H-1, H-2, H-3, H-6 |
-| ⏭️ 跳过 | 19 | S-1~S-7, A-3, A-4, A-6, A-8, A-9, C-1, C-2, C-3, D-1~D-4, D-6, D-7, H-5, P-2, P-4 |
-| ⏳ 待处理 | 13 | C-5, F-1~F-8, H-4, P-1, P-3, P-5, P-6 |
+| ✅ 已完成 | 36 | R-1, A-1, A-2, A-5, A-7, C-4~C-16, D-5, F-1~F-8, H-1~H-3, H-6, P-1, P-3, P-5, P-6 |
+| ⏭️ 跳过 | 15 | S-1~S-7, A-3, A-4, A-6, A-8, A-9, D-1~D-4, D-6, D-7, H-5, P-2, P-4 |
+| ⏳ 待处理 | 1 | H-4 |
 
 ### Git 提交记录
 
@@ -200,6 +200,21 @@
 | 16 | `feat: get_media_info 返回值添加 has_children 字段` |
 | 17 | `perf: has_children 改用 EXISTS(1) 替代 COUNT(*)` |
 | 18 | `refactor(C-4): 将 typeOptions/typeIcons/typeLabels 集中到 constants/mediaTypes.js` |
+
+### 2026-08-16 第二轮优化提交
+
+| # | 提交信息 |
+|---|---------|
+| 19 | `fix(batch): 移除 MediaItem.DisplayOrder 传参（列已删除），同步清理 schema/枚举/测试` |
+| 20 | `test: 修复 37 个失败测试（media 接口补鉴权、UserData 字段、设置 schema、exclude_unset）` |
+| 21 | `perf(index): 新增 UserData/ItemLinks/FileLink 复合索引迁移（收藏/历史/去重/主图）` |
+| 22 | `perf(search): SQLite FTS5 trigram 全文搜索 + PG pg_trgm GIN 索引` |
+| 23 | `perf(cache): get_media_info / get_media_list 增加 diskcache TTL 缓存` |
+| 24 | `security: 登录限流（滑动窗口）+ 登出令牌 denylist 失效 + 媒体 URL 校验用户活跃` |
+| 25 | `feat(user): 新增修改密码接口与前端对话框` |
+| 26 | `perf(frontend): 设置/搜索防抖、AbortController、路由守卫缓存、轮询可见性优化` |
+| 27 | `refactor(frontend): ICON 映射去重、Home 统计卡隐藏空项、清理 theme 死代码` |
+| 28 | `security(frontend): Token 存储 localStorage 改 sessionStorage` |
 
 ---
 

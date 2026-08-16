@@ -85,7 +85,9 @@ backend/scripts/data/
 
 # Secrets
 secrets/config.yaml
-backend/secrets/config.yaml
+
+# Android keystore password（含真实凭据，不入库）
+mobile/android/app/keystore_pass.txt
 
 # Runtime data (backend)
 backend/data/
