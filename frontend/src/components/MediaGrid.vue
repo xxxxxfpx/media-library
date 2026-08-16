@@ -138,10 +138,8 @@ const listConfig = {
 }
 import {
   VideoCamera, Search, Grid, List, StarFilled,
-  Film, Headset, Picture, Document,
-  User, FolderOpened, Collection,
 } from '@element-plus/icons-vue'
-import { TYPE_OPTIONS, TYPE_ICONS, getTypeLabel } from '@/constants/mediaTypes'
+import { TYPE_OPTIONS, getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
 
 const props = defineProps({
   params: { type: Object, default: () => ({}) },
@@ -172,15 +170,8 @@ const filters = ref({ types: [] })
 const currentSearchId = ref(0)
 const wrapperRef = ref(null)
 
-const _iconComponents = {
-  Film, VideoCamera, Headset, Picture, Document,
-  User, FolderOpened, Collection,
-}
-
-function getTypeIcon(type) {
-  const name = TYPE_ICONS[type] || 'VideoCamera'
-  return _iconComponents[name] || VideoCamera
-}
+let abortController = null
+let searchTimer = null
 
 function toggleType(type) {
   const index = filters.value.types.indexOf(type)
@@ -206,6 +197,8 @@ function handleCurrentChange() {
 
 async function fetchData() {
   loading.value = true
+  if (abortController) abortController.abort()
+  abortController = new AbortController()
   try {
     const params = {
       ...props.params,
@@ -216,10 +209,11 @@ async function fetchData() {
       params.types = filters.value.types.join(',')
     }
 
-    const response = await mediaAPI.getList(params)
+    const response = await mediaAPI.getList(params, { signal: abortController.signal })
     items.value = response.items || []
     total.value = response.total || 0
   } catch (error) {
+    if (error.name === 'CanceledError' || error.__CANCEL__) return
     console.error('[MediaGrid] Fetch error:', error)
     items.value = []
     total.value = 0
@@ -232,6 +226,8 @@ async function searchData() {
   currentSearchId.value++
   const searchId = currentSearchId.value
   loading.value = true
+  if (abortController) abortController.abort()
+  abortController = new AbortController()
   try {
     const params = {
       ...props.params,
@@ -243,11 +239,12 @@ async function searchData() {
     }
     if (searchQuery.value) params.search = searchQuery.value
 
-    const response = await mediaAPI.getList(params)
+    const response = await mediaAPI.getList(params, { signal: abortController.signal })
     if (searchId !== currentSearchId.value) return
     items.value = response.items || []
     total.value = response.total || 0
   } catch (error) {
+    if (error.name === 'CanceledError' || error.__CANCEL__) return
     if (searchId !== currentSearchId.value) return
     console.error('[MediaGrid] Search error:', error)
     items.value = []
@@ -266,13 +263,17 @@ watch(() => filters.value.types, () => {
   fetchData()
 }, { deep: true })
 
+// 搜索防抖：300ms 内连续输入只触发一次请求
 watch(searchQuery, (val) => {
   currentPage.value = 1
-  if (val && val.trim()) {
-    searchData()
-  } else {
-    fetchData()
-  }
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    if (val && val.trim()) {
+      searchData()
+    } else {
+      fetchData()
+    }
+  }, 300)
 })
 
 watch(

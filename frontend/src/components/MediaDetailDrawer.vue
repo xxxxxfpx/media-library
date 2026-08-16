@@ -138,20 +138,12 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { mediaAPI, fileAPI } from '@/api'
 import { useMediaNavigation, closeMediaDetail } from '@/composables/useMediaNavigation'
-import { getTypeLabel, TYPE_ICONS } from '@/constants/mediaTypes'
+import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
 import { formatDate, formatFileSize } from '@/utils/format'
 import { getFileDataUrl, getPrimaryImageUrl } from '@/utils/url'
 import {
-  Loading, Close, StarFilled,
-  Film, VideoCamera, Headset, Picture,
-  Document, Notebook, User, FolderOpened, Collection
+  Loading, Close, StarFilled
 } from '@element-plus/icons-vue'
-
-const ICON_COMPONENT_MAP = {
-  'Film': Film, 'VideoCamera': VideoCamera, 'Headset': Headset,
-  'Picture': Picture, 'Notebook': Notebook, 'User': User,
-  'FolderOpened': FolderOpened, 'Collection': Collection,
-}
 
 const router = useRouter()
 const { state } = useMediaNavigation()
@@ -178,10 +170,7 @@ const itemTypeClass = computed(() => (item.value?.type || '').toLowerCase())
 
 const typeLabel = computed(() => getTypeLabel(item.value?.type))
 
-const typeIcon = computed(() => {
-  const iconName = TYPE_ICONS[item.value?.type] || 'Film'
-  return ICON_COMPONENT_MAP[iconName] || Film
-})
+const typeIcon = computed(() => getTypeIcon(item.value?.type))
 
 const heroBgStyle = computed(() => {
   const backdrop = item.value?.files?.find(f => f.image_type === 'Backdrop')

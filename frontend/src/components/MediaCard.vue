@@ -47,18 +47,11 @@ import { userAPI } from '@/api'
 import { ElMessage } from 'element-plus'
 import { openMediaDetail } from '@/composables/useMediaNavigation'
 import AdaptiveImage from '@/components/AdaptiveImage.vue'
-import { getTypeLabel, TYPE_ICONS } from '@/constants/mediaTypes'
+import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
 import { getPrimaryImageUrl } from '@/utils/url'
 import {
-  Star, StarFilled, VideoCamera, Headset,
-  Picture, Document, Film, Collection, FolderOpened, User as UserIcon
+  Star, StarFilled
 } from '@element-plus/icons-vue'
-
-const ICON_MAP = {
-  'Film': Film, 'Headset': Headset, 'Picture': Picture,
-  'Document': Document, 'Collection': Collection,
-  'VideoCamera': VideoCamera, 'FolderOpened': FolderOpened, 'User': UserIcon,
-}
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -77,10 +70,7 @@ const favLoading = ref(false)
 const isFavorite = ref(props.item?.userdata?.is_favorite ?? false)
 const primaryImageUrl = computed(() => getPrimaryImageUrl(props.item))
 
-const typeIcon = computed(() => {
-  const iconName = TYPE_ICONS[props.item.type] || 'VideoCamera'
-  return ICON_MAP[iconName] || VideoCamera
-})
+const typeIcon = computed(() => getTypeIcon(props.item.type))
 
 const effectiveDisableClick = computed(() => effectiveSetting.value.disableClick ?? props.disableClick)
 const effectiveDisableFavorite = computed(() => effectiveSetting.value.disableFavorite ?? props.disableFavorite)

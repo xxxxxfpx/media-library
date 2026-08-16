@@ -2,6 +2,11 @@
  * 媒体类型常量 - 统一维护类型标签和图标映射
  */
 
+import {
+  Film, VideoCamera, Headset, Picture,
+  Document, Notebook, User, FolderOpened, Collection
+} from '@element-plus/icons-vue'
+
 export const TYPE_LABELS = {
   'Movie': '电影',
   'Series': '剧集',
@@ -36,6 +41,13 @@ export const TYPE_ICONS = {
   'BoxSet': 'Collection',
 }
 
+// 图标名称 → 组件引用映射（唯一维护处，供各组件共用）
+export const ICON_COMPONENT_MAP = {
+  'Film': Film, 'VideoCamera': VideoCamera, 'Headset': Headset,
+  'Picture': Picture, 'Notebook': Notebook, 'User': User,
+  'FolderOpened': FolderOpened, 'Collection': Collection,
+}
+
 export const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([value, label]) => ({
   value,
   label,
@@ -47,4 +59,9 @@ export function getTypeLabel(type) {
 
 export function getTypeIconName(type) {
   return TYPE_ICONS[type] || 'VideoCamera'
+}
+
+export function getTypeIcon(type) {
+  const iconName = TYPE_ICONS[type] || 'VideoCamera'
+  return ICON_COMPONENT_MAP[iconName] || Film
 }
