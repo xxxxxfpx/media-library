@@ -17,7 +17,7 @@ app:
     password: "admin123"
 
 # 123云盘 WebDAV 配置
-# 敏感凭据请放入 backend/secrets/config.yaml（同样被 gitignore 忽略）
+# 敏感凭据请放入 secrets/config.yaml（同样被 gitignore 忽略）
 cloud_auth:
   username: ""
   password: ""

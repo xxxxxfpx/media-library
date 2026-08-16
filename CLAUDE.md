@@ -52,7 +52,7 @@ alembic upgrade head
 - **Backend**: Python FastAPI, SQLAlchemy 2.0 async, JWT auth (python-jose), Pydantic v2
 - **Frontend**: Vue 3 (Composition API), Vite, Pinia, Element Plus, Axios
 - **Mobile**: Flutter 3.x, Riverpod, Dio, media_kit
-- **Database**: SQLite via aiosqlite (dev), PostgreSQL via asyncpg (target)
+- **Database**: SQLite via aiosqlite (default, WAL mode), PostgreSQL via asyncpg (optional)
 - **File Storage**: 123 Cloud WebDAV (files served via redirect)
 
 ### Backend Structure (`backend/app/`)
@@ -65,11 +65,12 @@ alembic upgrade head
 **Key pattern**: API routes are thin; most logic is in service functions. Dependencies use `get_db_session` (context manager yielding `AsyncSession`).
 
 ### Database Design (`backend/database/`)
-- **Single-table design**: All media entities in `MediaItems` table, differentiated by `Type` enum
-- **Relationships** via `ItemLinks` table (many-to-many, includes Person/Genre/Studio associations)
+- **Single-table design**: Video media entities in `MediaItems` table, differentiated by `Type` enum (video-only since `video_only_schema` migration; AlbumId column removed)
+- **Relationships** via `ItemLinks` table (many-to-many, includes Person/Genre/Studio associations, `Order` for Season/Episode)
 - **Files** in `Files` table, linked to MediaItems via `FileLinks`
 - **User data** in `UserData` table (composite PK: UserId + ItemId)
 - **Soft delete**: `MediaItem.IsDeleted` flag, filtered in all queries
+- **Optimization**: WAL + `busy_timeout=5000` + `foreign_keys=ON` set on SQLite connect (`core.py`); composite indexes (`db_optimization_indexes`); keyset pagination via `cursor`; stats cached 60s in production
 - **Session management**: `SessionManager` context manager + `get_db_session` generator for FastAPI DI
 
 ### Frontend Structure (`frontend/src/`)
@@ -95,8 +96,8 @@ alembic upgrade head
 - `backend/config/default.yaml` — production defaults
 - `backend/config/setting.yaml` — UI card display config
 - `backend/config/local.yaml` — local overrides (gitignored, see `local.example.yaml`)
-- `backend/secrets/config.yaml` — sensitive credentials (gitignored, see `config.example.yaml`)
-- `backend/config.py` — dataclass-based config loader with YAML parsing
+- `secrets/config.yaml` — sensitive credentials (gitignored, see root `secrets/config.example.yaml`)
+- `backend/config.py` — dataclass-based config loader with YAML parsing (merges `SECRETS_PATH`)
 
 ### Key Flows
 

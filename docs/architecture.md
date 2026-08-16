@@ -5,7 +5,7 @@
 - **后端**：Python FastAPI + SQLAlchemy 2.0 async + JWT (python-jose) + Pydantic v2
 - **前端**：Vue 3 (Composition API) + Vite + Pinia + Element Plus + Axios
 - **移动端**：Flutter 3.x + Riverpod + Dio + media_kit
-- **数据库**：SQLite (aiosqlite，开发) / PostgreSQL (asyncpg，生产目标)
+- **数据库**：SQLite (aiosqlite，默认，WAL 模式) / PostgreSQL (asyncpg，生产可选)
 - **文件存储**：123 云盘 WebDAV（文件通过 302 重定向提供）
 
 ## 目录结构
@@ -18,11 +18,11 @@ media-library/
 │  ├─ tests/         # pytest 测试
 │  ├─ scripts/       # 数据校验/迁移/运维脚本（按职责拆分）
 │  ├─ config/        # 配置文件（default/local/setting）
-│  ├─ secrets/       # 敏感凭据（config.example.yaml 提交，实际文件 gitignore）
 │  ├─ data/          # 运行时数据（数据库、缓存、日志）
 │  ├─ config.py      # 配置加载模块
 │  ├─ run.py         # 启动脚本
 │  └─ requirements.txt
+├─ secrets/          # 敏感凭据（config.example.yaml 提交，实际文件 gitignore）
 ├─ frontend/         # Vue 3 前端
 │  ├─ src/           # 源码（views / components / store / api / router）
 │  ├─ tests/         # Vitest 单元测试
@@ -44,6 +44,13 @@ media-library/
 ### 媒体列表
 
 `GET /api/media/list` → `get_media_list()` 批量查询 items，再并行批量查询 links / files / userdata / aliases，经 `app/schemas/media.py` 序列化。
+
+- 支持 keyset 分页（`cursor` + `next_cursor`，`date_created`/`order` 排序），不传时回退 offset
+- `fetch_files_batch` 显式列选择，避免回拉 `FFmpeg` 大 JSON
+
+### 媒体统计
+
+`GET /api/media/stats` → 生产模式缓存 60s（diskcache），debug 模式直接查询保证一致性。
 
 ### 认证
 

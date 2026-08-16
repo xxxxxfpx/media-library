@@ -8,7 +8,7 @@
 | `config/setting.yaml` | UI 卡牌显示配置 | ✅ 提交 |
 | `config/local.yaml` | 本地开发覆盖（复制自 `local.example.yaml`） | ❌ gitignore |
 | `env.yaml` | 开发/测试专用配置 | ✅ 提交 |
-| `secrets/config.yaml` | 云盘/远程库等敏感凭据（复制自 `config.example.yaml`） | ❌ gitignore |
+| `secrets/config.yaml` | 云盘/远程库等敏感凭据（复制自根 `secrets/config.example.yaml`） | ❌ gitignore |
 
 ## 加载顺序
 

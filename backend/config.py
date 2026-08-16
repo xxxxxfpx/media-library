@@ -62,7 +62,8 @@ class CloudAuthConfig:
 def _merge_secret_config(data: dict) -> dict:
     """Merge local secrets over the selected non-sensitive config."""
     secrets_path = os.environ.get(
-        "SECRETS_PATH", os.path.join(os.path.dirname(__file__), "secrets", "config.yaml")
+        "SECRETS_PATH",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "secrets", "config.yaml"),
     )
     if not os.path.exists(secrets_path):
         return data

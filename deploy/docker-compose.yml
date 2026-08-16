@@ -9,15 +9,25 @@ services:
     environment:
       # 生产环境通过 .env 文件或宿主机环境注入敏感配置
       CONFIG_PATH: /app/config/local.yaml
+      SECRETS_PATH: /app/secrets/config.yaml
+      # 若未挂载 secrets/config.yaml，入口脚本会据此生成
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-}
+      APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-}
+      CLOUD_USERNAME: ${CLOUD_USERNAME:-}
+      CLOUD_PASSWORD: ${CLOUD_PASSWORD:-}
+      CLOUD_PREFIX: ${CLOUD_PREFIX:-/}
+      # 生产 CORS 来源（逗号分隔）
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
     volumes:
       # 本地配置覆盖（含凭据）
       - ../backend/config:/app/config:ro
+      # 密钥文件（若已配置则优先使用；缺失时由入口脚本生成到 /app/secrets）
+      - ../secrets:/app/secrets:rw
       # 运行时数据持久化
-      - ../backend/data:/app/data
-      # 密钥文件
-      - ../backend/secrets:/app/secrets:ro
+      - media_data:/app/data
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
@@ -35,4 +45,7 @@ services:
       - ../frontend/dist:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
+
+volumes:
+  media_data:

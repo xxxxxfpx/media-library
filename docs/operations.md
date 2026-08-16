@@ -19,17 +19,18 @@ curl http://localhost:8000/health
 
 | 路径 | 内容 |
 |------|------|
-| `data/database/media.db` | SQLite 数据库 |
+| `data/database/media.db` | SQLite 数据库（WAL 模式，含 -wal/-shm 伴随文件） |
 | `data/cache/file_url` | WebDAV URL 缓存（diskcache） |
+| `data/cache/media_stats` | 媒体统计缓存（diskcache，生产模式） |
 | `data/log/` | 日志 |
 
-> 缓存可安全删除；数据库需定期备份。
+> 缓存可安全删除；数据库需定期备份。备份 SQLite 时建议先检查点 WAL（`PRAGMA wal_checkpoint`）或停服复制。
 
 ## 备份
 
 - SQLite：直接复制 `media.db`（建议先停服或使用 SQLite 在线备份）
 - PostgreSQL：`pg_dump`
-- 配置与密钥：`backend/config/`、`backend/secrets/`
+- 配置与密钥：`backend/config/`、`secrets/`
 
 ## 常用运维脚本
 

@@ -7,7 +7,7 @@
 cd frontend && npm ci && npm run build && cd ..
 
 # 2. 准备配置与密钥
-cp backend/secrets/config.example.yaml backend/secrets/config.yaml   # 填入真实凭据
+cp secrets/config.example.yaml secrets/config.yaml   # 填入真实凭据
 cp backend/config/local.example.yaml backend/config/local.yaml       # 生产覆盖
 cp deploy/.env.example deploy/.env                                   # 生产环境变量
 
@@ -40,3 +40,14 @@ sudo systemctl enable --now media-manager-backend
 - 通过 `secrets/config.yaml` 注入云盘与远程库凭据
 - 数据库改用 PostgreSQL 时更新 `database.*` 配置
 - 前置一层 HTTPS 反向代理
+
+## 数据库迁移
+
+首次部署或升级时执行 Alembic 迁移（含视频化精简 `video_only_schema`）：
+
+```bash
+cd backend
+.\.venv\Scripts\python.exe -m alembic -c database/alembic.ini upgrade head
+```
+
+> 视频化迁移为破坏性变更（删除 `AlbumId` 列）。迁移前可先运行 `scripts/checks/check_video_only_prep.py` 确认库中无非视频类型数据。
