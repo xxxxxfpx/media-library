@@ -57,7 +57,7 @@ class MediaItem(Base):
     }
 
     Id = Column("Id", Integer, primary_key=True, autoincrement=True, comment="主键 - 自增整数 ID")
-    Type = Column("Type", SQLEnum(MediaType, name="media_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, index=True, comment="媒体项类型")
+    Type = Column("Type", SQLEnum(MediaType, name="media_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="媒体项类型")
     Name = Column("Name", String(500), nullable=True, comment="名称 - 显示名称")
 
     Overview = Column("Overview", Text, nullable=True, comment="简介 - 内容描述")
@@ -99,7 +99,7 @@ class MediaItem(Base):
     CreatedAt = Column("CreatedAt", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, comment="审计字段 - 创建时间")
     UpdatedAt = Column("UpdatedAt", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, comment="审计字段 - 更新时间")
 
-    IsDeleted = Column("IsDeleted", Boolean, default=False, nullable=False, index=True, comment="软删除标记")
+    IsDeleted = Column("IsDeleted", Boolean, default=False, nullable=False, comment="软删除标记")
 
     PresentationUniqueKey = Column("PresentationUniqueKey", Text, nullable=True, comment="展示唯一键")
     PreferredMetadataLanguage = Column("PreferredMetadataLanguage", String(50), nullable=True, comment="首选元数据语言")
@@ -120,6 +120,8 @@ class MediaItem(Base):
         Index("idx_media_items_is_deleted", "IsDeleted"),
         Index("idx_media_items_type_is_deleted", "Type", "IsDeleted"),
         Index("idx_media_items_type_is_deleted_created", "Type", "IsDeleted", "DateCreated"),
+        Index("idx_media_items_type_is_deleted_name", "Type", "IsDeleted", "Name"),
+        Index("idx_media_items_type_is_deleted_rating", "Type", "IsDeleted", "CommunityRating"),
     )
 
 

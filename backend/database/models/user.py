@@ -109,10 +109,9 @@ class UserData(Base):
     Item = relationship("MediaItem", back_populates="UserDataItems")
 
     __table_args__ = (
-        Index("idx_user_data_user_id", "UserId"),
-        Index("idx_user_data_item_id", "ItemId"),
         Index("idx_user_data_favorited_at", "FavoritedAt"),
         Index("idx_user_data_item_user", "ItemId", "UserId"),
         Index("idx_user_data_user_favorited", "UserId", "FavoritedAt"),
         Index("idx_user_data_user_last_played", "UserId", "LastPlayedAt"),
+        Index("idx_user_data_user_rating", "UserId", "Rating"),
     )

@@ -58,13 +58,12 @@ class ItemLinks(Base):
     LinkedItem = relationship("MediaItem", back_populates="LinkedItems", foreign_keys=[LinkedItemId])
 
     __table_args__ = (
-        Index("idx_item_links_item_id", "ItemId"),
-        Index("idx_item_links_linked_item_id", "LinkedItemId"),
         Index("idx_item_links_people_type", "PeopleType"),
         Index("idx_item_links_source_id", "SourceId"),
         Index("idx_item_links_linked_item_item", "LinkedItemId", "ItemId"),
         Index("idx_item_links_linked_item_order", "LinkedItemId", "Order"),
         Index("idx_item_links_linked_source", "LinkedItemId", "SourceId"),
+        Index("idx_item_links_item_people_type", "ItemId", "PeopleType"),
         UniqueConstraint("ItemId", "LinkedItemId", name="uq_item_links_item_linked"),
         # 注意：不要在这里添加 SourceId 的唯一约束
         # 因为同一 source 下多个不同类型的 item 可以有相同的 source_id

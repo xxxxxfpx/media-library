@@ -47,7 +47,6 @@ class Alias(Base):
 
     __table_args__ = (
         PrimaryKeyConstraint("ItemId", "Name", name="pk_aliases"),
-        Index("idx_aliases_item", "ItemId"),
         Index("idx_aliases_name", "Name"),
         Index("idx_aliases_source", "Source", "ItemId"),
     )

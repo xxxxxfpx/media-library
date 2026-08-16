@@ -17,10 +17,7 @@ SQLAlchemy 声明式基类，所有模型类都继承自此类。
 版本：3.0.0 (简化注释)
 """
 
-from datetime import datetime, timezone
-from typing import Any
-
-from sqlalchemy import Column, DateTime, event, MetaData, func
+from sqlalchemy import MetaData
 from sqlalchemy.orm import declarative_base
 
 
@@ -36,10 +33,3 @@ NAMING_CONVENTION = {
 metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 Base = declarative_base(metadata=metadata)
-
-
-@event.listens_for(Base, "before_update", propagate=True)
-def receive_before_update(mapper: Any, connection: Any, target: Any):
-    """更新前自动设置 updated_at (如果目标有 updated_at 属性)"""
-    if hasattr(target, 'updated_at'):
-        target.updated_at = datetime.now(timezone.utc)

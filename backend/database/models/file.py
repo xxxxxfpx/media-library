@@ -59,12 +59,12 @@ class File(Base):
     __tablename__ = "Files"
 
     Id = Column("Id", Integer, primary_key=True, autoincrement=True, comment="主键 ID - 自增，用于关联")
-    Etag = Column("Etag", String(64), nullable=True, index=True, comment="ETag - 文件哈希值，用于缓存验证")
+    Etag = Column("Etag", String(64), nullable=True, comment="ETag - 文件哈希值，用于缓存验证")
     Size = Column("Size", BigInteger, nullable=True, comment="文件大小 - 字节")
     Name = Column("Name", Text, nullable=True, comment="文件名")
     SortName = Column("SortName", Text, nullable=True, comment="排序名称 - 用于排序的文件名")
-    Path = Column("Path", Text, nullable=False, unique=True, comment="文件路径 - 唯一键，用于标识文件")
-    CloudId = Column("CloudId", String(255), nullable=True, unique=True, comment="云盘文件 ID - 唯一键，可为空")
+    Path = Column("Path", Text, nullable=False, comment="文件路径 - 唯一键，用于标识文件")
+    CloudId = Column("CloudId", String(255), nullable=True, comment="云盘文件 ID - 唯一键，可为空")
     Type = Column("Type", SQLEnum(FileType, name="file_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="文件类型")
     FFmpeg = Column("FFmpeg", JSON, nullable=True, comment="ffprobe 完整输出 - JSON 格式，前端自行解析流信息")
 
@@ -76,7 +76,6 @@ class File(Base):
         Index("idx_files_path", "Path", unique=True),
         Index("idx_files_cloud_id", "CloudId", unique=True),
     )
-
     FileLinks = relationship("FileLink", back_populates="File", cascade="all, delete")
 
     def __repr__(self):
@@ -124,7 +123,6 @@ class FileLink(Base):
     UpdatedAt = Column("UpdatedAt", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, comment="审计字段 - 更新时间")
 
     __table_args__ = (
-        Index("idx_file_links_item", "ItemId"),
         Index("idx_file_links_file", "FileId"),
         Index("idx_file_links_chapter", "ItemId", "ChapterIndex"),
         Index("idx_file_links_item_file", "ItemId", "FileId"),
