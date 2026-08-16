@@ -90,7 +90,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -119,7 +119,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         # 验证数据库
@@ -154,7 +154,6 @@ class TestMediaBatchAPI:
                         community_rating=8.5,
                         critic_rating=85.0,
                         status="Continuing",
-                        display_order="Default",
                         production_locations=["美国", "中国"],
                         remote_trailers=["http://trailer.com"],
                         preferred_metadata_language="zh",
@@ -164,7 +163,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         # 验证数据库
@@ -199,7 +198,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -255,7 +254,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -323,7 +322,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -394,7 +393,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         # 应该返回 422 验证错误
         assert response.status_code == 422, f"无效 type 应该返回 422，实际: {response.status_code}"
 
@@ -432,7 +431,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(), headers=auth_headers)
+        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
         assert response1.status_code == 200, f"第一次请求失败: {response1.text}"
 
         result1 = response1.json()
@@ -450,7 +449,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(), headers=auth_headers)
+        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
         assert response2.status_code == 200, f"第二次请求失败: {response2.text}"
 
         result2 = response2.json()
@@ -459,7 +458,7 @@ class TestMediaBatchAPI:
         assert result2["items"]["item-2"] == original_id, "重复 source_id 应该更新而非新建"
 
         # 验证更新后的数据 - 直接通过 API 查询
-        info_response = await app_client.get(f"/api/media/info?id={original_id}")
+        info_response = await app_client.get(f"/api/media/info?id={original_id}", headers=auth_headers)
         assert info_response.status_code == 200
         item_data = info_response.json()
         assert item_data["name"] == "新名称", f"name 应该被更新，实际: {item_data.get('name')}"
@@ -480,7 +479,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(), headers=auth_headers)
+        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
         assert response1.status_code == 200, f"source_A 请求失败: {response1.text}"
         id1 = response1.json()["items"]["item-1"]
 
@@ -496,7 +495,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(), headers=auth_headers)
+        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
         assert response2.status_code == 200, f"source_B 请求失败: {response2.text}"
         id2 = response2.json()["items"]["item-2"]
 
@@ -504,8 +503,8 @@ class TestMediaBatchAPI:
         assert id1 != id2, f"不同 source_name 应该创建不同 item，实际 id1={id1}, id2={id2}"
 
         # 验证两者都存在且不同
-        info1 = await app_client.get(f"/api/media/info?id={id1}")
-        info2 = await app_client.get(f"/api/media/info?id={id2}")
+        info1 = await app_client.get(f"/api/media/info?id={id1}", headers=auth_headers)
+        info2 = await app_client.get(f"/api/media/info?id={id2}", headers=auth_headers)
         assert info1.json()["name"] == "电影A"
         assert info2.json()["name"] == "电影B"
 
@@ -531,7 +530,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
         result = response.json()
 
@@ -541,8 +540,8 @@ class TestMediaBatchAPI:
         assert video_id != tag_id, f"不同 type 应该创建不同 item，实际 video_id={video_id}, tag_id={tag_id}"
 
         # 验证两者都存在
-        info_video = await app_client.get(f"/api/media/info?id={video_id}")
-        info_tag = await app_client.get(f"/api/media/info?id={tag_id}")
+        info_video = await app_client.get(f"/api/media/info?id={video_id}", headers=auth_headers)
+        info_tag = await app_client.get(f"/api/media/info?id={tag_id}", headers=auth_headers)
         assert info_video.json()["name"] == "视频"
         assert info_video.json()["type"] == "Movie"
         assert info_tag.json()["name"] == "标签"
@@ -563,7 +562,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(), headers=auth_headers)
+        response1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
         assert response1.status_code == 200
         id1 = response1.json()["items"]["first"]
 
@@ -579,7 +578,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(), headers=auth_headers)
+        response2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
         assert response2.status_code == 200
         id2 = response2.json()["items"]["second"]
 
@@ -587,7 +586,7 @@ class TestMediaBatchAPI:
         assert id1 == id2, f"相同 source_name + source_id + type 应该返回相同 ID，实际 id1={id1}, id2={id2}"
 
         # 验证 name 被更新，overview 保持不变
-        info = await app_client.get(f"/api/media/info?id={id1}")
+        info = await app_client.get(f"/api/media/info?id={id1}", headers=auth_headers)
         item_data = info.json()
         assert item_data["name"] == "新名称", f"name 应该被更新为'新名称'，实际: {item_data.get('name')}"
         assert item_data["overview"] == "第一个简介", f"overview 应该保持不变，实际: {item_data.get('overview')}"
@@ -618,7 +617,7 @@ class TestMediaBatchAPI:
         """测试11: 空 batch - 仅 source_name"""
         data = MediaBatchCreate(source_name="empty_test")
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"空 batch 应该成功，实际: {response.text}"
 
         result = response.json()
@@ -659,7 +658,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -714,7 +713,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -746,7 +745,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -778,7 +777,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -803,7 +802,7 @@ class TestMediaBatchAPI:
             # 注意：没有 file_links
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         result = response.json()
@@ -848,7 +847,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         # 验证日期被正确解析和存储
@@ -875,7 +874,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"请求失败: {response.text}"
 
         # 验证特殊字符被正确存储
@@ -896,7 +895,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 422, f"无效 file type 应该返回 422，实际: {response.status_code}"
 
     @pytest.mark.asyncio
@@ -913,7 +912,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         # 由于 person_type 会在序列化时被过滤，可能不报错
         # 这个测试验证的是 service 层能处理这种情况
         # 如果 Pydantic 验证通过了，则 API 会处理
@@ -946,7 +945,7 @@ class TestMediaBatchAPI:
             file_links=file_links
         )
 
-        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"大批量请求失败: {response.text}"
 
         result = response.json()
@@ -977,7 +976,7 @@ class TestMediaBatchAPI:
         )
 
         # 默认 strict_graph=True，图是连通的（A-B-C），应该成功
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"连通图应该成功，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -993,7 +992,7 @@ class TestMediaBatchAPI:
             # 注意：没有 item_links，三个节点互不相连
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 422, f"非连通图应该返回 422，实际: {response.status_code}"
         assert "孤立节点" in response.text or "isolated" in response.text.lower(), \
             f"错误信息应提到孤立节点，实际: {response.text}"
@@ -1012,7 +1011,7 @@ class TestMediaBatchAPI:
 
         response = await app_client.post(
             "/api/media/batch?strict_graph=false",
-            json=data.model_dump(),
+            json=data.model_dump(exclude_unset=True),
             headers=auth_headers
         )
         assert response.status_code == 200, f"strict_graph=false 应该允许不连通图，实际: {response.text}"
@@ -1030,7 +1029,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"单节点图应该成功，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -1044,7 +1043,7 @@ class TestMediaBatchAPI:
             # 没有 item_links，单个节点自己成图
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"单个 item 无 item_links 应该成功，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -1059,7 +1058,7 @@ class TestMediaBatchAPI:
             # 没有 item_links，多个节点互不相连
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 422, f"多个 items 无 item_links 应该失败，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -1078,7 +1077,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 422, f"存在孤立节点应该失败，实际: {response.text}"
         result = response.json()
         assert "group-b1" in result["detail"], f"错误信息应包含孤立节点 group-b1，实际: {result}"
@@ -1101,7 +1100,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"链式拓扑应该成功，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -1122,7 +1121,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"星形拓扑应该成功，实际: {response.text}"
 
     @pytest.mark.asyncio
@@ -1142,7 +1141,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(), headers=auth_headers)
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         assert response.status_code == 200, f"环形拓扑应该成功，实际: {response.text}"
 
 
@@ -1156,7 +1155,7 @@ class TestSchemaValidation:
             source_info=SourceInfo(source_id="s1"),
             attrs=ItemBaseAttrs(type="Movie", name="测试")
         )
-        dumped = item.model_dump()
+        dumped = item.model_dump(exclude_unset=True)
         assert "source_id" in dumped["source_info"]
         # UNSET 的 source_link 不应该出现
         assert "source_link" not in dumped["source_info"]

@@ -43,12 +43,12 @@ USERS_EXPECTED_COLUMNS = {
 }
 
 
-# MediaItems 表的关键列
+# MediaItems 表的关键列（视频化精简后，无 AlbumId/DisplayOrder）
 MEDIAITEMS_KEY_COLUMNS = [
     "Id", "Type", "Name", "Overview", "Tagline",
     "PremiereDate", "EndDate", "StartDate",
     "OfficialRating", "CustomRating", "CommunityRating", "CriticRating",
-    "Status", "DisplayOrder", "ChannelNumber", "AlbumId",
+    "Status", "ChannelNumber",
     "DateCreated", "DateModified", "DateLastRefreshed", "DateLastSaved",
     "CreatedAt", "UpdatedAt", "IsDeleted",
     "PresentationUniqueKey", "PreferredMetadataLanguage",
@@ -165,7 +165,7 @@ class TestDatabaseInit:
         columns = await get_table_columns(db_session, "UserData")
         column_names = [col["name"] for col in columns]
 
-        expected_cols = ["UserId", "ItemId", "IsFavorite", "PlaybackPositionTicks",
+        expected_cols = ["UserId", "ItemId", "PlaybackPositionTicks",
                          "PlayCount", "IsPlayed", "Rating", "PlaybackRate", "LastPlayedAt", "FavoritedAt",
                          "CreatedAt", "UpdatedAt"]
         for expected_col in expected_cols:

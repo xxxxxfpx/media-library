@@ -153,7 +153,7 @@ class TestUserAPI:
 
         userdata = await query_userdata(db_session, user_id, item_id)
         assert userdata is not None, "UserData 记录应该被创建"
-        assert userdata["IsFavorite"] == 1, "IsFavorite 应该为 true"
+        assert userdata["FavoritedAt"] is not None, "FavoritedAt 应该不为空"
         assert userdata["PlaybackPositionTicks"] == 3600000000.0, "PlaybackPositionTicks 应该为 3600000000"
 
     @pytest.mark.asyncio
@@ -193,7 +193,7 @@ class TestUserAPI:
         info_response = await app_client.get("/api/user/info", headers=auth_headers)
         user_id = info_response.json()["id"]
 
-        new_setting = {"dark_mode": True, "language": "zh-CN"}
+        new_setting = {"theme_mode": "dark", "auto_sync_interval": 8}
         response = await app_client.post(
             "/api/user/setting",
             headers=auth_headers,
@@ -201,7 +201,8 @@ class TestUserAPI:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "message" in data or "setting" in data, "响应应包含更新结果"
+        assert "theme_mode" in data, "响应应包含 theme_mode"
+        assert data["theme_mode"] == "dark", "theme_mode 应该为 dark"
 
         # 数据库验证
         user = await query_user_by_id(db_session, user_id)

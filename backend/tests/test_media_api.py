@@ -21,9 +21,9 @@ class TestMediaAPI:
     """媒体 API 测试类"""
 
     @pytest.mark.asyncio
-    async def test_get_media_list_empty(self, app_client):
+    async def test_get_media_list_empty(self, app_client, auth_headers):
         """测试空数据库获取媒体列表"""
-        response = await app_client.get("/api/media/list")
+        response = await app_client.get("/api/media/list", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -35,7 +35,7 @@ class TestMediaAPI:
         assert data["items"] == [], "空数据库应返回空列表"
 
     @pytest.mark.asyncio
-    async def test_get_media_list_with_data(self, app_client, db_session):
+    async def test_get_media_list_with_data(self, app_client, db_session, auth_headers):
         """测试有数据时获取媒体列表"""
         # 插入测试数据
         await db_session.execute(text("""
@@ -44,7 +44,7 @@ class TestMediaAPI:
         """))
         await db_session.commit()
 
-        response = await app_client.get("/api/media/list")
+        response = await app_client.get("/api/media/list", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -52,7 +52,7 @@ class TestMediaAPI:
         assert data["total"] >= 1, "total 应该 >= 1"
 
     @pytest.mark.asyncio
-    async def test_get_media_list_with_types_filter(self, app_client, db_session):
+    async def test_get_media_list_with_types_filter(self, app_client, db_session, auth_headers):
         """测试类型过滤"""
         # 插入 Movie 和 Series 各一个
         await db_session.execute(text("""
@@ -66,7 +66,7 @@ class TestMediaAPI:
         await db_session.commit()
 
         # 只获取 Movie
-        response = await app_client.get("/api/media/list?types=Movie")
+        response = await app_client.get("/api/media/list?types=Movie", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -74,7 +74,7 @@ class TestMediaAPI:
         assert data["items"][0]["type"] == "Movie", "应该是 Movie 类型"
 
     @pytest.mark.asyncio
-    async def test_get_media_list_pagination(self, app_client, db_session):
+    async def test_get_media_list_pagination(self, app_client, db_session, auth_headers):
         """测试分页"""
         # 插入多个测试数据
         for i in range(15):
@@ -85,7 +85,7 @@ class TestMediaAPI:
         await db_session.commit()
 
         # 测试第一页
-        response = await app_client.get("/api/media/list?limit=10&offset=0")
+        response = await app_client.get("/api/media/list?limit=10&offset=0", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 10, "应该返回 10 条"
@@ -93,13 +93,13 @@ class TestMediaAPI:
         assert data["offset"] == 0
 
         # 测试第二页
-        response = await app_client.get("/api/media/list?limit=10&offset=10")
+        response = await app_client.get("/api/media/list?limit=10&offset=10", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) >= 5, "第二页应该返回剩余数据"
 
     @pytest.mark.asyncio
-    async def test_get_media_list_search(self, app_client, db_session):
+    async def test_get_media_list_search(self, app_client, db_session, auth_headers):
         """测试搜索功能"""
         await db_session.execute(text("""
             INSERT INTO MediaItems (Type, Name, IsDeleted, DateCreated, DateModified, CreatedAt, UpdatedAt)
@@ -111,7 +111,7 @@ class TestMediaAPI:
         """))
         await db_session.commit()
 
-        response = await app_client.get("/api/media/list?search=星际")
+        response = await app_client.get("/api/media/list?search=星际", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -119,7 +119,7 @@ class TestMediaAPI:
         assert "星际" in data["items"][0]["name"], "名称应该包含搜索关键词"
 
     @pytest.mark.asyncio
-    async def test_get_media_list_exclude_deleted(self, app_client, db_session):
+    async def test_get_media_list_exclude_deleted(self, app_client, db_session, auth_headers):
         """测试排除已删除项"""
         # 插入一个正常项和一个已删除项
         await db_session.execute(text("""
@@ -132,7 +132,7 @@ class TestMediaAPI:
         """))
         await db_session.commit()
 
-        response = await app_client.get("/api/media/list")
+        response = await app_client.get("/api/media/list", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -142,9 +142,9 @@ class TestMediaAPI:
         assert "已删除电影" not in names, "不应该包含已删除电影"
 
     @pytest.mark.asyncio
-    async def test_get_media_info_not_found(self, app_client):
+    async def test_get_media_info_not_found(self, app_client, auth_headers):
         """测试获取不存在的媒体"""
-        response = await app_client.get("/api/media/info?id=99999")
+        response = await app_client.get("/api/media/info?id=99999", headers=auth_headers)
         # 可能返回 404 或空数据，取决于实现
         assert response.status_code in [404, 200]
         if response.status_code == 200:
@@ -152,7 +152,7 @@ class TestMediaAPI:
             assert data is None or "detail" in data
 
     @pytest.mark.asyncio
-    async def test_get_media_info_with_valid_id(self, app_client, db_session):
+    async def test_get_media_info_with_valid_id(self, app_client, db_session, auth_headers):
         """测试获取存在的媒体详情"""
         # 插入测试数据
         await db_session.execute(text("""
@@ -165,7 +165,7 @@ class TestMediaAPI:
         result = await db_session.execute(text("SELECT Id FROM MediaItems WHERE Name = '电影详情测试'"))
         item_id = result.scalar()
 
-        response = await app_client.get(f"/api/media/info?id={item_id}")
+        response = await app_client.get(f"/api/media/info?id={item_id}", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
@@ -236,7 +236,7 @@ class TestMediaAPI:
         assert data["movie_count"] == db_movie_count, "movie_count 应该与数据库一致"
 
     @pytest.mark.asyncio
-    async def test_media_list_with_links(self, app_client, db_session):
+    async def test_media_list_with_links(self, app_client, db_session, auth_headers):
         """测试媒体列表包含关联信息"""
         # 插入测试数据
         await db_session.execute(text("""
@@ -245,7 +245,7 @@ class TestMediaAPI:
         """))
         await db_session.commit()
 
-        response = await app_client.get("/api/media/list?limit=1")
+        response = await app_client.get("/api/media/list?limit=1", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
 
