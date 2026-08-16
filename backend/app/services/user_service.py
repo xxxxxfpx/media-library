@@ -85,3 +85,16 @@ async def update_user_setting(db: AsyncSession, user_id: int, setting: UpdateUse
     await db.commit()
     
     return UserSettings(**current_settings)
+
+
+async def change_password(db: AsyncSession, user_id: int, old_password: str, new_password: str) -> None:
+    """修改密码：校验旧密码后设置新密码"""
+    user = await db.get(User, user_id)
+    if not user:
+        raise ValueError("用户不存在")
+    if not user.verify_password(old_password):
+        raise ValueError("旧密码不正确")
+    if len(new_password) < 6:
+        raise ValueError("新密码长度至少 6 位")
+    user.set_password(new_password)
+    await db.commit()

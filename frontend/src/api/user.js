@@ -9,4 +9,5 @@ export const userAPI = {
   getHistory: (params) => api.get('/api/user/history', { params }),
   getSetting: () => api.get('/api/user/setting'),
   updateSetting: (setting) => api.post('/api/user/setting', setting),
+  changePassword: (data) => api.post('/api/user/change-password', data),
 }
