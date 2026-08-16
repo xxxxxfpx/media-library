@@ -321,6 +321,7 @@ async function loadVideo() {
     try {
       userSettings.value = await loadUserSettings()
     } catch {
+      // 设置加载失败不影响播放，静默忽略
     }
 
     let fileData
@@ -348,6 +349,7 @@ async function loadVideo() {
         const mediaInfo = await mediaAPI.getInfo(parseInt(itemId.value))
         userData.value = mediaInfo.userdata || null
       } catch {
+        // 用户数据加载失败时保持 null，静默忽略
       }
     }
   } catch (error) {

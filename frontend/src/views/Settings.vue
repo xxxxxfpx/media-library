@@ -133,6 +133,7 @@ onMounted(async () => {
     defaultMuted.value = localStorage.getItem('video_default_muted') === 'true'
     if (settings.auto_sync_interval) syncInterval.value = settings.auto_sync_interval * 1000
   } catch {
+    // 获取设置失败时使用默认值，静默忽略
   }
 })
 
