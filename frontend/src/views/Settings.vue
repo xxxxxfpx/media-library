@@ -82,14 +82,32 @@
           <span>修改密码</span>
           <span class="setting-desc">更新您的账户密码</span>
         </div>
-        <el-button type="primary" plain @click="showPasswordDialog = true">修改密码</el-button>
+        <el-button type="primary" plain @click="openPasswordDialog">修改密码</el-button>
       </div>
     </el-card>
+
+    <el-dialog v-model="showPasswordDialog" title="修改密码" width="420px" destroy-on-close>
+      <el-form label-width="90px" @submit.prevent>
+        <el-form-item label="旧密码">
+          <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入旧密码" />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="至少 6 位" />
+        </el-form-item>
+        <el-form-item label="确认密码">
+          <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="再次输入新密码" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showPasswordDialog = false">取消</el-button>
+        <el-button type="primary" :loading="passwordLoading" @click="submitPasswordChange">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/store'
 import { userAPI } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -102,6 +120,8 @@ const isDark = computed({
 })
 
 const showPasswordDialog = ref(false)
+const passwordLoading = ref(false)
+const passwordForm = ref({ oldPassword: '', newPassword: '', confirmPassword: '' })
 const autoplay = ref(false)
 const defaultMuted = ref(false)
 const syncInterval = ref(8000)
@@ -120,19 +140,58 @@ async function saveSettings() {
   try {
     // 如果开启自动播放，强制开启默认静音
     const finalDefaultMuted = autoplay.value ? true : defaultMuted.value
-    
+
     localStorage.setItem('video_autoplay', String(autoplay.value))
     localStorage.setItem('video_default_muted', String(finalDefaultMuted))
     await userAPI.updateSetting({ auto_sync_interval: Math.round(syncInterval.value / 1000) })
-    ElMessage.success('设置已保存')
   } catch {
     ElMessage.error('保存失败')
   }
 }
 
+// 防抖：300ms 内多次变更只保存一次
+let saveTimer = null
 watch([autoplay, defaultMuted, syncInterval], () => {
-  saveSettings()
-}, { deep: true })
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(saveSettings, 300)
+})
+
+onUnmounted(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
+
+function openPasswordDialog() {
+  passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
+  showPasswordDialog.value = true
+}
+
+async function submitPasswordChange() {
+  const { oldPassword, newPassword, confirmPassword } = passwordForm.value
+  if (!oldPassword || !newPassword) {
+    ElMessage.warning('请填写旧密码和新密码')
+    return
+  }
+  if (newPassword.length < 6) {
+    ElMessage.warning('新密码长度至少 6 位')
+    return
+  }
+  if (newPassword !== confirmPassword) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+
+  passwordLoading.value = true
+  try {
+    await userAPI.changePassword({ old_password: oldPassword, new_password: newPassword })
+    ElMessage.success('密码修改成功，请重新登录')
+    showPasswordDialog.value = false
+    setTimeout(() => store.logout(), 800)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '密码修改失败')
+  } finally {
+    passwordLoading.value = false
+  }
+}
 </script>
 
 <style scoped lang="scss">

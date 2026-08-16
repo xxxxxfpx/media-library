@@ -271,7 +271,7 @@ import MediaGrid from '@/components/MediaGrid.vue'
 import MediaCard from '@/components/MediaCard.vue'
 import LinkCard from '@/components/LinkCard.vue'
 import FileRow from '@/components/FileRow.vue'
-import { getTypeLabel, TYPE_ICONS } from '@/constants/mediaTypes'
+import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
 import { formatDate, formatFileSize, parseFFmpegInfo } from '@/utils/format'
 import { getFileDataUrl } from '@/utils/url'
 
@@ -285,16 +285,8 @@ const heroConfig = {
 }
 import {
   ArrowLeft, ArrowRight, Loading, StarFilled, Star,
-  Film, VideoCamera, Headset, Picture,
-  Document, Collection, Notebook,
-  User, FolderOpened, VideoPlay
+  VideoPlay
 } from '@element-plus/icons-vue'
-
-const ICON_COMPONENT_MAP = {
-  'Film': Film, 'VideoCamera': VideoCamera, 'Headset': Headset,
-  'Picture': Picture, 'Notebook': Notebook, 'User': User,
-  'FolderOpened': FolderOpened, 'Collection': Collection,
-}
 
 const route = useRoute()
 const router = useRouter()
@@ -316,10 +308,7 @@ const itemTypeClass = computed(() => (item.value?.type || '').toLowerCase())
 
 const typeLabel = computed(() => getTypeLabel(item.value?.type))
 
-const typeIcon = computed(() => {
-  const iconName = TYPE_ICONS[item.value?.type] || 'Film'
-  return ICON_COMPONENT_MAP[iconName] || Film
-})
+const typeIcon = computed(() => getTypeIcon(item.value?.type))
 
 const heroBgStyle = computed(() => {
   if (backdropUrl.value) {

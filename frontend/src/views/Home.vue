@@ -3,7 +3,7 @@
     <!-- 统计卡片 -->
     <div class="stats-section">
       <div
-        v-for="stat in stats"
+        v-for="stat in visibleStats"
         :key="stat.key"
         class="stat-card"
         :style="{ '--stat-color': stat.color }"
@@ -54,11 +54,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { mediaAPI } from '@/api'
 import MediaGrid from '@/components/MediaGrid.vue'
 import {
-  VideoCamera, Headset, Picture, Document, Clock, ArrowRight
+  Clock, ArrowRight
 } from '@element-plus/icons-vue'
 
 const stats = ref([
@@ -67,6 +67,8 @@ const stats = ref([
   { key: 'image', label: '图片', value: 0, icon: 'Picture', color: '#FF9800' },
   { key: 'book', label: '电子书', value: 0, icon: 'Document', color: '#9C27B0' },
 ])
+
+const visibleStats = computed(() => stats.value.filter(s => s.value > 0))
 
 function formatNumber(num) {
   return num.toLocaleString('zh-CN')

@@ -110,13 +110,36 @@ function getProgressColor(value) {
   return '#67C23A'
 }
 
+function startPolling() {
+  stopPolling()
+  timer = setInterval(fetchSystemInfo, 5000)
+}
+
+function stopPolling() {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+function onVisibilityChange() {
+  if (document.hidden) {
+    stopPolling()
+  } else {
+    fetchSystemInfo()
+    startPolling()
+  }
+}
+
 onMounted(() => {
   fetchSystemInfo()
-  timer = setInterval(fetchSystemInfo, 5000)
+  startPolling()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  stopPolling()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
