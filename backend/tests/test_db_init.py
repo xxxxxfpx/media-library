@@ -49,11 +49,11 @@ MEDIAITEMS_KEY_COLUMNS = [
     "PremiereDate", "EndDate", "StartDate",
     "OfficialRating", "CustomRating", "CommunityRating", "CriticRating",
     "Status", "ChannelNumber",
-    "DateCreated", "DateModified", "DateLastRefreshed", "DateLastSaved",
+    "DateCreated", "DateModified",
     "CreatedAt", "UpdatedAt", "IsDeleted",
-    "PresentationUniqueKey", "PreferredMetadataLanguage",
-    "PreferredMetadataCountryCode", "LockedFields",
+    "PresentationUniqueKey", "PreferredMetadataLanguage", "PreferredMetadataCountryCode", "LockedFields",
     "ProductionLocations", "RemoteTrailers",
+    "SourceId", "SourceLink", "SourceItemId",
 ]
 
 
@@ -155,7 +155,7 @@ class TestDatabaseInit:
         column_names = [col["name"] for col in columns]
 
         expected_cols = ["Id", "ItemId", "LinkedItemId", "PeopleType", "PeopleRole",
-                         "SourceId", "SourceLink", "CreatedAt", "UpdatedAt"]
+                         "Order", "CreatedAt", "UpdatedAt"]
         for expected_col in expected_cols:
             assert expected_col in column_names, f"ItemLinks 表应包含列: {expected_col}"
 

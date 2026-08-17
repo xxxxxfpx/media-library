@@ -163,12 +163,14 @@ class ItemLinksMigration:
                     continue
 
                 try:
-                    link = ItemLinks(
-                        ItemId=item_id,
-                        LinkedItemId=source_local_id,
-                        SourceId=source_id,
+                    result = await db.execute(
+                        select(MediaItem).where(MediaItem.Id == item_id)
                     )
-                    db.add(link)
+                    media = result.scalar_one_or_none()
+                    if media:
+                        media.SourceId = source_id
+                        media.SourceItemId = source_local_id
+                        db.add(media)
                     await db.flush()
                     self.stats['item_providers_inserted'] += 1
                 except Exception:

@@ -85,6 +85,9 @@ class MediaItemSummary(BaseModel):
     critic_rating: Optional[float] = None
     date_created: Optional[str] = None
     date_modified: Optional[str] = None
+    source_id: Optional[str] = None
+    source_link: Optional[str] = None
+    source_name: Optional[str] = None
 
 
 class MediaItemResponse(MediaItemSummary):
@@ -128,7 +131,7 @@ def serialize_links(links_result, primary_images_map: dict[int, str] | None = No
         links.append(LinkItem(
             people_type=link.PeopleType.value if link.PeopleType else None,
             people_role=link.PeopleRole,
-            source_link=link.SourceLink,
+            source_link=None,
             linked_item=LinkedItemSummary(
                 id=linked_item.Id,
                 name=linked_item.Name,
@@ -139,7 +142,7 @@ def serialize_links(links_result, primary_images_map: dict[int, str] | None = No
                 official_rating=linked_item.OfficialRating,
                 community_rating=linked_item.CommunityRating,
                 primary_image=primary_image,
-                source_link=link.SourceLink,
+                source_link=None,
             )
         ))
     return links
@@ -207,6 +210,9 @@ def serialize_item(item) -> MediaItemSummary:
         critic_rating=item.CriticRating,
         date_created=item.DateCreated.isoformat() if item.DateCreated else None,
         date_modified=item.DateModified.isoformat() if item.DateModified else None,
+        source_id=item.SourceId,
+        source_link=item.SourceLink,
+        source_name=None,
     )
 
 

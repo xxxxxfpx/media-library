@@ -486,13 +486,16 @@ class FullMigration:
                     continue
 
                 try:
-                    link = ItemLinks(
-                        ItemId=item_id,
-                        LinkedItemId=local_source_id,
-                        SourceId=source_id,
-                        SourceLink=row.get('Url'),
+                    # 通过 SourceItemId 直接写入 MediaItem
+                    result = await db.execute(
+                        select(MediaItem).where(MediaItem.Id == item_id)
                     )
-                    db.add(link)
+                    media = result.scalar_one_or_none()
+                    if media:
+                        media.SourceId = source_id
+                        media.SourceLink = row.get('Url')
+                        media.SourceItemId = local_source_id
+                        db.add(media)
                     inserted += 1
                 except Exception:
                     skipped += 1

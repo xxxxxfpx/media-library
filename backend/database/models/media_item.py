@@ -18,11 +18,10 @@ from datetime import datetime, timezone
 from typing import Any, Optional, Set
 
 from sqlalchemy import (
-    BigInteger, Boolean, Column, DateTime, Enum as SQLEnum, Float, Index, Integer, String, Text, func
+    BigInteger, Boolean, Column, DateTime, Enum as SQLEnum, Float, ForeignKey, Index, Integer, String, Text, func
 )
 from sqlalchemy import event
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.hybrid import hybrid_property
 
 from .base import Base
 from .enums import ItemStatus, MediaType
@@ -98,6 +97,10 @@ class MediaItem(Base):
     PreferredMetadataCountryCode = Column("PreferredMetadataCountryCode", String(10), nullable=True, comment="首选元数据国家代码")
     LockedFields = Column("LockedFields", Text, nullable=True, comment="锁定字段 - JSON 数组")
 
+    SourceId = Column("SourceId", String(255), nullable=True, comment="来源标识 - 关联来源的唯一 ID")
+    SourceLink = Column("SourceLink", Text, nullable=True, comment="来源链接 - 关联来源的 URL 或路径")
+    SourceItemId = Column("SourceItemId", Integer, ForeignKey("MediaItems.Id", ondelete="SET NULL"), nullable=True, comment="指向 Source 类型 MediaItem 的 ID")
+
     Links = relationship("ItemLinks", back_populates="Item", cascade="all, delete-orphan", foreign_keys="ItemLinks.ItemId")
     LinkedItems = relationship("ItemLinks", back_populates="LinkedItem", cascade="all", foreign_keys="ItemLinks.LinkedItemId")
     UserDataItems = relationship("UserData", back_populates="Item", cascade="all, delete-orphan", foreign_keys="UserData.ItemId")
@@ -114,6 +117,9 @@ class MediaItem(Base):
         Index("idx_media_items_type_is_deleted_created", "Type", "IsDeleted", "DateCreated"),
         Index("idx_media_items_type_is_deleted_name", "Type", "IsDeleted", "Name"),
         Index("idx_media_items_type_is_deleted_rating", "Type", "IsDeleted", "CommunityRating"),
+        Index("idx_media_items_source_item", "SourceItemId"),
+        Index("idx_media_items_source_id", "SourceId"),
+        Index("idx_media_items_source_item_type", "SourceItemId", "SourceId", "Type"),
     )
 
 

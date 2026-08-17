@@ -47,8 +47,6 @@ def migrate():
             LinkedItemId INTEGER NOT NULL,
             PeopleType TEXT,
             PeopleRole TEXT,
-            SourceId TEXT,
-            SourceLink TEXT,
             CreatedAt TEXT NOT NULL,
             UpdatedAt TEXT NOT NULL,
             FOREIGN KEY (ItemId) REFERENCES MediaItems(Id) ON DELETE CASCADE,
@@ -57,15 +55,15 @@ def migrate():
     """)
     print("   新表创建完成")
 
-    # 5. 复制数据（只复制存在的列）
+    # 5. 复制数据（SourceId/SourceLink 已迁移至 MediaItems 表）
     print("\n5. 复制数据到新表...")
     cursor.execute("SELECT COUNT(*) FROM ItemLinks")
     total = cursor.fetchone()[0]
     print(f"   总记录数: {total}")
 
     cursor.execute("""
-        INSERT INTO ItemLinks_new (Id, ItemId, LinkedItemId, PeopleType, PeopleRole, SourceId, SourceLink, CreatedAt, UpdatedAt)
-        SELECT Id, ItemId, LinkedItemId, PeopleType, PeopleRole, SourceId, SourceLink, CreatedAt, UpdatedAt
+        INSERT INTO ItemLinks_new (Id, ItemId, LinkedItemId, PeopleType, PeopleRole, CreatedAt, UpdatedAt)
+        SELECT Id, ItemId, LinkedItemId, PeopleType, PeopleRole, CreatedAt, UpdatedAt
         FROM ItemLinks
     """)
     conn.commit()

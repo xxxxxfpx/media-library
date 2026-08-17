@@ -128,11 +128,10 @@ class TestMediaBatchAPI:
         assert item["Type"] == "Movie"
         assert item["Name"] == "测试电影"
 
-        # 验证 source 关联
-        itemlinks = await self._get_itemlinks(db_session, item["Id"])
-        source_links = [il for il in itemlinks if il["SourceId"] == "src-001"]
-        assert len(source_links) == 1, "应该有 source 关联"
-        assert source_links[0]["SourceLink"] == "http://example.com/1"
+        # 验证 source 关联（已迁移至 MediaItem 列）
+        assert item["SourceId"] == "src-001"
+        assert item["SourceLink"] == "http://example.com/1"
+        assert item["SourceItemId"] is not None
 
     @pytest.mark.asyncio
     async def test_full_attrs(self, app_client, db_session, auth_headers):

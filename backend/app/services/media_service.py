@@ -123,6 +123,27 @@ async def fetch_has_children_batch(db: AsyncSession, item_ids: List[int]) -> set
     return {row[0] for row in result.all()}
 
 
+async def fetch_source_names_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, str]:
+    """批量查询 items 的 source_name（通过 SourceItemId 关联 Source 类型 MediaItem）"""
+    if not item_ids:
+        return {}
+    result = await db.execute(
+        select(MediaItem.Id, MediaItem.SourceItemId)
+        .where(MediaItem.Id.in_(item_ids), MediaItem.SourceItemId.isnot(None))
+    )
+    source_ids = [row.SourceItemId for row in result.all()]
+    if not source_ids:
+        return {}
+    src_result = await db.execute(
+        select(MediaItem.Id, MediaItem.Name).where(
+            MediaItem.Id.in_(source_ids),
+            MediaItem.Type == MediaType.Source,
+        )
+    )
+    src_map = {row.Id: row.Name for row in src_result.all()}
+    return {row.Id: src_map.get(row.SourceItemId) for row in result.all()}
+
+
 # ==================== 搜索优化 ====================
 # SQLite 使用 FTS5 trigram 虚拟表（media_item_fts），PostgreSQL 使用 pg_trgm GIN 索引。
 # trigram 要求关键词 >= 3 字符才能命中索引；短词（常见中文 2 字词）回退 LIKE。
@@ -408,11 +429,14 @@ async def get_media_list(
     userdata_map = await fetch_userdata_batch(db, item_ids_list, user_id)
     alias_map = await fetch_alias_batch(db, item_ids_list)
     has_children_set = await fetch_has_children_batch(db, item_ids_list)
+    source_names_map = await fetch_source_names_batch(db, item_ids_list)
 
     media_list = []
     for item in items:
+        data = serialize_item(item).model_dump()
+        data['source_name'] = source_names_map.get(item.Id)
         entry = MediaItemResponse(
-            **serialize_item(item).model_dump(),
+            **data,
             links=links_map.get(item.Id, []),
             files=files_map.get(item.Id, []),
             userdata=userdata_map.get(item.Id, None),
@@ -547,8 +571,21 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
     )
     has_children_val = has_children.scalar() is True
 
+    # 获取 source_name（通过 SourceItemId 关联）
+    source_name = None
+    if item.SourceItemId is not None:
+        src_result = await db.execute(
+            select(MediaItem.Name).where(
+                MediaItem.Id == item.SourceItemId,
+                MediaItem.Type == MediaType.Source,
+            )
+        )
+        source_name = src_result.scalar_one_or_none()
+
+    data = serialize_item(item).model_dump()
+    data['source_name'] = source_name
     return MediaItemResponse(
-        **serialize_item(item).model_dump(),
+        **data,
         links=links,
         files=files,
         userdata=userdata,
@@ -684,7 +721,7 @@ async def create_media_batch(
                 "请确保通过 item_links 将所有媒体项连接起来，或使用 strict_graph=False 禁用此检查。"
             )
 
-    # 获取或创建 source_name 对应的 source item（用于唯一性判定）
+    # 获取或创建 source_name 对应的 source item
     source_name = data.source_name
     source_item_result = await db.execute(
         select(MediaItem.Id).where(
@@ -695,7 +732,6 @@ async def create_media_batch(
     )
     source_item_id = source_item_result.scalar_one_or_none()
 
-    # 如果 source item 不存在，则创建
     if source_item_id is None:
         source_item = MediaItem(
             Type=MediaType.Source,
@@ -710,24 +746,19 @@ async def create_media_batch(
         attrs = item_data.attrs
         source_info = item_data.source_info
 
-        # 查找是否已存在相同的 source_name + source_id + item.type
         source_id = source_info.source_id if source_info and source_info.is_set("source_id") else None
+        source_link = source_info.source_link if source_info and source_info.is_set("source_link") else None
         item_type = attrs.type if attrs.is_set("type") else None
 
-        # 通过 ItemLinks 查找 source 关联的 item
-        # 唯一性判定：source_name（source item的name）+ source_id + item.type
+        # 唯一性判定：SourceItemId + SourceId + Type（直接在 MediaItem 列上查询）
         existing_item_id = None
         if source_id and source_item_id and item_type:
             result = await db.execute(
-                select(ItemLinks.ItemId).where(
-                    ItemLinks.LinkedItemId == source_item_id,
-                    ItemLinks.SourceId == source_id,
-                    ItemLinks.ItemId.in_(
-                        select(MediaItem.Id).where(
-                            MediaItem.Type == item_type,
-                            MediaItem.IsDeleted == False
-                        )
-                    )
+                select(MediaItem.Id).where(
+                    MediaItem.SourceItemId == source_item_id,
+                    MediaItem.SourceId == source_id,
+                    MediaItem.Type == item_type,
+                    MediaItem.IsDeleted == False,
                 ).limit(1)
             )
             existing_item_id = result.scalar_one_or_none()
@@ -767,49 +798,34 @@ async def create_media_batch(
                 Status=ItemStatus(attrs.status) if attrs.status and attrs.is_set("status") else None,
                 PreferredMetadataLanguage=attrs.preferred_metadata_language if attrs.is_set("preferred_metadata_language") else None,
                 PreferredMetadataCountryCode=attrs.preferred_metadata_country_code if attrs.is_set("preferred_metadata_country_code") else None,
+                SourceItemId=source_item_id if source_id else None,
+                SourceId=source_id,
+                SourceLink=source_link,
             )
             db.add(item)
-            await db.flush()
-            item_temp_to_id[item_data.temp_id] = item.Id
-
-            # 创建 source 关联（如果提供了 source_id）
-            if source_id:
-                source_link = source_info.source_link if source_info and source_info.is_set("source_link") else None
-                # 对于 source item，LinkedItemId 指向自己；对于其他 item，LinkedItemId 指向 source
-                link_to_id = item.Id if item_type == MediaType.Source else source_item_id
-                source_link = ItemLinks(
-                    ItemId=item.Id,
-                    LinkedItemId=link_to_id,
-                    SourceId=source_id,
-                    SourceLink=source_link,
+            try:
+                await db.flush()
+            except IntegrityError:
+                await db.rollback()
+                # 并发场景：另一个请求已创建相同 source_name + source_id + item_type
+                # 重新查找已存在的 item 并复用其 id
+                result = await db.execute(
+                    select(MediaItem.Id).where(
+                        MediaItem.SourceItemId == source_item_id,
+                        MediaItem.SourceId == source_id,
+                        MediaItem.Type == item_type,
+                        MediaItem.IsDeleted == False,
+                    ).limit(1)
                 )
-                db.add(source_link)
-                try:
+                existing = result.scalar_one_or_none()
+                if existing:
+                    await db.delete(item)
                     await db.flush()
-                except IntegrityError:
-                    await db.rollback()
-                    # 并发场景：另一个请求已创建相同 source_name + source_id + item_type
-                    # 重新查找已存在的 item 并复用其 id
-                    result = await db.execute(
-                        select(ItemLinks.ItemId).where(
-                            ItemLinks.LinkedItemId == source_item_id,
-                            ItemLinks.SourceId == source_id,
-                            ItemLinks.ItemId.in_(
-                                select(MediaItem.Id).where(
-                                    MediaItem.Type == item_type,
-                                    MediaItem.IsDeleted == False
-                                )
-                            )
-                        ).limit(1)
-                    )
-                    existing = result.scalar_one_or_none()
-                    if existing:
-                        # 删除刚创建的重复 MediaItem，复用已有的
-                        await db.delete(item)
-                        await db.flush()
-                        item_temp_to_id[item_data.temp_id] = existing
-                        continue
-                    raise
+                    item_temp_to_id[item_data.temp_id] = existing
+                    continue
+                raise
+            else:
+                item_temp_to_id[item_data.temp_id] = item.Id
 
     # 2. 创建 Files
     for file_data in data.files:
