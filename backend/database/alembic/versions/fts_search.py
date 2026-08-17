@@ -15,6 +15,8 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
+from database.fts_ddl import FTS5_CREATE_SQL, FTS5_DROP_SQL
+
 
 # revision identifiers, used by Alembic.
 revision: str = 'fts_search'
@@ -24,36 +26,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _create_sqlite_fts(conn) -> None:
-    """创建 FTS5 外部内容虚拟表与同步触发器（幂等）"""
-    conn.execute(sa.text("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS media_item_fts USING fts5(
-            Name, Overview, Tagline,
-            content='MediaItems', content_rowid='Id',
-            tokenize='trigram'
-        )
-    """))
-    conn.execute(sa.text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_ai AFTER INSERT ON MediaItems BEGIN
-            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
-            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
-        END
-    """))
-    conn.execute(sa.text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_ad AFTER DELETE ON MediaItems BEGIN
-            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
-            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
-        END
-    """))
-    conn.execute(sa.text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_au AFTER UPDATE ON MediaItems BEGIN
-            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
-            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
-            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
-            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
-        END
-    """))
-    # 重建索引：从内容表回填所有行（幂等，重复执行无副作用）
-    conn.execute(sa.text("INSERT INTO media_item_fts(media_item_fts) VALUES('rebuild')"))
+    """创建 FTS5 外部内容虚拟表与同步触发器（幂等，DDL 与 database/core.py 共用单一来源）"""
+    for statement in FTS5_CREATE_SQL:
+        conn.execute(sa.text(statement))
 
 
 def _create_pg_trgm(conn) -> None:
@@ -83,10 +58,8 @@ def upgrade() -> None:
 def downgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "sqlite":
-        bind.execute(sa.text("DROP TRIGGER IF EXISTS media_item_fts_ai"))
-        bind.execute(sa.text("DROP TRIGGER IF EXISTS media_item_fts_ad"))
-        bind.execute(sa.text("DROP TRIGGER IF EXISTS media_item_fts_au"))
-        bind.execute(sa.text("DROP TABLE IF EXISTS media_item_fts"))
+        for statement in FTS5_DROP_SQL:
+            bind.execute(sa.text(statement))
     elif bind.dialect.name == "postgresql":
         bind.execute(sa.text("DROP INDEX IF EXISTS idx_aliases_name_trgm"))
         bind.execute(sa.text("DROP INDEX IF EXISTS idx_media_items_tagline_trgm"))

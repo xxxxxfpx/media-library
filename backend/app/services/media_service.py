@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
-from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata
+from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata, serialize_item
 from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
 from config import config as _app_config
 
@@ -131,27 +131,26 @@ _FTS_MIN_LENGTH = 3
 _fts_available: bool | None = None
 
 
-# ==================== 响应缓存 ====================
-# get_media_info / get_media_list 的 diskcache 缓存（TTL 30s），仅生产（debug=False）启用，
+# ==================== diskcache 缓存（统一惰性初始化） ====================
+# get_media_info / get_media_list 的响应缓存与 get_media_stats 的统计缓存共用
+# 同一惰性初始化机制，仅缓存目录名不同。仅生产（debug=False）启用，
 # 避免每次请求重复查询数据库。写操作（create_media_batch）成功后主动失效。
 
-_response_cache = None
-_response_cache_dir = None
+_cache_instances: dict = {}
 
 
-def _get_response_cache():
-    """惰性初始化响应缓存（diskcache，与 stats 缓存同机制）"""
-    global _response_cache, _response_cache_dir
-    if _response_cache is None:
+def _get_cache(name: str):
+    """惰性初始化指定名称的 diskcache 缓存（同名只创建一次）"""
+    if name not in _cache_instances:
         import os
         import diskcache
-        _response_cache_dir = os.path.join(
+        cache_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "data", "cache", "media_response",
+            "data", "cache", name,
         )
-        os.makedirs(_response_cache_dir, exist_ok=True)
-        _response_cache = diskcache.Cache(_response_cache_dir)
-    return _response_cache
+        os.makedirs(cache_dir, exist_ok=True)
+        _cache_instances[name] = diskcache.Cache(cache_dir)
+    return _cache_instances[name]
 
 
 def _cache_enabled() -> bool:
@@ -162,21 +161,20 @@ def _cache_enabled() -> bool:
 async def _cache_get(key: str):
     if not _cache_enabled():
         return None
-    return _get_response_cache().get(key)
+    return _get_cache("media_response").get(key)
 
 
 async def _cache_set(key: str, value, expire: int = 30) -> None:
     if not _cache_enabled():
         return
-    _get_response_cache().set(key, value, expire=expire)
+    _get_cache("media_response").set(key, value, expire=expire)
 
 
 def invalidate_response_cache() -> None:
     """媒体数据变更后失效全部响应缓存"""
-    global _response_cache
-    if _response_cache is None:
-        return
-    _response_cache.clear()
+    cache = _cache_instances.get("media_response")
+    if cache is not None:
+        cache.clear()
 
 
 async def _is_fts_available(db: AsyncSession) -> bool:
@@ -414,18 +412,7 @@ async def get_media_list(
     media_list = []
     for item in items:
         entry = MediaItemResponse(
-            id=item.Id,
-            name=item.Name,
-            type=item.Type.value if item.Type else None,
-            overview=item.Overview,
-            tagline=item.Tagline,
-            premiere_date=item.PremiereDate.isoformat() if item.PremiereDate else None,
-            end_date=item.EndDate.isoformat() if item.EndDate else None,
-            official_rating=item.OfficialRating,
-            community_rating=item.CommunityRating,
-            critic_rating=item.CriticRating,
-            date_created=item.DateCreated.isoformat() if item.DateCreated else None,
-            date_modified=item.DateModified.isoformat() if item.DateModified else None,
+            **serialize_item(item).model_dump(),
             links=links_map.get(item.Id, []),
             files=files_map.get(item.Id, []),
             userdata=userdata_map.get(item.Id, None),
@@ -561,18 +548,7 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
     has_children_val = has_children.scalar() is True
 
     return MediaItemResponse(
-        id=item.Id,
-        name=item.Name,
-        type=item.Type.value if item.Type else None,
-        overview=item.Overview,
-        tagline=item.Tagline,
-        premiere_date=item.PremiereDate.isoformat() if item.PremiereDate else None,
-        end_date=item.EndDate.isoformat() if item.EndDate else None,
-        official_rating=item.OfficialRating,
-        community_rating=item.CommunityRating,
-        critic_rating=item.CriticRating,
-        date_created=item.DateCreated.isoformat() if item.DateCreated else None,
-        date_modified=item.DateModified.isoformat() if item.DateModified else None,
+        **serialize_item(item).model_dump(),
         links=links,
         files=files,
         userdata=userdata,
@@ -939,31 +915,12 @@ async def create_media_batch(
     }
 
 
-_stats_cache_dir = None
-_stats_cache = None
-
-
-def _get_stats_cache():
-    """惰性初始化统计缓存（diskcache，与 file_url 缓存同机制）"""
-    global _stats_cache_dir, _stats_cache
-    if _stats_cache is None:
-        import os
-        import diskcache
-        _stats_cache_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            "data", "cache", "media_stats",
-        )
-        os.makedirs(_stats_cache_dir, exist_ok=True)
-        _stats_cache = diskcache.Cache(_stats_cache_dir)
-    return _stats_cache
-
-
 async def get_media_stats(db: AsyncSession) -> dict:
     # 统计结果缓存 60s，避免首页每次全表 group by；
     # debug 模式（开发/测试）禁用缓存，保证数据一致性
     from config import config as _config
     if not _config.app.debug:
-        cache = _get_stats_cache()
+        cache = _get_cache("media_stats")
         cached = cache.get("media_stats")
         if cached is not None:
             return cached

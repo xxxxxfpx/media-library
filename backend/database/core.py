@@ -6,24 +6,23 @@ Database Core - 数据库核心配置
 提供 SQLAlchemy 异步引擎、会话工厂和依赖注入配置。
 
 使用方式:
-    from database.core import SessionManager
+    from database.core import AsyncSessionLocal
 
-    # 上下文管理器方式
-    async with SessionManager() as session:
+    async with AsyncSessionLocal() as session:
         stmt = select(User).where(User.Username == username)
         result = await session.execute(stmt)
 
 作者：数据库架构团队
-版本：3.0.0 (移除循环导入，统一会话管理)
+版本：3.1.0 (移除未使用的 SessionManager，统一 get_db_session)
 """
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import event, text
-from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from config import config
+from database.fts_ddl import FTS5_CREATE_SQL
 
 # 构建数据库URL
 if config.database.type == "sqlite":
@@ -74,24 +73,6 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
 )
 
-@asynccontextmanager
-async def SessionManager(auto_commit: bool = True) -> AsyncGenerator[AsyncSession, None]:
-    """
-    获取数据库会话（上下文管理器方式）
-
-    Yields:
-        AsyncSession: 异步数据库会话
-    """
-    async with AsyncSessionLocal() as db:
-        try:
-            yield db
-            if auto_commit:
-                await db.commit()
-        except Exception:
-            await db.rollback()
-            raise
-
-
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     获取数据库会话（FastAPI 依赖注入方式）
@@ -115,37 +96,11 @@ from database.models.base import Base
 
 
 async def _ensure_fts5(conn) -> None:
-    """SQLite 下创建 FTS5 trigram 虚拟表与同步触发器（幂等，与 alembic fts_search 迁移一致）"""
+    """SQLite 下创建 FTS5 trigram 虚拟表与同步触发器（幂等，DDL 与 alembic fts_search 迁移共用单一来源）"""
     if config.database.type != "sqlite":
         return
-    await conn.execute(text("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS media_item_fts USING fts5(
-            Name, Overview, Tagline,
-            content='MediaItems', content_rowid='Id',
-            tokenize='trigram'
-        )
-    """))
-    await conn.execute(text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_ai AFTER INSERT ON MediaItems BEGIN
-            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
-            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
-        END
-    """))
-    await conn.execute(text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_ad AFTER DELETE ON MediaItems BEGIN
-            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
-            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
-        END
-    """))
-    await conn.execute(text("""
-        CREATE TRIGGER IF NOT EXISTS media_item_fts_au AFTER UPDATE ON MediaItems BEGIN
-            INSERT INTO media_item_fts(media_item_fts, rowid, Name, Overview, Tagline)
-            VALUES ('delete', old.Id, old.Name, old.Overview, old.Tagline);
-            INSERT INTO media_item_fts(rowid, Name, Overview, Tagline)
-            VALUES (new.Id, new.Name, new.Overview, new.Tagline);
-        END
-    """))
-    await conn.execute(text("INSERT INTO media_item_fts(media_item_fts) VALUES('rebuild')"))
+    for statement in FTS5_CREATE_SQL:
+        await conn.execute(text(statement))
 
 
 async def init_db():

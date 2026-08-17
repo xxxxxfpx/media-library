@@ -34,7 +34,6 @@ from database.core import (
     engine,
     AsyncSessionLocal,
     Base,
-    SessionManager,
     get_db_session,
 )
 
@@ -56,6 +55,5 @@ __all__ = [
     "ImageType",
     "engine",
     "AsyncSessionLocal",
-    "SessionManager",
     "get_db_session",
 ]
