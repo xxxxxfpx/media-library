@@ -17,6 +17,8 @@
 每个测试后通过 db_session 直接查询数据库验证
 """
 
+import json
+
 import pytest
 from sqlalchemy import text
 from pydantic import ValidationError
@@ -464,6 +466,70 @@ class TestMediaBatchAPI:
         assert item_data["overview"] == "原简介", f"overview 应该保持不变，实际: {item_data.get('overview')}"
 
     @pytest.mark.asyncio
+    async def test_duplicate_item_update_all_fields(self, app_client, db_session, auth_headers):
+        """测试9a: 重复提交时更新所有显式设置的属性字段"""
+        data1 = MediaBatchCreate(
+            source_name="dup_full_test",
+            items=[
+                ItemCreate(
+                    temp_id="item-1",
+                    source_info=SourceInfo(source_id="dup-full-001", source_link="http://old.link"),
+                    attrs=ItemBaseAttrs(
+                        type="Movie", name="原名", overview="原简介", tagline="原标语",
+                        official_rating="PG", community_rating=7.0, critic_rating=70.0,
+                        premiere_date="2023-01-01", status="Continuing",
+                        production_locations=["美国"], remote_trailers=["http://t1"],
+                        preferred_metadata_language="en", preferred_metadata_country_code="US",
+                    )
+                )
+            ]
+        )
+        resp1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
+        assert resp1.status_code == 200, f"第一次提交失败: {resp1.text}"
+        item_id = resp1.json()["items"]["item-1"]
+
+        # 第二次提交相同 source_id，所有字段都给新值
+        data2 = MediaBatchCreate(
+            source_name="dup_full_test",
+            items=[
+                ItemCreate(
+                    temp_id="item-2",
+                    source_info=SourceInfo(source_id="dup-full-001", source_link="http://new.link"),
+                    attrs=ItemBaseAttrs(
+                        type="Movie", name="新名", overview="新简介", tagline="新标语",
+                        official_rating="PG-13", community_rating=8.5, critic_rating=85.0,
+                        premiere_date="2024-06-15", status="Ended",
+                        production_locations=["中国"], remote_trailers=["http://t2"],
+                        preferred_metadata_language="zh", preferred_metadata_country_code="CN",
+                    )
+                )
+            ]
+        )
+        resp2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
+        assert resp2.status_code == 200, f"第二次提交失败: {resp2.text}"
+        assert resp2.json()["items"]["item-2"] == item_id, "重复 source_id 应更新而非新建"
+
+        # API 暴露的字段
+        info = (await app_client.get(f"/api/media/info?id={item_id}", headers=auth_headers)).json()
+        assert info["name"] == "新名"
+        assert info["overview"] == "新简介"
+        assert info["tagline"] == "新标语"
+        assert info["official_rating"] == "PG-13"
+        assert info["community_rating"] == 8.5
+        assert info["critic_rating"] == 85.0
+        assert info["source_link"] == "http://new.link"
+
+        # 数据库全字段校验（含 API 未暴露的字段）
+        item = await self._get_item_by_name(db_session, "新名")
+        assert item is not None
+        assert item["Status"] == "Ended"
+        assert item["ProductionLocations"] == json.dumps(["中国"], ensure_ascii=False)
+        assert item["RemoteTrailers"] == json.dumps(["http://t2"], ensure_ascii=False)
+        assert item["PreferredMetadataLanguage"] == "zh"
+        assert item["PreferredMetadataCountryCode"] == "CN"
+        assert item["SourceLink"] == "http://new.link"
+
+    @pytest.mark.asyncio
     async def test_different_source_same_source_id(self, app_client, db_session, auth_headers):
         """测试9b: 不同 source_name 相同 source_id 应该创建不同 item"""
         # 第一次创建 - source_A
@@ -765,7 +831,7 @@ class TestMediaBatchAPI:
 
     @pytest.mark.asyncio
     async def test_item_link_to_nonexistent_temp_id(self, app_client, db_session, auth_headers):
-        """测试15: item_link 引用不存在的 temp_id（应被静默忽略）"""
+        """测试15: item_link 引用不存在的 temp_id（应返回 422 报错）"""
         data = MediaBatchCreate(
             source_name="nonexistent_link_test",
             items=[
@@ -777,15 +843,8 @@ class TestMediaBatchAPI:
         )
 
         response = await app_client.post("/api/media/batch?strict_graph=false", json=data.model_dump(exclude_unset=True), headers=auth_headers)
-        assert response.status_code == 200, f"请求失败: {response.text}"
-
-        result = response.json()
-        # item-1 存在，non-existent-temp-id 不存在，所以 link 不应该创建
-        m1_id = result["items"]["item-1"]
-        m1_links = await self._get_itemlinks(db_session, m1_id)
-        # linked 指向不存在的 id，所以不会有任何关联
-        linked_to_nonexistent = [l for l in m1_links if l["LinkedItemId"] not in result["items"].values()]
-        assert len(linked_to_nonexistent) == 0, "引用不存在 temp_id 的 link 应该被跳过"
+        assert response.status_code == 422, f"引用不存在 temp_id 的 link 应该返回 422，实际: {response.status_code}"
+        assert "non-existent-temp-id" in response.text, f"错误信息应指出缺失的 temp_id，实际: {response.text}"
 
     @pytest.mark.asyncio
     async def test_orphaned_file(self, app_client, db_session, auth_headers):
@@ -955,6 +1014,66 @@ class TestMediaBatchAPI:
         count_result = await db_session.execute(text("SELECT COUNT(*) FROM MediaItems WHERE IsDeleted = 0"))
         db_count = count_result.scalar()
         assert db_count >= 50, f"数据库应有至少 50 条记录，实际: {db_count}"
+
+    @pytest.mark.asyncio
+    async def test_duplicate_file_path_reuses(self, app_client, db_session, auth_headers):
+        """测试21b: 相同 Path 的文件重复提交应幂等复用同一文件，而非报错或新建"""
+        data1 = MediaBatchCreate(
+            source_name="dup_file_test",
+            items=[
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影")),
+            ],
+            files=[
+                FileCreate(temp_id="file-1", attrs=FileBaseAttrs(name="a.mp4", path="/v/a.mp4", type="Video", size=1024)),
+            ],
+            file_links=[
+                FileLinkCreate(item="item-1", file="file-1"),
+            ]
+        )
+        resp1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
+        assert resp1.status_code == 200, f"第一次提交失败: {resp1.text}"
+        file_id1 = resp1.json()["files"]["file-1"]
+
+        # 重复提交相同 Path（不同 temp_id/name/size），应复用同一文件并更新字段
+        data2 = MediaBatchCreate(
+            source_name="dup_file_test",
+            items=[
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影")),
+            ],
+            files=[
+                FileCreate(temp_id="file-2", attrs=FileBaseAttrs(name="a2.mp4", path="/v/a.mp4", type="Video", size=2048)),
+            ],
+            file_links=[
+                FileLinkCreate(item="item-1", file="file-2"),
+            ]
+        )
+        resp2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
+        assert resp2.status_code == 200, f"重复 Path 提交不应报错: {resp2.text}"
+        file_id2 = resp2.json()["files"]["file-2"]
+        assert file_id2 == file_id1, f"相同 Path 应复用同一文件，实际 file1={file_id1}, file2={file_id2}"
+
+        # 文件总数应只有 1 条，且字段已更新
+        count = (await db_session.execute(text("SELECT COUNT(*) FROM Files WHERE Path = '/v/a.mp4'"))).scalar()
+        assert count == 1, f"相同 Path 只应有 1 条文件记录，实际: {count}"
+        file_row = (await db_session.execute(text("SELECT * FROM Files WHERE Path = '/v/a.mp4'"))).fetchone()
+        assert file_row._mapping["Name"] == "a2.mp4"
+        assert file_row._mapping["Size"] == 2048
+
+    @pytest.mark.asyncio
+    async def test_file_link_to_nonexistent_temp_id(self, app_client, db_session, auth_headers):
+        """测试21c: file_link 引用不存在的 temp_id（应返回 422 报错）"""
+        data = MediaBatchCreate(
+            source_name="nonexistent_file_link_test",
+            items=[
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
+            ],
+            file_links=[
+                FileLinkCreate(item="item-1", file="missing-file"),
+            ]
+        )
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
+        assert response.status_code == 422, f"引用不存在 temp_id 的 file_link 应返回 422，实际: {response.status_code}"
+        assert "missing-file" in response.text, f"错误信息应指出缺失的 temp_id，实际: {response.text}"
 
     # ========== strict_graph 相关测试 ==========
 

@@ -5,7 +5,7 @@ import time
 from collections import defaultdict
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, or_, text
+from sqlalchemy import select, func, or_, text, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -721,6 +721,22 @@ async def create_media_batch(
                 "请确保通过 item_links 将所有媒体项连接起来，或使用 strict_graph=False 禁用此检查。"
             )
 
+    # 0b. 校验关联引用的 temp_id 均存在，避免数据静默丢失
+    item_temp_ids = {item.temp_id for item in data.items}
+    file_temp_ids = {file.temp_id for file in data.files}
+    missing_refs = []
+    for link in data.item_links:
+        if link.link not in item_temp_ids or link.linked not in item_temp_ids:
+            missing_refs.append(f"item_link: {link.link} -> {link.linked}")
+    for f_link in data.file_links:
+        if f_link.item not in item_temp_ids or f_link.file not in file_temp_ids:
+            missing_refs.append(f"file_link: item={f_link.item} file={f_link.file}")
+    if missing_refs:
+        shown = ", ".join(missing_refs[:10])
+        if len(missing_refs) > 10:
+            shown += f" 等共 {len(missing_refs)} 处"
+        raise ValueError(f"item_links/file_links 引用了不存在的 temp_id: {shown}")
+
     # 获取或创建 source_name 对应的 source item
     source_name = data.source_name
     source_item_result = await db.execute(
@@ -741,46 +757,78 @@ async def create_media_batch(
         await db.flush()
         source_item_id = source_item.Id
 
+    # 预查询：按 (source_id, type) 批量查找已存在 items，消除逐条 SELECT 的 N+1
+    item_key_existing: dict[tuple, MediaItem] = {}
+    item_key_created: dict[tuple, MediaItem] = {}
+    dedup_keys = []
+    for item_data in data.items:
+        attrs = item_data.attrs
+        source_info = item_data.source_info
+        source_id = source_info.source_id if source_info and source_info.is_set("source_id") else None
+        item_type = attrs.type if attrs.is_set("type") else None
+        if source_id and source_item_id and item_type:
+            dedup_keys.append((source_id, MediaType(item_type)))
+    if dedup_keys:
+        uniq_keys = list(dict.fromkeys(dedup_keys))
+        conditions = [
+            and_(
+                MediaItem.SourceItemId == source_item_id,
+                MediaItem.SourceId == key[0],
+                MediaItem.Type == key[1],
+                MediaItem.IsDeleted == False,
+            )
+            for key in uniq_keys
+        ]
+        result = await db.execute(select(MediaItem).where(or_(*conditions)))
+        for item in result.scalars().all():
+            item_key_existing[(item.SourceId, item.Type)] = item
+
     # 1. 创建或查找 Items
     for item_data in data.items:
         attrs = item_data.attrs
         source_info = item_data.source_info
-
         source_id = source_info.source_id if source_info and source_info.is_set("source_id") else None
         source_link = source_info.source_link if source_info and source_info.is_set("source_link") else None
         item_type = attrs.type if attrs.is_set("type") else None
+        dedup_key = (source_id, MediaType(item_type)) if (source_id and source_item_id and item_type) else None
 
-        # 唯一性判定：SourceItemId + SourceId + Type（直接在 MediaItem 列上查询）
-        existing_item_id = None
-        if source_id and source_item_id and item_type:
-            result = await db.execute(
-                select(MediaItem.Id).where(
-                    MediaItem.SourceItemId == source_item_id,
-                    MediaItem.SourceId == source_id,
-                    MediaItem.Type == item_type,
-                    MediaItem.IsDeleted == False,
-                ).limit(1)
-            )
-            existing_item_id = result.scalar_one_or_none()
+        existing = item_key_existing.get(dedup_key) if dedup_key else None
+        if existing is None and dedup_key:
+            existing = item_key_created.get(dedup_key)
 
-        if existing_item_id:
-            # 更新现有 item
-            result = await db.execute(
-                select(MediaItem).where(MediaItem.Id == existing_item_id)
-            )
-            item = result.scalar_one()
+        if existing:
+            # 更新现有 item（仅更新显式设置的字段，未设置的保持原值）
             if attrs.is_set("name"):
-                item.Name = attrs.name
+                existing.Name = attrs.name
             if attrs.is_set("overview"):
-                item.Overview = attrs.overview
+                existing.Overview = attrs.overview
             if attrs.is_set("tagline"):
-                item.Tagline = attrs.tagline
+                existing.Tagline = attrs.tagline
+            if attrs.is_set("official_rating"):
+                existing.OfficialRating = attrs.official_rating
             if attrs.is_set("community_rating"):
-                item.CommunityRating = attrs.community_rating
-            item.DateModified = now
-            db.add(item)
+                existing.CommunityRating = attrs.community_rating
+            if attrs.is_set("critic_rating"):
+                existing.CriticRating = attrs.critic_rating
+            if attrs.is_set("premiere_date"):
+                existing.PremiereDate = parse_datetime(attrs.premiere_date)
+            if attrs.is_set("end_date"):
+                existing.EndDate = parse_datetime(attrs.end_date)
+            if attrs.is_set("production_locations"):
+                existing.ProductionLocations = to_json(attrs.production_locations)
+            if attrs.is_set("remote_trailers"):
+                existing.RemoteTrailers = to_json(attrs.remote_trailers)
+            if attrs.is_set("status"):
+                existing.Status = ItemStatus(attrs.status) if attrs.status else None
+            if attrs.is_set("preferred_metadata_language"):
+                existing.PreferredMetadataLanguage = attrs.preferred_metadata_language
+            if attrs.is_set("preferred_metadata_country_code"):
+                existing.PreferredMetadataCountryCode = attrs.preferred_metadata_country_code
+            if source_info and source_info.is_set("source_link"):
+                existing.SourceLink = source_link
+            existing.DateModified = now
             await db.flush()
-            item_temp_to_id[item_data.temp_id] = existing_item_id
+            item_temp_to_id[item_data.temp_id] = existing.Id
         else:
             # 创建新 item
             item = MediaItem(
@@ -802,119 +850,189 @@ async def create_media_batch(
                 SourceId=source_id,
                 SourceLink=source_link,
             )
-            db.add(item)
             try:
-                await db.flush()
+                async with db.begin_nested():
+                    db.add(item)
+                    await db.flush()
             except IntegrityError:
-                await db.rollback()
                 # 并发场景：另一个请求已创建相同 source_name + source_id + item_type
-                # 重新查找已存在的 item 并复用其 id
+                # SAVEPOINT 已回滚当前 item，外层事务保持完整；重新查找并复用其 id
                 result = await db.execute(
-                    select(MediaItem.Id).where(
+                    select(MediaItem).where(
                         MediaItem.SourceItemId == source_item_id,
                         MediaItem.SourceId == source_id,
                         MediaItem.Type == item_type,
                         MediaItem.IsDeleted == False,
                     ).limit(1)
                 )
-                existing = result.scalar_one_or_none()
-                if existing:
-                    await db.delete(item)
-                    await db.flush()
-                    item_temp_to_id[item_data.temp_id] = existing
+                found = result.scalar_one_or_none()
+                if found:
+                    item_temp_to_id[item_data.temp_id] = found.Id
+                    if dedup_key:
+                        item_key_created[dedup_key] = found
                     continue
                 raise
             else:
                 item_temp_to_id[item_data.temp_id] = item.Id
+                if dedup_key:
+                    item_key_created[dedup_key] = item
 
-    # 2. 创建 Files
+    # 预查询：按 Path 批量查找已存在的 Files
+    file_path_existing: dict[str, File] = {}
+    file_path_created: dict[str, File] = {}
+    dedup_paths = [f.attrs.path for f in data.files if f.attrs.path is not None]
+    if dedup_paths:
+        result = await db.execute(
+            select(File).where(File.Path.in_(list(dict.fromkeys(dedup_paths))))
+        )
+        for file in result.scalars().all():
+            file_path_existing[file.Path] = file
+
+    # 2. 创建 Files（按 Path 去重，重复提交幂等复用）
     for file_data in data.files:
         attrs = file_data.attrs
-        file = File(
-            Name=attrs.name if attrs.is_set("name") else None,
-            Path=attrs.path if attrs.is_set("path") else None,
-            Type=FileType(attrs.type) if attrs.is_set("type") else FileType.Other,
-            Size=attrs.size if attrs.is_set("size") else None,
-            Etag=attrs.etag if attrs.is_set("etag") else None,
-            FFmpeg=to_json(attrs.ffmpeg),
-        )
-        db.add(file)
-        await db.flush()
-        file_temp_to_id[file_data.temp_id] = file.Id
+        existing = None
+        if attrs.path is not None:
+            existing = file_path_existing.get(attrs.path)
+            if existing is None:
+                existing = file_path_created.get(attrs.path)
+        if existing:
+            if attrs.is_set("name"):
+                existing.Name = attrs.name
+            if attrs.is_set("size"):
+                existing.Size = attrs.size
+            if attrs.is_set("etag"):
+                existing.Etag = attrs.etag
+            if attrs.is_set("type"):
+                existing.Type = FileType(attrs.type)
+            if attrs.is_set("ffmpeg"):
+                existing.FFmpeg = to_json(attrs.ffmpeg)
+            existing.UpdatedAt = now
+            await db.flush()
+            file_temp_to_id[file_data.temp_id] = existing.Id
+        else:
+            file = File(
+                Name=attrs.name if attrs.is_set("name") else None,
+                Path=attrs.path if attrs.is_set("path") else None,
+                Type=FileType(attrs.type) if attrs.is_set("type") else FileType.Other,
+                Size=attrs.size if attrs.is_set("size") else None,
+                Etag=attrs.etag if attrs.is_set("etag") else None,
+                FFmpeg=to_json(attrs.ffmpeg),
+            )
+            try:
+                async with db.begin_nested():
+                    db.add(file)
+                    await db.flush()
+            except IntegrityError:
+                # 并发场景：Path 唯一约束冲突，复用已存在的文件
+                existing_file = None
+                if attrs.path is not None:
+                    res = await db.execute(
+                        select(File).where(File.Path == attrs.path).limit(1)
+                    )
+                    existing_file = res.scalar_one_or_none()
+                if existing_file:
+                    file_temp_to_id[file_data.temp_id] = existing_file.Id
+                    if attrs.path is not None:
+                        file_path_created[attrs.path] = existing_file
+                    continue
+                raise
+            else:
+                file_temp_to_id[file_data.temp_id] = file.Id
+                if attrs.path is not None:
+                    file_path_created[attrs.path] = file
+
+    # 预查询：批量查找已存在的 ItemLinks
+    link_existing: dict[tuple, ItemLinks] = {}
+    link_created: dict[tuple, ItemLinks] = {}
+    link_pairs = [
+        (item_temp_to_id[link_data.link], item_temp_to_id[link_data.linked])
+        for link_data in data.item_links
+    ]
+    if link_pairs:
+        uniq_pairs = list(dict.fromkeys(link_pairs))
+        conditions = [
+            and_(ItemLinks.ItemId == pair[0], ItemLinks.LinkedItemId == pair[1])
+            for pair in uniq_pairs
+        ]
+        result = await db.execute(select(ItemLinks).where(or_(*conditions)))
+        for link in result.scalars().all():
+            link_existing[(link.ItemId, link.LinkedItemId)] = link
 
     # 3. 创建 ItemLinks
     for link_data in data.item_links:
-        link_item_id = item_temp_to_id.get(link_data.link)
-        linked_item_id = item_temp_to_id.get(link_data.linked)
+        pair = (item_temp_to_id[link_data.link], item_temp_to_id[link_data.linked])
+        existing = link_existing.get(pair)
+        if existing is None:
+            existing = link_created.get(pair)
 
-        if link_item_id and linked_item_id:
-            # 检查是否已存在相同关联
-            existing = await db.execute(
-                select(ItemLinks).where(
-                    ItemLinks.ItemId == link_item_id,
-                    ItemLinks.LinkedItemId == linked_item_id,
-                )
+        if existing:
+            if link_data.is_set("people_type"):
+                existing.PeopleType = PersonType(link_data.people_type) if link_data.people_type else None
+            if link_data.is_set("people_role"):
+                existing.PeopleRole = link_data.people_role
+            existing.UpdatedAt = now
+        else:
+            new_link = ItemLinks(
+                ItemId=pair[0],
+                LinkedItemId=pair[1],
+                PeopleType=PersonType(link_data.people_type) if link_data.people_type and link_data.is_set("people_type") else None,
+                PeopleRole=link_data.people_role if link_data.is_set("people_role") else None,
             )
-            existing_link = existing.scalar_one_or_none()
+            db.add(new_link)
+            link_created[pair] = new_link
 
-            if existing_link:
-                if link_data.is_set("people_type"):
-                    existing_link.PeopleType = PersonType(link_data.people_type) if link_data.people_type else None
-                if link_data.is_set("people_role"):
-                    existing_link.PeopleRole = link_data.people_role
-                existing_link.UpdatedAt = now
-                db.add(existing_link)
-            else:
-                new_link = ItemLinks(
-                    ItemId=link_item_id,
-                    LinkedItemId=linked_item_id,
-                    PeopleType=PersonType(link_data.people_type) if link_data.people_type and link_data.is_set("people_type") else None,
-                    PeopleRole=link_data.people_role if link_data.is_set("people_role") else None,
-                )
-                db.add(new_link)
+    # 预查询：批量查找已存在的 FileLinks
+    file_link_existing: dict[tuple, FileLink] = {}
+    file_link_created: dict[tuple, FileLink] = {}
+    file_link_pairs = [
+        (item_temp_to_id[f_link.item], file_temp_to_id[f_link.file])
+        for f_link in data.file_links
+    ]
+    if file_link_pairs:
+        uniq_pairs = list(dict.fromkeys(file_link_pairs))
+        conditions = [
+            and_(FileLink.ItemId == pair[0], FileLink.FileId == pair[1])
+            for pair in uniq_pairs
+        ]
+        result = await db.execute(select(FileLink).where(or_(*conditions)))
+        for f_link in result.scalars().all():
+            file_link_existing[(f_link.ItemId, f_link.FileId)] = f_link
 
     # 4. 创建 FileLinks
-    for file_link_data in data.file_links:
-        item_id = item_temp_to_id.get(file_link_data.item)
-        file_id = file_temp_to_id.get(file_link_data.file)
+    for f_link_data in data.file_links:
+        pair = (item_temp_to_id[f_link_data.item], file_temp_to_id[f_link_data.file])
+        existing = file_link_existing.get(pair)
+        if existing is None:
+            existing = file_link_created.get(pair)
 
-        if item_id and file_id:
-            # 检查是否已存在相同关联
-            existing = await db.execute(
-                select(FileLink).where(
-                    FileLink.ItemId == item_id,
-                    FileLink.FileId == file_id,
-                )
+        if existing:
+            if f_link_data.is_set("image_type"):
+                existing.ImageType = ImageType(f_link_data.image_type) if f_link_data.image_type else None
+            if f_link_data.is_set("image_index"):
+                existing.ImageIndex = f_link_data.image_index
+            if f_link_data.is_set("chapter_index"):
+                existing.ChapterIndex = f_link_data.chapter_index
+            if f_link_data.is_set("chapter_name"):
+                existing.ChapterName = f_link_data.chapter_name
+            if f_link_data.is_set("start_position_ticks"):
+                existing.StartPositionTicks = f_link_data.start_position_ticks
+            if f_link_data.is_set("marker_type"):
+                existing.MarkerType = f_link_data.marker_type
+            existing.UpdatedAt = now
+        else:
+            new_fl = FileLink(
+                ItemId=pair[0],
+                FileId=pair[1],
+                ImageType=ImageType(f_link_data.image_type) if f_link_data.image_type and f_link_data.is_set("image_type") else None,
+                ImageIndex=f_link_data.image_index if f_link_data.is_set("image_index") else 0,
+                ChapterIndex=f_link_data.chapter_index if f_link_data.is_set("chapter_index") else None,
+                ChapterName=f_link_data.chapter_name if f_link_data.is_set("chapter_name") else None,
+                StartPositionTicks=f_link_data.start_position_ticks if f_link_data.is_set("start_position_ticks") else None,
+                MarkerType=f_link_data.marker_type if f_link_data.is_set("marker_type") else None,
             )
-            existing_fl = existing.scalar_one_or_none()
-
-            if existing_fl:
-                if file_link_data.is_set("image_type"):
-                    existing_fl.ImageType = ImageType(file_link_data.image_type) if file_link_data.image_type else None
-                if file_link_data.is_set("image_index"):
-                    existing_fl.ImageIndex = file_link_data.image_index
-                if file_link_data.is_set("chapter_index"):
-                    existing_fl.ChapterIndex = file_link_data.chapter_index
-                if file_link_data.is_set("chapter_name"):
-                    existing_fl.ChapterName = file_link_data.chapter_name
-                if file_link_data.is_set("start_position_ticks"):
-                    existing_fl.StartPositionTicks = file_link_data.start_position_ticks
-                if file_link_data.is_set("marker_type"):
-                    existing_fl.MarkerType = file_link_data.marker_type
-                existing_fl.UpdatedAt = now
-                db.add(existing_fl)
-            else:
-                new_fl = FileLink(
-                    ItemId=item_id,
-                    FileId=file_id,
-                    ImageType=ImageType(file_link_data.image_type) if file_link_data.image_type and file_link_data.is_set("image_type") else None,
-                    ImageIndex=file_link_data.image_index if file_link_data.is_set("image_index") else 0,
-                    ChapterIndex=file_link_data.chapter_index if file_link_data.is_set("chapter_index") else None,
-                    ChapterName=file_link_data.chapter_name if file_link_data.is_set("chapter_name") else None,
-                    StartPositionTicks=file_link_data.start_position_ticks if file_link_data.is_set("start_position_ticks") else None,
-                    MarkerType=file_link_data.marker_type if file_link_data.is_set("marker_type") else None,
-                )
-                db.add(new_fl)
+            db.add(new_fl)
+            file_link_created[pair] = new_fl
 
     await db.commit()
 
