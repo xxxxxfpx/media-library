@@ -43,12 +43,7 @@ class MediaItem(Base):
 
     FOLDER_MEDIA_TYPES: Set[MediaType] = {
         MediaType.Source,
-        MediaType.UserRootFolder,
-        MediaType.UserView,
-        MediaType.Folder,
-        MediaType.AggregateFolder,
         MediaType.BoxSet,
-        MediaType.Playlist,
         MediaType.Season,
         MediaType.Series,
         MediaType.Genre,
@@ -93,9 +88,6 @@ class MediaItem(Base):
         nullable=False,
         comment="修改日期 - UTC 时间"
     )
-    DateLastRefreshed = Column("DateLastRefreshed", DateTime(timezone=True), nullable=True, comment="最后刷新日期")
-    DateLastSaved = Column("DateLastSaved", DateTime(timezone=True), nullable=True, comment="最后保存日期")
-
     CreatedAt = Column("CreatedAt", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, comment="审计字段 - 创建时间")
     UpdatedAt = Column("UpdatedAt", DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False, comment="审计字段 - 更新时间")
 

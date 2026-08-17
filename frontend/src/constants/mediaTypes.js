@@ -3,8 +3,7 @@
  */
 
 import {
-  Film, VideoCamera, Headset, Picture,
-  Document, Notebook, User, FolderOpened, Collection
+  Film, VideoCamera, User, FolderOpened, Collection
 } from '@element-plus/icons-vue'
 
 export const TYPE_LABELS = {
@@ -12,16 +11,12 @@ export const TYPE_LABELS = {
   'Series': '剧集',
   'Season': '季度',
   'Episode': '单集',
-  'Audio': '音乐',
-  'Photo': '图片',
-  'Book': '图书',
   'Person': '人物',
   'Source': '媒体源',
   'Studio': '工作室',
   'Genre': '类型',
   'Tag': '标签',
-  'CollectionFolder': '合集',
-  'BoxSet': '合集包',
+  'BoxSet': '合集',
 }
 
 export const TYPE_ICONS = {
@@ -29,22 +24,17 @@ export const TYPE_ICONS = {
   'Series': 'Film',
   'Season': 'Film',
   'Episode': 'Film',
-  'Audio': 'Headset',
-  'Photo': 'Picture',
-  'Book': 'Document',
   'Person': 'User',
   'Source': 'FolderOpened',
   'Studio': 'VideoCamera',
   'Genre': 'Collection',
   'Tag': 'Collection',
-  'CollectionFolder': 'Collection',
   'BoxSet': 'Collection',
 }
 
 // 图标名称 → 组件引用映射（唯一维护处，供各组件共用）
 export const ICON_COMPONENT_MAP = {
-  'Film': Film, 'VideoCamera': VideoCamera, 'Headset': Headset,
-  'Picture': Picture, 'Notebook': Notebook, 'User': User,
+  'Film': Film, 'VideoCamera': VideoCamera, 'User': User,
   'FolderOpened': FolderOpened, 'Collection': Collection,
 }
 

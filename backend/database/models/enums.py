@@ -10,7 +10,7 @@ Enums - 枚举类型定义
 - MediaType: 媒体项类型（Movie、Series、Season、Episode、Person 等）
 - PersonType: 人物类型（Actor、Director、Writer 等）
 - ItemLinkType: ItemLinks 链接类型（Genre、Studio、Tag、Person、Source 等）
-- FileType: 文件类型（Image、Video、Audio、Subtitle 等）
+- FileType: 文件类型（Image、Video、Subtitle 等）
 - ImageType: 图片类型（Primary、Backdrop、Logo 等）
 - ItemStatus: 媒体项状态（Continuing、Ended、Cancelled）
 
@@ -39,12 +39,6 @@ class MediaType(str, Enum):
     Person = "Person"  # 23 - 人物
     Studio = "Studio"  # 29 - 工作室
     Tag = "Tag"  # 21 - 标签
-    Folder = "Folder"
-    UserRootFolder = "UserRootFolder"
-    UserView = "UserView"
-    AggregateFolder = "AggregateFolder"
-    Playlist = "Playlist"
-    Video = "Video"
 
     @property
     def type_code(self) -> int:
@@ -55,20 +49,14 @@ class MediaType(str, Enum):
             int: 原生 Emby 的 type 值
         """
         type_code_map = {
-            MediaType.Folder: 3,
             MediaType.Source: 4,
             MediaType.Episode: 5,
             MediaType.Movie: 6,
             MediaType.Season: 8,
             MediaType.Series: 9,
             MediaType.BoxSet: 15,
-            MediaType.Playlist: 16,
-            MediaType.Video: 18,
-            MediaType.UserView: 20,
             MediaType.Tag: 21,
-            MediaType.AggregateFolder: 22,
             MediaType.Person: 23,
-            MediaType.UserRootFolder: 24,
             MediaType.Studio: 29,
             MediaType.Genre: 34,
         }
@@ -86,24 +74,18 @@ class MediaType(str, Enum):
             MediaType: 对应的 MediaType 枚举值
         """
         code_to_type = {
-            3: cls.Folder,
             4: cls.Source,
             5: cls.Episode,
             6: cls.Movie,
             8: cls.Season,
             9: cls.Series,
             15: cls.BoxSet,
-            16: cls.Playlist,
-            18: cls.Video,
-            20: cls.UserView,
             21: cls.Tag,
-            22: cls.AggregateFolder,
             23: cls.Person,
-            24: cls.UserRootFolder,
             29: cls.Studio,
             34: cls.Genre,
         }
-        return code_to_type.get(code, cls.Video)
+        return code_to_type.get(code, cls.Movie)
 
 
 class PersonType(str, Enum):
