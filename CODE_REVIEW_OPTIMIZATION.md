@@ -3,7 +3,7 @@
 > 审阅标准：低耦合、无历史遗留、高内聚、生产级、高复用、规则统一、无BUG  
 > 审阅范围：后端 (FastAPI)、前端 (Vue 3)、数据库模型、配置、Git 历史  
 > 审阅日期：2026-04-29  
-> 最后更新：2026-08-16
+> 最后更新：2026-08-17
 
 ---
 
@@ -89,6 +89,9 @@
 | C-6 | **收藏切换逻辑重复三处** | MediaCard、Media.vue、useFavorite.js | ✅ 已完成 | 删除 useFavorite.js（未被使用），MediaCard 和 Media.vue 各自保留实现 |
 | C-7 | **FFmpeg 解析逻辑重复两处** | Media.vue vs VideoPlayer.vue | ✅ 已完成 | 提取为 utils/format.js 中的 parseFFmpegInfo + formatTime 工具方法 |
 | C-8 | **Primary 图片 URL 获取重复四处** | MediaCard、SeasonCard、EpisodeCard、MediaDetailDrawer | ✅ 已完成 | 统一使用 utils/url.js 的 getPrimaryImageUrl |
+| C-17 | **FTS5 建表 DDL 双处维护** | core.py vs alembic/versions/fts_search.py | ✅ 已完成 | 抽为 database/fts_ddl.py 单一来源，运行时建表与迁移共用同一套 SQL |
+| C-19 | **diskcache 惰性初始化重复两处** | media_service.py | ✅ 已完成 | 合并为 _get_cache(name)，响应缓存与统计缓存共用，invalidate 改查实例表 |
+| C-20 | **MediaItemResponse 字段映射内联重复两处** | media_service.py | ✅ 已完成 | get_media_list/get_media_info 改用 schemas.serialize_item，消除各 14 行内联映射 |
 
 ### 3.3 死代码与未使用导出
 
@@ -99,6 +102,7 @@
 | C-11 | **get_db 从未被调用** | app/database.py | ✅ 已完成 | 随 A-7 一并删除 app/database.py |
 | C-12 | **url.js 的 getPrimaryImageUrl 未被使用** | url.js | ✅ 已完成 | 随 C-8 一并修复，现在四个组件都在使用 |
 | C-13 | **useFavorite composable 未被使用** | useFavorite.js | ✅ 已完成 | 删除文件 |
+| C-18 | **SessionManager 从未被调用** | database/core.py | ✅ 已完成 | 删除 SessionManager 及导出，统一 get_db_session |
 
 ### 3.4 生产代码中的调试信息
 
@@ -154,6 +158,7 @@
 | H-4 | **Git 仅 2 次提交** | Git 历史 | ⏳ 待处理 | 未在本次处理范围 |
 | H-5 | **.trae/ 文档堆积** | `.trae/documents/` | ⏭️ 跳过 | 用户确认跳过 |
 | H-6 | **数据库审查报告** | `数据库审查报告.txt` | ✅ 已完成 | 已删除 |
+| H-7 | **scripts/ 重叠与失效脚本** | backend/scripts/ | ✅ 已完成 | 删除 4 个重复/失效脚本（fix_file_types、clean_item_3102、test_join_fix2、migrate_full），legacy 中可运行的 migrate_itemlinks/migrate_hanime 移入 migrations/ |
 
 ---
 
@@ -174,7 +179,7 @@
 
 | 状态 | 数量 | 编号 |
 |------|------|------|
-| ✅ 已完成 | 36 | R-1, A-1, A-2, A-5, A-7, C-4~C-16, D-5, F-1~F-8, H-1~H-3, H-6, P-1, P-3, P-5, P-6 |
+| ✅ 已完成 | 41 | R-1, A-1, A-2, A-5, A-7, C-4~C-20, D-5, F-1~F-8, H-1~H-3, H-6, H-7, P-1, P-3, P-5, P-6 |
 | ⏭️ 跳过 | 15 | S-1~S-7, A-3, A-4, A-6, A-8, A-9, D-1~D-4, D-6, D-7, H-5, P-2, P-4 |
 | ⏳ 待处理 | 1 | H-4 |
 
@@ -215,6 +220,13 @@
 | 26 | `perf(frontend): 设置/搜索防抖、AbortController、路由守卫缓存、轮询可见性优化` |
 | 27 | `refactor(frontend): ICON 映射去重、Home 统计卡隐藏空项、清理 theme 死代码` |
 | 28 | `security(frontend): Token 存储 localStorage 改 sessionStorage` |
+
+### 2026-08-17 第三轮优化提交
+
+| # | 提交信息 |
+|---|---------|
+| 29 | `refactor(backend): 消除后端重复模块，收敛单一来源`（C-17/C-18/C-19/C-20/H-7） |
+| 30 | `docs: 更新优化报告，补录第三轮后端模块冗余清理` |
 
 ---
 
@@ -537,3 +549,39 @@ onUnmounted(() => { stopPolling(); document.removeEventListener('visibilitychang
 ```
 
 **涉及文件：** `frontend/src/views/System.vue`
+
+---
+
+## 十一、2026-08-17 第三轮优化（后端模块冗余清理）
+
+针对后端"同一模块分散/重复编写"问题，本轮收敛 5 处冗余（C-17~C-20、H-7）。
+
+### 3.1 FTS5 DDL 单一来源（C-17）
+
+- 原 `database/core.py::_ensure_fts5` 与 `alembic/versions/fts_search.py` 逐字重复同一套 FTS5 建表/触发器 SQL，两处维护易漂移。
+- 新增 `database/fts_ddl.py` 存放 `FTS5_CREATE_SQL` / `FTS5_DROP_SQL`，core.py（异步 `text()`）与迁移（同步 `sa.text()`）均引用之；行为幂等不变。
+
+### 3.2 删除 SessionManager 死代码（C-18）
+
+- `database/core.py` 中 `SessionManager` 与 `get_db_session` 逻辑近乎相同，且前者全仓库无真实调用点（仅自身定义与 `__init__` 再导出）。
+- 删除 `SessionManager`、`asynccontextmanager` 导入及 `database/__init__.py` 导出，统一 `get_db_session`。
+
+### 3.3 diskcache 惰性初始化统一（C-19）
+
+- `media_service.py` 的 `_get_response_cache` 与 `_get_stats_cache` 为完全相同路径拼接 + `diskcache.Cache` 初始化。
+- 合并为 `_get_cache(name)`（按名注册单例），`invalidate_response_cache` 改查实例表；缓存目录 `data/cache/media_response`、`media_stats` 不变。
+
+### 3.4 serialize_item 复用（C-20）
+
+- `get_media_list` / `get_media_info` 各自内联 14 行基础字段映射构造 `MediaItemResponse`，而 `schemas/media.py::serialize_item` 是死代码。
+- 两处改为 `**serialize_item(item).model_dump()` + 关联字段，死代码转单一来源。
+
+### 3.5 scripts/ 重叠脚本清理（H-7）
+
+- 删除重复/失效：`tools/fix_file_types.py`（保留 SQL 版）、`migrations/clean_item_3102.py`（`clean_all_3102` 为超集）、`tools/test_join_fix2.py`（`test_join_fix` 子集）、`migrations/migrate_full.py`（仅能跑 `example_table` 的无效脚手架）。
+- legacy/ 逐文件核实后，仅 `migrate_itemlinks.py`、`migrate_hanime.py` 使用当前模型，移入 `migrations/`；其余 25 个引用已删除字段（`ItemLinks.Type`/`ItemLinkType`/`OriginalTitle`/`IsFavorite` 等），按 `scripts/README.md` 与 docs 约定保留存档勿运行。
+- `test_webdav` 三件套为不同实验保留；`migrate_files.py` 与 `migrate_files_for_3102.py` 目标不同（Hanime / 3102）非重复。
+
+### 验证
+
+全量后端测试 **95 passed / 0 failed**（基线 85 之上）。
