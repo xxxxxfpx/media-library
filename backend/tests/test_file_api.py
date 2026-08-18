@@ -53,8 +53,8 @@ class TestFileAPI:
         item_id = result.scalar()
 
         await db_session.execute(text("""
-            INSERT INTO FileLinks (ItemId, FileId, ImageType, ImageIndex, CreatedAt, UpdatedAt)
-            VALUES (:item_id, :file_id, 'Primary', 0, datetime('now'), datetime('now'))
+            INSERT INTO FileLinks (ItemId, FileId, LinkType, ImageType, ImageIndex, CreatedAt, UpdatedAt)
+            VALUES (:item_id, :file_id, 'Image', 'Primary', 0, datetime('now'), datetime('now'))
         """), {"item_id": item_id, "file_id": file_id})
         await db_session.commit()
 
@@ -115,10 +115,10 @@ class TestFileAPI:
         result = await db_session.execute(text("SELECT Id FROM Files WHERE Name = 'linked_video.mp4'"))
         file_id = result.scalar()
 
-        # 创建关联（ImageType 使用 Primary，因为这是视频文件的主文件）
+        # 创建关联（LinkType=MediaSource，视频源文件无需 ImageType）
         await db_session.execute(text("""
-            INSERT INTO FileLinks (ItemId, FileId, ImageType, ImageIndex, CreatedAt, UpdatedAt)
-            VALUES (:item_id, :file_id, 'Primary', 0, datetime('now'), datetime('now'))
+            INSERT INTO FileLinks (ItemId, FileId, LinkType, ImageType, ImageIndex, CreatedAt, UpdatedAt)
+            VALUES (:item_id, :file_id, 'MediaSource', NULL, 0, datetime('now'), datetime('now'))
         """), {"item_id": item_id, "file_id": file_id})
         await db_session.commit()
 
@@ -166,11 +166,11 @@ class TestFileAPI:
         result = await db_session.execute(text("SELECT Id FROM Files WHERE Name LIKE 'episode_%'"))
         file_ids = [row[0] for row in result.fetchall()]
 
-        # 创建多个关联
+        # 创建多个关联（LinkType=MediaSource，视频源文件无需 ImageType）
         for fid in file_ids:
             await db_session.execute(text("""
-                INSERT INTO FileLinks (ItemId, FileId, ImageType, ImageIndex, CreatedAt, UpdatedAt)
-                VALUES (:item_id, :file_id, 'Video', 0, datetime('now'), datetime('now'))
+                INSERT INTO FileLinks (ItemId, FileId, LinkType, ImageType, ImageIndex, CreatedAt, UpdatedAt)
+                VALUES (:item_id, :file_id, 'MediaSource', NULL, 0, datetime('now'), datetime('now'))
             """), {"item_id": item_id, "file_id": fid})
             await db_session.commit()
 

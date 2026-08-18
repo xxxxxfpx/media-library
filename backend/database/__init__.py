@@ -28,6 +28,7 @@ from .models import (
     ShareLevel,
     FileType,
     ImageType,
+    FileLinkType,
 )
 
 from database.core import (
@@ -53,6 +54,7 @@ __all__ = [
     "ShareLevel",
     "FileType",
     "ImageType",
+    "FileLinkType",
     "engine",
     "AsyncSessionLocal",
     "get_db_session",

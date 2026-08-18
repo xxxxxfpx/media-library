@@ -9,7 +9,7 @@ from sqlalchemy import select, func, or_, text, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
+from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType, FileLinkType
 from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata, serialize_item
 from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
 from config import config as _app_config
@@ -29,6 +29,15 @@ def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
             except ValueError:
                 pass
     return result if result else None
+
+
+def _infer_link_type(image_type=None, chapter_index=None) -> FileLinkType:
+    """根据字段组合推断 FileLinkType：ChapterIndex 优先，其次 ImageType，否则 MediaSource"""
+    if chapter_index is not None:
+        return FileLinkType.Chapter
+    if image_type is not None:
+        return FileLinkType.Image
+    return FileLinkType.MediaSource
 
 
 async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[LinkItem]]:
@@ -65,7 +74,7 @@ async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
         select(
             File.Id, File.Name, File.SortName, File.Path, File.Size,
             File.Type, File.Etag,
-            FileLink.ItemId, FileLink.FileId, FileLink.ImageType, FileLink.ImageIndex,
+            FileLink.ItemId, FileLink.FileId, FileLink.LinkType, FileLink.ImageType, FileLink.ImageIndex,
             FileLink.ChapterIndex, FileLink.ChapterName, FileLink.StartPositionTicks, FileLink.MarkerType,
         )
         .join(FileLink, FileLink.FileId == File.Id)
@@ -78,8 +87,8 @@ async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
             Type=row.Type, Etag=row.Etag,
         )
         file_link = FileLink(
-            ItemId=row.ItemId, FileId=row.FileId, ImageType=row.ImageType,
-            ImageIndex=row.ImageIndex, ChapterIndex=row.ChapterIndex,
+            ItemId=row.ItemId, FileId=row.FileId, LinkType=row.LinkType,
+            ImageType=row.ImageType, ImageIndex=row.ImageIndex, ChapterIndex=row.ChapterIndex,
             ChapterName=row.ChapterName, StartPositionTicks=row.StartPositionTicks,
             MarkerType=row.MarkerType,
         )
@@ -536,7 +545,7 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
             select(FileLink.ItemId, FileLink.FileId)
             .where(
                 FileLink.ItemId.in_(linked_item_ids),
-                FileLink.ImageType.isnot(None)
+                FileLink.LinkType.in_([FileLinkType.Image, FileLinkType.Chapter])
             )
         )
         for item_id, file_id in img_result.all():
@@ -679,7 +688,7 @@ async def create_media_batch(
     """
     _t0 = time.perf_counter()
     from app.schemas.create import MediaBatchCreate
-    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus
+    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus, FileLinkType
     from datetime import datetime, timezone
     import json
 
@@ -1006,27 +1015,36 @@ async def create_media_batch(
         if existing is None:
             existing = file_link_created.get(pair)
 
+        # 解析字段值
+        image_type_val = ImageType(f_link_data.image_type) if f_link_data.image_type and f_link_data.is_set("image_type") else None
+        chapter_index_val = f_link_data.chapter_index if f_link_data.is_set("chapter_index") else None
+
+        # 推断 LinkType
+        link_type = _infer_link_type(image_type_val, chapter_index_val)
+
         if existing:
             if f_link_data.is_set("image_type"):
-                existing.ImageType = ImageType(f_link_data.image_type) if f_link_data.image_type else None
+                existing.ImageType = image_type_val
             if f_link_data.is_set("image_index"):
                 existing.ImageIndex = f_link_data.image_index
             if f_link_data.is_set("chapter_index"):
-                existing.ChapterIndex = f_link_data.chapter_index
+                existing.ChapterIndex = chapter_index_val
             if f_link_data.is_set("chapter_name"):
                 existing.ChapterName = f_link_data.chapter_name
             if f_link_data.is_set("start_position_ticks"):
                 existing.StartPositionTicks = f_link_data.start_position_ticks
             if f_link_data.is_set("marker_type"):
                 existing.MarkerType = f_link_data.marker_type
+            existing.LinkType = link_type
             existing.UpdatedAt = now
         else:
             new_fl = FileLink(
                 ItemId=pair[0],
                 FileId=pair[1],
-                ImageType=ImageType(f_link_data.image_type) if f_link_data.image_type and f_link_data.is_set("image_type") else None,
+                LinkType=link_type,
+                ImageType=image_type_val,
                 ImageIndex=f_link_data.image_index if f_link_data.is_set("image_index") else 0,
-                ChapterIndex=f_link_data.chapter_index if f_link_data.is_set("chapter_index") else None,
+                ChapterIndex=chapter_index_val,
                 ChapterName=f_link_data.chapter_name if f_link_data.is_set("chapter_name") else None,
                 StartPositionTicks=f_link_data.start_position_ticks if f_link_data.is_set("start_position_ticks") else None,
                 MarkerType=f_link_data.marker_type if f_link_data.is_set("marker_type") else None,

@@ -20,13 +20,13 @@ File 表字段说明：
 FileLink 表字段说明（融合 ItemSource + LinkImageFile + ChapterImage）：
 - ItemId: INT (媒体项 ID)
 - FileId: INT (文件 ID)
-- ImageType: ENUM (图片类型) - Primary、Backdrop、Logo 等（仅图片使用）
+- LinkType: ENUM (关联类型) - MediaSource/Image/Chapter，显式区分三种语义
+- ImageType: ENUM (图片类型) - Primary、Backdrop、Logo 等（仅 Image/Chapter 使用）
 - ImageIndex: INT (图片索引)
 - ChapterIndex: INT (章节索引) - 章节图片使用，标记该图片属于哪个章节
 - ChapterName: TEXT (章节名称) - 该图片对应的章节名称
 - StartPositionTicks: BIGINT (章节开始位置) - ticks (1 tick = 100ns)
 - MarkerType: ENUM (标记类型) - Chapter、IntroStart、CreditsStart 等
-- 链接类型通过关联的 File.Type 确定
 
 作者：白鸟青城
 版本：11.0.0 (合并 Chapter 到 FileLink，添加章节相关字段)
@@ -41,7 +41,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from .base import Base
-from .enums import FileType, ImageType, ChapterMarkerType
+from .enums import FileType, ImageType, ChapterMarkerType, FileLinkType
 
 
 class File(Base):
@@ -86,15 +86,15 @@ class FileLink(Base):
     """
     文件链接关联表 - 融合 ItemSource + LinkImageFile + ChapterImage
 
-    存储 MediaItem 与 File 之间的关联关系，统一处理媒体源和图片：
-    - 视频/音频/字幕文件：对应 File.Type=Video/Audio/Subtitle
-    - 图片文件：对应 File.Type=Image，同时指定 ImageType 和 ImageIndex
-    - 章节图片：对应 File.Type=Image，同时指定 ChapterIndex 及其他章节字段
+    存储 MediaItem 与 File 之间的关联关系，通过 LinkType 显式区分三种语义：
+    - MediaSource: 视频/音频/字幕源文件
+    - Image: 图片文件（海报/头像/截图等），同时指定 ImageType 和 ImageIndex
+    - Chapter: 章节图片/标记，同时指定 ChapterIndex 及其他章节字段
 
     设计原则：
     - 一个文件对应一个 FileLink
     - 响应 MediaSource 时，id 字段使用 FileId
-    - 章节相关字段仅在 ChapterIndex 不为空时使用
+    - LinkType 由服务层根据 File.Type + 字段组合自动推断
     """
 
     __tablename__ = "FileLinks"
@@ -102,6 +102,17 @@ class FileLink(Base):
     Id = Column("Id", Integer, primary_key=True, autoincrement=True, comment="主键 ID")
     ItemId = Column("ItemId", Integer, ForeignKey("MediaItems.Id", ondelete="CASCADE"), nullable=False, comment="媒体项 ID")
     FileId = Column("FileId", Integer, ForeignKey("Files.Id", ondelete="CASCADE"), nullable=False, comment="文件 ID")
+    LinkType = Column(
+        "LinkType",
+        SQLEnum(
+            FileLinkType,
+            name="file_link_type_enum",
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x]
+        ),
+        nullable=False,
+        comment="关联类型 - MediaSource/Image/Chapter"
+    )
     ImageType = Column("ImageType", SQLEnum(ImageType, name="image_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=True, comment="图片类型 - Primary、Backdrop、Logo 等（仅图片使用）")
     ImageIndex = Column("ImageIndex", Integer, nullable=False, default=0, comment="图片索引")
     ChapterIndex = Column("ChapterIndex", Integer, nullable=True, comment="章节索引 - 章节图片使用，标记该图片属于哪个章节")
@@ -134,7 +145,7 @@ class FileLink(Base):
 
     @property
     def IsChapterImage(self) -> bool:
-        return self.ChapterIndex is not None
+        return self.LinkType == FileLinkType.Chapter
 
     @property
     def StartPositionSeconds(self) -> float:

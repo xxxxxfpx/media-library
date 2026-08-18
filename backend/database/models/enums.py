@@ -151,6 +151,20 @@ class ItemStatus(str, Enum):
     Cancelled = "Cancelled"
 
 
+class FileLinkType(str, Enum):
+    """
+    文件关联类型枚举
+
+    对应 FileLinks 表的 link_type 字段，显式区分三种关联语义：
+    - MediaSource: 视频/音频/字幕源文件
+    - Image: 图片（海报/头像/截图等）
+    - Chapter: 章节图片/标记
+    """
+    MediaSource = "MediaSource"
+    Image = "Image"
+    Chapter = "Chapter"
+
+
 class ChapterMarkerType(str, Enum):
     """
     章节标记类型枚举

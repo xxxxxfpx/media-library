@@ -18,6 +18,7 @@ from .enums import (
     ShareLevel,
     FileType,
     ImageType,
+    FileLinkType,
 )
 from .user import User, UserData
 from .media_item import MediaItem
@@ -34,6 +35,7 @@ __all__ = [
     "ShareLevel",
     "FileType",
     "ImageType",
+    "FileLinkType",
     "MediaItem",
     "ItemLinks",
     "UserData",

@@ -142,7 +142,7 @@ class TestDatabaseInit:
         columns = await get_table_columns(db_session, "FileLinks")
         column_names = [col["name"] for col in columns]
 
-        expected_cols = ["Id", "ItemId", "FileId", "ImageType", "ImageIndex",
+        expected_cols = ["Id", "ItemId", "FileId", "LinkType", "ImageType", "ImageIndex",
                          "ChapterIndex", "ChapterName", "StartPositionTicks", "MarkerType",
                          "CreatedAt", "UpdatedAt"]
         for expected_col in expected_cols:

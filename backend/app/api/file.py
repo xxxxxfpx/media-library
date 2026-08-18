@@ -113,6 +113,7 @@ async def get_file_info(
         name=file.Name,
         path=file.Path,
         type=file.Type.value if file.Type else None,
+        link_type=file_link.LinkType.value if file_link.LinkType else None,
         item_id=file_link.ItemId,
         image_type=file_link.ImageType.value if file_link.ImageType else None,
         image_index=file_link.ImageIndex,
