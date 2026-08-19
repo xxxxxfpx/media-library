@@ -75,7 +75,8 @@ jobs:
           # 生成临时配置覆盖 sqlite_path，避免污染仓库默认测试库
           python - <<PY
           import os, yaml
-          with open('env.yaml') as f:
+          # 基于仓库内已提交的默认配置生成临时 CI 配置（env.yaml 为 gitignored 本地覆盖，CI 上不存在）
+          with open('config/default.yaml') as f:
               cfg = yaml.safe_load(f)
           cfg['database']['sqlite_path'] = os.environ['DB_PATH']
           cfg['app']['secret_key'] = 'ci-secret'
