@@ -223,6 +223,8 @@ jobs:
               echo "attempt $i: service starting, retrying in 3s..."
               sleep 3
             done
-            docker ps --filter name=media-library --format '{{.Status}}'
+            docker ps -a --filter name=media-library --format '{{.Status}} | {{.Image}}'
+            echo "--- container logs (last 40 lines) ---"
+            docker logs --tail 40 media-library 2>&1 || true
             echo "health check failed after 10 attempts"
             exit 1
