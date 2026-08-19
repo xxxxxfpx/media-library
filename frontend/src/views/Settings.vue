@@ -86,6 +86,60 @@
       </div>
     </el-card>
 
+    <el-card v-if="store.isAdmin" class="mb-4">
+      <template #header>
+        <div class="card-header-row">
+          <span>光芽云盘</span>
+          <el-tag :type="guangYaPanConfig.configured ? 'success' : 'info'" size="small">
+            {{ guangYaPanConfig.configured ? '已配置' : '未配置' }}
+          </el-tag>
+        </div>
+      </template>
+      <el-form label-position="top" class="drive-form" @submit.prevent>
+        <el-form-item label="Access Token">
+          <el-input
+            v-model="guangYaPanForm.access_token"
+            type="password"
+            show-password
+            placeholder="留空表示保持当前 Token"
+            autocomplete="new-password"
+          />
+        </el-form-item>
+        <el-form-item label="Refresh Token">
+          <el-input
+            v-model="guangYaPanForm.refresh_token"
+            type="password"
+            show-password
+            placeholder="留空表示保持当前 Refresh Token"
+            autocomplete="new-password"
+          />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="Client ID">
+            <el-input v-model="guangYaPanForm.client_id" placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="Device ID">
+            <el-input v-model="guangYaPanForm.device_id" placeholder="可选" />
+          </el-form-item>
+        </div>
+        <el-form-item label="默认网盘目录 ID">
+          <el-input
+            v-model="guangYaPanForm.default_parent_id"
+            placeholder="上传和离线下载共用此目录 ID"
+          />
+          <div class="setting-desc">上传和离线下载统一使用此目录；文件名由源 URL 的 SHA-256 自动生成。</div>
+        </el-form-item>
+        <div class="drive-actions">
+          <span v-if="guangYaPanConfig.updated_at" class="setting-desc">
+            最近更新：{{ formatDate(guangYaPanConfig.updated_at) }}
+          </span>
+          <el-button type="primary" :loading="guangYaPanSaving" @click="saveGuangYaPanConfig">
+            保存云盘设置
+          </el-button>
+        </div>
+      </el-form>
+    </el-card>
+
     <el-dialog v-model="showPasswordDialog" title="修改密码" width="420px" destroy-on-close>
       <el-form label-width="90px" @submit.prevent>
         <el-form-item label="旧密码">
@@ -109,7 +163,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/store'
-import { userAPI } from '@/api'
+import { guangYaPanAPI, userAPI } from '@/api'
 import { ElMessage } from 'element-plus'
 
 const store = useAppStore()
@@ -125,6 +179,15 @@ const passwordForm = ref({ oldPassword: '', newPassword: '', confirmPassword: ''
 const autoplay = ref(false)
 const defaultMuted = ref(false)
 const syncInterval = ref(8000)
+const guangYaPanSaving = ref(false)
+const guangYaPanConfig = ref({ configured: false, updated_at: null })
+const guangYaPanForm = ref({
+  access_token: '',
+  refresh_token: '',
+  client_id: '',
+  device_id: '',
+  default_parent_id: ''
+})
 
 onMounted(async () => {
   try {
@@ -132,6 +195,13 @@ onMounted(async () => {
     autoplay.value = localStorage.getItem('video_autoplay') === 'true'
     defaultMuted.value = localStorage.getItem('video_default_muted') === 'true'
     if (settings.auto_sync_interval) syncInterval.value = settings.auto_sync_interval * 1000
+    if (store.isAdmin) {
+      const config = await guangYaPanAPI.getConfig()
+      guangYaPanConfig.value = config
+      guangYaPanForm.value.client_id = config.client_id || ''
+      guangYaPanForm.value.device_id = config.device_id || ''
+      guangYaPanForm.value.default_parent_id = config.default_parent_id || ''
+    }
   } catch {
     // 获取设置失败时使用默认值，静默忽略
   }
@@ -148,6 +218,28 @@ async function saveSettings() {
   } catch {
     ElMessage.error('保存失败')
   }
+}
+
+async function saveGuangYaPanConfig() {
+  guangYaPanSaving.value = true
+  try {
+    const payload = { ...guangYaPanForm.value }
+    if (!payload.access_token) delete payload.access_token
+    if (!payload.refresh_token) delete payload.refresh_token
+    const config = await guangYaPanAPI.updateConfig(payload)
+    guangYaPanConfig.value = config
+    guangYaPanForm.value.access_token = ''
+    guangYaPanForm.value.refresh_token = ''
+    ElMessage.success('光芽云盘设置已保存')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '光芽云盘设置保存失败')
+  } finally {
+    guangYaPanSaving.value = false
+  }
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleString() : ''
 }
 
 // 防抖：300ms 内多次变更只保存一次
@@ -242,6 +334,31 @@ async function submitPasswordChange() {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
+}
+
+.card-header-row,
+.drive-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.drive-form {
+  max-width: 640px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
 }
 
 .setting-label {

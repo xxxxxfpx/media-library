@@ -17,7 +17,7 @@ export const fileAPI = {
    * @returns {string} 文件数据URL
    */
   getDataUrl: (fileId) => {
-    const token = localStorage.getItem('access_token')
+    const token = sessionStorage.getItem('access_token')
     const base = `/api/file/data?file_id=${fileId}`
     return token ? `${base}&token=${encodeURIComponent(token)}` : base
   },
