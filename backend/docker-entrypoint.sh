@@ -7,6 +7,10 @@ set -e
 
 SECRETS_FILE="${SECRETS_PATH:-/app/secrets/config.yaml}"
 
+# ── 0. 确保运行时数据目录存在 ──
+# bind mount 会覆盖镜像内 Dockerfile 创建的目录，需在启动时重建
+mkdir -p /app/data/database /app/data/log /app/data/cache/file_url /app/secrets
+
 # ── 1. 兜底生成随机密钥（仅当未显式设置时） ──
 if [ -z "${APP_SECRET_KEY:-}" ]; then
     APP_SECRET_KEY="$(head -c 48 /dev/urandom | base64 | tr -d '\n')"
