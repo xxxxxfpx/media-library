@@ -39,7 +39,7 @@ COPY backend/app ./app
 COPY backend/database ./database
 COPY backend/config ./config
 COPY backend/config.py backend/run.py ./
-COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY backend/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # 将前端构建产物放入静态目录，由 FastAPI 托管
