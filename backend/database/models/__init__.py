@@ -6,7 +6,7 @@ Database Models - ORM 模型包
 导出所有 SQLAlchemy ORM 模型和枚举类型。
 
 作者：白鸟青城
-版本：10.0.0 (移除 UserLike，精简枚举)
+版本：12.0.0 (统一 MediaItem 类型模型)
 """
 
 from .base import Base
@@ -25,6 +25,8 @@ from .media_item import MediaItem
 from .item_links import ItemLinks
 from .file import File, FileLink
 from .alias import Alias
+from .drive_file import DriveFile
+from .guangyapan_config import GuangYaPanConfig
 
 __all__ = [
     "Base",
@@ -43,4 +45,6 @@ __all__ = [
     "FileLink",
     "User",
     "Alias",
+    "DriveFile",
+    "GuangYaPanConfig",
 ]

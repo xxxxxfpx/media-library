@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.file import router as file_router
+from app.api.guangyapan import router as guangyapan_router
 from app.api.media import router as media_router
 from app.api.system import router as system_router
 from app.api.user import router as user_router
@@ -93,6 +94,7 @@ app.add_middleware(RequestLogMiddleware)
 app.include_router(user_router)
 app.include_router(media_router)
 app.include_router(file_router)
+app.include_router(guangyapan_router)
 app.include_router(system_router, prefix="/api")
 
 
