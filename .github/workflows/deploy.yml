@@ -169,7 +169,7 @@ jobs:
 
             # 健康检查
             for i in $(seq 1 10); do
-              if curl -fsS --max-time 3 http://127.0.0.1:8000/health; then
+              if curl -fsS --max-time 3 http://127.0.0.1:1999/health; then
                 echo "health check ok after ${i} attempts"
                 exit 0
               fi
