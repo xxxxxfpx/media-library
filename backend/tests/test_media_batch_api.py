@@ -24,8 +24,10 @@ from sqlalchemy import text
 from pydantic import ValidationError
 
 from app.schemas.create import (
-    MediaBatchCreate, ItemCreate, FileCreate, ItemLinkCreate, FileLinkCreate,
-    ItemBaseAttrs, FileBaseAttrs, SourceInfo,
+    MediaBatchCreate, ItemCreate, FileCreate, ItemLinkCreate,
+    FileBaseAttrs, SourceInfo,
+    MediaSourceFileLink, ImageFileLink, ChapterFileLink,
+    MovieAttrs, SeriesAttrs, SeasonAttrs, EpisodeAttrs, BoxSetAttrs, PersonAttrs, GenreAttrs, TagAttrs,
 )
 
 
@@ -87,7 +89,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie")
+                    attrs=MovieAttrs(type="Movie")
                 )
             ]
         )
@@ -116,7 +118,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(source_id="src-001", source_link="http://example.com/1"),
-                    attrs=ItemBaseAttrs(type="Movie", name="测试电影")
+                    attrs=MovieAttrs(type="Movie", name="测试电影")
                 )
             ]
         )
@@ -144,7 +146,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(source_id="src-002"),
-                    attrs=ItemBaseAttrs(
+                    attrs=MovieAttrs(
                         type="Movie",
                         name="完整测试电影",
                         overview="这是简介",
@@ -155,10 +157,6 @@ class TestMediaBatchAPI:
                         community_rating=8.5,
                         critic_rating=85.0,
                         status="Continuing",
-                        production_locations=["美国", "中国"],
-                        remote_trailers=["http://trailer.com"],
-                        preferred_metadata_language="zh",
-                        preferred_metadata_country_code="CN",
                     )
                 )
             ]
@@ -185,7 +183,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie", name="电影1")
+                    attrs=MovieAttrs(type="Movie", name="电影1")
                 )
             ],
             files=[
@@ -195,7 +193,7 @@ class TestMediaBatchAPI:
                 )
             ],
             file_links=[
-                FileLinkCreate(item="item-1", file="file-1", image_type="Primary")
+                ImageFileLink(item="item-1", file="file-1", link_type="Image", image_type="Primary")
             ]
         )
 
@@ -228,12 +226,12 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie", name="电影A")
+                    attrs=MovieAttrs(type="Movie", name="电影A")
                 ),
                 ItemCreate(
                     temp_id="item-2",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie", name="电影B")
+                    attrs=MovieAttrs(type="Movie", name="电影B")
                 )
             ],
             files=[
@@ -250,8 +248,8 @@ class TestMediaBatchAPI:
                 ItemLinkCreate(link="item-1", linked="item-2", people_type="Actor", people_role="主演")
             ],
             file_links=[
-                FileLinkCreate(item="item-1", file="file-1"),
-                FileLinkCreate(item="item-2", file="file-2"),
+                MediaSourceFileLink(item="item-1", file="file-1", link_type="MediaSource"),
+                MediaSourceFileLink(item="item-2", file="file-2", link_type="MediaSource"),
             ]
         )
 
@@ -284,22 +282,22 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="series-1",
                     source_info=SourceInfo(source_id="tmdb-100"),
-                    attrs=ItemBaseAttrs(type="Series", name="测试剧集", overview="剧集简介")
+                    attrs=SeriesAttrs(type="Series", name="测试剧集", overview="剧集简介")
                 ),
                 ItemCreate(
                     temp_id="season-1",
                     source_info=SourceInfo(source_id="tmdb-100-s1"),
-                    attrs=ItemBaseAttrs(type="Season", name="第1季")
+                    attrs=SeasonAttrs(type="Season", name="第1季")
                 ),
                 ItemCreate(
                     temp_id="episode-1",
                     source_info=SourceInfo(source_id="tmdb-100-s1-e1"),
-                    attrs=ItemBaseAttrs(type="Episode", name="第1集", overview="第1集简介")
+                    attrs=EpisodeAttrs(type="Episode", name="第1集", overview="第1集简介")
                 ),
                 ItemCreate(
                     temp_id="person-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Person", name="演员甲")
+                    attrs=PersonAttrs(type="Person", name="演员甲")
                 ),
             ],
             files=[
@@ -318,8 +316,8 @@ class TestMediaBatchAPI:
                 ItemLinkCreate(link="episode-1", linked="person-1", people_type="Actor", people_role="领衔主演"),
             ],
             file_links=[
-                FileLinkCreate(item="series-1", file="file-poster", image_type="Primary"),
-                FileLinkCreate(item="episode-1", file="file-video"),
+                ImageFileLink(item="series-1", file="file-poster", link_type="Image", image_type="Primary"),
+                MediaSourceFileLink(item="episode-1", file="file-video", link_type="MediaSource"),
             ]
         )
 
@@ -389,7 +387,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="InvalidType")
+                    attrs={"type": "InvalidType"}
                 )
             ]
         )
@@ -397,6 +395,36 @@ class TestMediaBatchAPI:
         response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         # 应该返回 422 验证错误
         assert response.status_code == 422, f"无效 type 应该返回 422，实际: {response.status_code}"
+
+    @pytest.mark.asyncio
+    async def test_extra_field_rejected(self, app_client, db_session, auth_headers):
+        """媒体属性不允许混入其他类型的字段。"""
+        data = {
+            "source_name": "extra_field_test",
+            "items": [{
+                "temp_id": "item-1",
+                "source_info": {},
+                "attrs": {"type": "Movie", "birth_date": "2000-01-01"},
+            }],
+        }
+
+        response = await app_client.post("/api/media/batch", json=data, headers=auth_headers)
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_rating_range_rejected(self, app_client, db_session, auth_headers):
+        """评分字段必须落在 schema 声明的范围内。"""
+        data = {
+            "source_name": "rating_range_test",
+            "items": [{
+                "temp_id": "item-1",
+                "source_info": {},
+                "attrs": {"type": "Movie", "community_rating": 10.1},
+            }],
+        }
+
+        response = await app_client.post("/api/media/batch", json=data, headers=auth_headers)
+        assert response.status_code == 422
 
     @pytest.mark.asyncio
     async def test_invalid_source_id_type(self, app_client, db_session, auth_headers):
@@ -427,7 +455,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(source_id="dup-src-001"),
-                    attrs=ItemBaseAttrs(type="Movie", name="原名称", overview="原简介")
+                    attrs=MovieAttrs(type="Movie", name="原名称", overview="原简介")
                 )
             ]
         )
@@ -445,7 +473,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-2",
                     source_info=SourceInfo(source_id="dup-src-001"),  # 相同 source_id
-                    attrs=ItemBaseAttrs(type="Movie", name="新名称")  # 只更新 name，overview 用 UNSET
+                    attrs=MovieAttrs(type="Movie", name="新名称")  # 只更新 name，overview 用 UNSET
                 )
             ]
         )
@@ -474,12 +502,10 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(source_id="dup-full-001", source_link="http://old.link"),
-                    attrs=ItemBaseAttrs(
+                    attrs=MovieAttrs(
                         type="Movie", name="原名", overview="原简介", tagline="原标语",
                         official_rating="PG", community_rating=7.0, critic_rating=70.0,
                         premiere_date="2023-01-01", status="Continuing",
-                        production_locations=["美国"], remote_trailers=["http://t1"],
-                        preferred_metadata_language="en", preferred_metadata_country_code="US",
                     )
                 )
             ]
@@ -495,12 +521,10 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-2",
                     source_info=SourceInfo(source_id="dup-full-001", source_link="http://new.link"),
-                    attrs=ItemBaseAttrs(
+                    attrs=MovieAttrs(
                         type="Movie", name="新名", overview="新简介", tagline="新标语",
                         official_rating="PG-13", community_rating=8.5, critic_rating=85.0,
                         premiere_date="2024-06-15", status="Ended",
-                        production_locations=["中国"], remote_trailers=["http://t2"],
-                        preferred_metadata_language="zh", preferred_metadata_country_code="CN",
                     )
                 )
             ]
@@ -523,10 +547,6 @@ class TestMediaBatchAPI:
         item = await self._get_item_by_name(db_session, "新名")
         assert item is not None
         assert item["Status"] == "Ended"
-        assert item["ProductionLocations"] == json.dumps(["中国"], ensure_ascii=False)
-        assert item["RemoteTrailers"] == json.dumps(["http://t2"], ensure_ascii=False)
-        assert item["PreferredMetadataLanguage"] == "zh"
-        assert item["PreferredMetadataCountryCode"] == "CN"
         assert item["SourceLink"] == "http://new.link"
 
     @pytest.mark.asyncio
@@ -539,7 +559,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-1",
                     source_info=SourceInfo(source_id="1234"),
-                    attrs=ItemBaseAttrs(type="Movie", name="电影A")
+                    attrs=MovieAttrs(type="Movie", name="电影A")
                 )
             ]
         )
@@ -555,7 +575,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-2",
                     source_info=SourceInfo(source_id="1234"),  # 相同 source_id
-                    attrs=ItemBaseAttrs(type="Movie", name="电影B")
+                    attrs=MovieAttrs(type="Movie", name="电影B")
                 )
             ]
         )
@@ -582,12 +602,12 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="item-video",
                     source_info=SourceInfo(source_id="5678"),
-                    attrs=ItemBaseAttrs(type="Movie", name="视频")
+                    attrs=MovieAttrs(type="Movie", name="视频")
                 ),
                 ItemCreate(
                     temp_id="item-tag",
                     source_info=SourceInfo(source_id="5678"),  # 相同 source_id
-                    attrs=ItemBaseAttrs(type="Tag", name="标签")  # 不同 type
+                    attrs=TagAttrs(type="Tag", name="标签")  # 不同 type
                 )
             ],
             item_links=[
@@ -622,7 +642,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="first",
                     source_info=SourceInfo(source_id="unique-001"),
-                    attrs=ItemBaseAttrs(type="Movie", name="第一个名称", overview="第一个简介")
+                    attrs=MovieAttrs(type="Movie", name="第一个名称", overview="第一个简介")
                 )
             ]
         )
@@ -638,7 +658,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="second",
                     source_info=SourceInfo(source_id="unique-001"),
-                    attrs=ItemBaseAttrs(type="Movie", name="新名称")  # 只更新 name
+                    attrs=MovieAttrs(type="Movie", name="新名称")  # 只更新 name
                 )
             ]
         )
@@ -659,7 +679,7 @@ class TestMediaBatchAPI:
     @pytest.mark.asyncio
     async def test_missing_required_field(self, app_client, db_session, auth_headers):
         """测试10: 缺少必填字段 - attrs 缺失 type"""
-        # ItemBaseAttrs 的 type 是必填的
+        # ItemAttrsBase 不含 type，具体类型类要求 type 必填
         data = {
             "source_name": "test",
             "items": [
@@ -695,12 +715,12 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="complex_topology",
             items=[
-                ItemCreate(temp_id="m1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
-                ItemCreate(temp_id="m2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影2")),
-                ItemCreate(temp_id="m3", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影3")),
-                ItemCreate(temp_id="p1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Person", name="演员A")),
-                ItemCreate(temp_id="p2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Person", name="演员B")),
-                ItemCreate(temp_id="g1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Genre", name="动作")),
+                ItemCreate(temp_id="m1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影1")),
+                ItemCreate(temp_id="m2", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影2")),
+                ItemCreate(temp_id="m3", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影3")),
+                ItemCreate(temp_id="p1", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="演员A")),
+                ItemCreate(temp_id="p2", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="演员B")),
+                ItemCreate(temp_id="g1", source_info=SourceInfo(), attrs=GenreAttrs(type="Genre", name="动作")),
             ],
             item_links=[
                 # 演员参演两部电影
@@ -718,8 +738,8 @@ class TestMediaBatchAPI:
                 FileCreate(temp_id="f2", attrs=FileBaseAttrs(name="m2.mp4", path="/m2.mp4", type="Video")),
             ],
             file_links=[
-                FileLinkCreate(item="m1", file="f1"),
-                FileLinkCreate(item="m2", file="f2"),
+                MediaSourceFileLink(item="m1", file="f1", link_type="MediaSource"),
+                MediaSourceFileLink(item="m2", file="f2", link_type="MediaSource"),
             ]
         )
 
@@ -763,7 +783,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="movie-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie", name="多文件电影")
+                    attrs=MovieAttrs(type="Movie", name="多文件电影")
                 )
             ],
             files=[
@@ -772,9 +792,9 @@ class TestMediaBatchAPI:
                 FileCreate(temp_id="poster", attrs=FileBaseAttrs(name="poster.jpg", path="/i/poster.jpg", type="Image")),
             ],
             file_links=[
-                FileLinkCreate(item="movie-1", file="video"),
-                FileLinkCreate(item="movie-1", file="subtitle"),
-                FileLinkCreate(item="movie-1", file="poster", image_type="Primary"),
+                MediaSourceFileLink(item="movie-1", file="video", link_type="MediaSource"),
+                MediaSourceFileLink(item="movie-1", file="subtitle", link_type="MediaSource"),
+                ImageFileLink(item="movie-1", file="poster", link_type="Image", image_type="Primary"),
             ]
         )
 
@@ -801,8 +821,8 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="bidirectional_test",
             items=[
-                ItemCreate(temp_id="m1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
-                ItemCreate(temp_id="m2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影2")),
+                ItemCreate(temp_id="m1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影1")),
+                ItemCreate(temp_id="m2", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影2")),
             ],
             item_links=[
                 ItemLinkCreate(link="m1", linked="m2", people_type="Actor", people_role="主演"),
@@ -835,7 +855,7 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="nonexistent_link_test",
             items=[
-                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影1")),
             ],
             item_links=[
                 ItemLinkCreate(link="item-1", linked="non-existent-temp-id"),
@@ -852,7 +872,7 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="orphaned_file_test",
             items=[
-                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影1")),
             ],
             files=[
                 FileCreate(temp_id="orphan-file", attrs=FileBaseAttrs(name="orphan.mp4", path="/v/orphan.mp4", type="Video")),
@@ -885,7 +905,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="date-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(
+                    attrs=MovieAttrs(
                         type="Movie",
                         name="日期测试电影",
                         premiere_date="2024-01-01",
@@ -895,7 +915,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="date-2",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(
+                    attrs=SeriesAttrs(
                         type="Series",
                         name="带时区日期剧集",
                         premiere_date="2024-01-01T00:00:00Z",
@@ -927,7 +947,7 @@ class TestMediaBatchAPI:
                 ItemCreate(
                     temp_id="special-1",
                     source_info=SourceInfo(),
-                    attrs=ItemBaseAttrs(type="Movie", name=special_name)
+                    attrs=MovieAttrs(type="Movie", name=special_name)
                 )
             ]
         )
@@ -962,8 +982,8 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="invalid_person_type_test",
             items=[
-                ItemCreate(temp_id="p1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Person", name="演员")),
-                ItemCreate(temp_id="p2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影")),
+                ItemCreate(temp_id="p1", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="演员")),
+                ItemCreate(temp_id="p2", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影")),
             ],
             item_links=[
                 ItemLinkCreate(link="movie", linked="actor", people_type="InvalidActorType"),
@@ -987,14 +1007,14 @@ class TestMediaBatchAPI:
             items.append(ItemCreate(
                 temp_id=temp_id,
                 source_info=SourceInfo(),
-                attrs=ItemBaseAttrs(type="Movie", name=f"电影{i}")
+                attrs=MovieAttrs(type="Movie", name=f"电影{i}")
             ))
             file_temp_id = f"file-{i}"
             files.append(FileCreate(
                 temp_id=file_temp_id,
                 attrs=FileBaseAttrs(name=f"movie{i}.mp4", path=f"/v/movie{i}.mp4", type="Video")
             ))
-            file_links.append(FileLinkCreate(item=temp_id, file=file_temp_id))
+            file_links.append(MediaSourceFileLink(item=temp_id, file=file_temp_id, link_type="MediaSource"))
 
         data = MediaBatchCreate(
             source_name="large_batch_test",
@@ -1021,13 +1041,13 @@ class TestMediaBatchAPI:
         data1 = MediaBatchCreate(
             source_name="dup_file_test",
             items=[
-                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影")),
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影")),
             ],
             files=[
                 FileCreate(temp_id="file-1", attrs=FileBaseAttrs(name="a.mp4", path="/v/a.mp4", type="Video", size=1024)),
             ],
             file_links=[
-                FileLinkCreate(item="item-1", file="file-1"),
+                MediaSourceFileLink(item="item-1", file="file-1", link_type="MediaSource"),
             ]
         )
         resp1 = await app_client.post("/api/media/batch", json=data1.model_dump(exclude_unset=True), headers=auth_headers)
@@ -1038,13 +1058,13 @@ class TestMediaBatchAPI:
         data2 = MediaBatchCreate(
             source_name="dup_file_test",
             items=[
-                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影")),
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影")),
             ],
             files=[
                 FileCreate(temp_id="file-2", attrs=FileBaseAttrs(name="a2.mp4", path="/v/a.mp4", type="Video", size=2048)),
             ],
             file_links=[
-                FileLinkCreate(item="item-1", file="file-2"),
+                MediaSourceFileLink(item="item-1", file="file-2", link_type="MediaSource"),
             ]
         )
         resp2 = await app_client.post("/api/media/batch", json=data2.model_dump(exclude_unset=True), headers=auth_headers)
@@ -1065,10 +1085,10 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="nonexistent_file_link_test",
             items=[
-                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影1")),
+                ItemCreate(temp_id="item-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影1")),
             ],
             file_links=[
-                FileLinkCreate(item="item-1", file="missing-file"),
+                MediaSourceFileLink(item="item-1", file="missing-file", link_type="MediaSource"),
             ]
         )
         response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
@@ -1083,9 +1103,9 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="graph_test",
             items=[
-                ItemCreate(temp_id="a", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影A")),
-                ItemCreate(temp_id="b", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影B")),
-                ItemCreate(temp_id="c", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Person", name="演员C")),
+                ItemCreate(temp_id="a", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影A")),
+                ItemCreate(temp_id="b", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="人物B")),
+                ItemCreate(temp_id="c", source_info=SourceInfo(), attrs=GenreAttrs(type="Genre", name="类型C")),
             ],
             item_links=[
                 ItemLinkCreate(link="a", linked="b", people_type="Actor", people_role="主演"),
@@ -1103,9 +1123,9 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="disconnected_test",
             items=[
-                ItemCreate(temp_id="isolated-1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="孤立电影1")),
-                ItemCreate(temp_id="isolated-2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="孤立电影2")),
-                ItemCreate(temp_id="isolated-3", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="孤立电影3")),
+                ItemCreate(temp_id="isolated-1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="孤立电影1")),
+                ItemCreate(temp_id="isolated-2", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="孤立电影2")),
+                ItemCreate(temp_id="isolated-3", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="孤立电影3")),
             ],
             # 注意：没有 item_links，三个节点互不相连
         )
@@ -1121,8 +1141,8 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="disconnected_test",
             items=[
-                ItemCreate(temp_id="iso-a", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="孤立电影A")),
-                ItemCreate(temp_id="iso-b", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="孤立电影B")),
+                ItemCreate(temp_id="iso-a", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="孤立电影A")),
+                ItemCreate(temp_id="iso-b", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="孤立电影B")),
             ],
             # 没有 item_links，不连通
         )
@@ -1140,7 +1160,7 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="single_node_test",
             items=[
-                ItemCreate(temp_id="only-one", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="唯一电影")),
+                ItemCreate(temp_id="only-one", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="唯一电影")),
             ],
             item_links=[
                 ItemLinkCreate(link="only-one", linked="only-one"),  # 自己连自己
@@ -1156,7 +1176,7 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="no_links_test",
             items=[
-                ItemCreate(temp_id="only-one", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="唯一电影")),
+                ItemCreate(temp_id="only-one", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="唯一电影")),
             ],
             # 没有 item_links，单个节点自己成图
         )
@@ -1170,8 +1190,8 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="no_links_test",
             items=[
-                ItemCreate(temp_id="item-a", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影A")),
-                ItemCreate(temp_id="item-b", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影B")),
+                ItemCreate(temp_id="item-a", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影A")),
+                ItemCreate(temp_id="item-b", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影B")),
             ],
             # 没有 item_links，多个节点互不相连
         )
@@ -1185,9 +1205,9 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="partial_test",
             items=[
-                ItemCreate(temp_id="group-a1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="组A-1")),
-                ItemCreate(temp_id="group-a2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="组A-2")),
-                ItemCreate(temp_id="group-b1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="组B-1")),
+                ItemCreate(temp_id="group-a1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="组A-1")),
+                ItemCreate(temp_id="group-a2", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="组A-2")),
+                ItemCreate(temp_id="group-b1", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="组B-1")),
             ],
             item_links=[
                 ItemLinkCreate(link="group-a1", linked="group-a2"),  # A 组内部连通
@@ -1206,10 +1226,10 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="chain_test",
             items=[
-                ItemCreate(temp_id="n1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Series", name="系列1")),
-                ItemCreate(temp_id="n2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Season", name="季1")),
-                ItemCreate(temp_id="n3", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Episode", name="集1")),
-                ItemCreate(temp_id="n4", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Person", name="演员")),
+                ItemCreate(temp_id="n1", source_info=SourceInfo(), attrs=SeriesAttrs(type="Series", name="系列1")),
+                ItemCreate(temp_id="n2", source_info=SourceInfo(), attrs=SeasonAttrs(type="Season", name="季1")),
+                ItemCreate(temp_id="n3", source_info=SourceInfo(), attrs=EpisodeAttrs(type="Episode", name="集1")),
+                ItemCreate(temp_id="n4", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="演员")),
             ],
             item_links=[
                 ItemLinkCreate(link="n1", linked="n2"),  # 系列 -> 季
@@ -1227,10 +1247,10 @@ class TestMediaBatchAPI:
         data = MediaBatchCreate(
             source_name="star_test",
             items=[
-                ItemCreate(temp_id="center", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Series", name="剧集")),
-                ItemCreate(temp_id="leaf1", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Season", name="季1")),
-                ItemCreate(temp_id="leaf2", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Season", name="季2")),
-                ItemCreate(temp_id="leaf3", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Season", name="季3")),
+                ItemCreate(temp_id="center", source_info=SourceInfo(), attrs=SeriesAttrs(type="Series", name="剧集")),
+                ItemCreate(temp_id="leaf1", source_info=SourceInfo(), attrs=SeasonAttrs(type="Season", name="季1")),
+                ItemCreate(temp_id="leaf2", source_info=SourceInfo(), attrs=SeasonAttrs(type="Season", name="季2")),
+                ItemCreate(temp_id="leaf3", source_info=SourceInfo(), attrs=SeasonAttrs(type="Season", name="季3")),
             ],
             item_links=[
                 ItemLinkCreate(link="center", linked="leaf1"),
@@ -1244,13 +1264,13 @@ class TestMediaBatchAPI:
 
     @pytest.mark.asyncio
     async def test_strict_graph_cycle_topology(self, app_client, db_session, auth_headers):
-        """测试30: 环形拓扑 A->B->C->A"""
+        """测试30: 核心媒体环形拓扑被业务校验拒绝"""
         data = MediaBatchCreate(
             source_name="cycle_test",
             items=[
-                ItemCreate(temp_id="a", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影A")),
-                ItemCreate(temp_id="b", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影B")),
-                ItemCreate(temp_id="c", source_info=SourceInfo(), attrs=ItemBaseAttrs(type="Movie", name="电影C")),
+                ItemCreate(temp_id="a", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影A")),
+                ItemCreate(temp_id="b", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影B")),
+                ItemCreate(temp_id="c", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影C")),
             ],
             item_links=[
                 ItemLinkCreate(link="a", linked="b"),
@@ -1260,7 +1280,59 @@ class TestMediaBatchAPI:
         )
 
         response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
-        assert response.status_code == 200, f"环形拓扑应该成功，实际: {response.text}"
+        assert response.status_code == 422, f"核心媒体环形拓扑应该失败，实际: {response.text}"
+
+    @pytest.mark.asyncio
+    async def test_core_topology_rejects_movie_to_movie(self, app_client, db_session, auth_headers):
+        """核心媒体类型不能用任意连通关系代替业务拓扑。"""
+        data = MediaBatchCreate(
+            source_name="non_agent_source",
+            items=[
+                ItemCreate(temp_id="movie-a", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影A")),
+                ItemCreate(temp_id="movie-b", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影B")),
+            ],
+            item_links=[ItemLinkCreate(link="movie-a", linked="movie-b")],
+        )
+
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
+        assert response.status_code == 422
+        assert "裸电影" in response.text
+
+    @pytest.mark.asyncio
+    async def test_metadata_links_are_not_restricted_by_core_topology(self, app_client, db_session, auth_headers):
+        """Genre、Person、Tag 等辅助 Item 不参与核心拓扑方向校验。"""
+        data = MediaBatchCreate(
+            source_name="metadata_source",
+            items=[
+                ItemCreate(temp_id="movie", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影")),
+                ItemCreate(temp_id="person", source_info=SourceInfo(), attrs=PersonAttrs(type="Person", name="人物")),
+                ItemCreate(temp_id="genre", source_info=SourceInfo(), attrs=GenreAttrs(type="Genre", name="类型")),
+                ItemCreate(temp_id="tag", source_info=SourceInfo(), attrs=TagAttrs(type="Tag", name="标签")),
+            ],
+            item_links=[
+                ItemLinkCreate(link="movie", linked="person"),
+                ItemLinkCreate(link="genre", linked="movie"),
+                ItemLinkCreate(link="tag", linked="genre"),
+            ],
+        )
+
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
+        assert response.status_code == 200, response.text
+
+    @pytest.mark.asyncio
+    async def test_collection_core_topology_is_accepted(self, app_client, db_session, auth_headers):
+        """集合分支必须使用 BoxSet -> Movie。"""
+        data = MediaBatchCreate(
+            source_name="collection_source",
+            items=[
+                ItemCreate(temp_id="box", source_info=SourceInfo(), attrs=BoxSetAttrs(type="BoxSet", name="合集")),
+                ItemCreate(temp_id="movie", source_info=SourceInfo(), attrs=MovieAttrs(type="Movie", name="电影")),
+            ],
+            item_links=[ItemLinkCreate(link="box", linked="movie")],
+        )
+
+        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
+        assert response.status_code == 200, response.text
 
 
 class TestSchemaValidation:
@@ -1271,7 +1343,7 @@ class TestSchemaValidation:
         item = ItemCreate(
             temp_id="t1",
             source_info=SourceInfo(source_id="s1"),
-            attrs=ItemBaseAttrs(type="Movie", name="测试")
+            attrs=MovieAttrs(type="Movie", name="测试")
         )
         dumped = item.model_dump(exclude_unset=True)
         assert "source_id" in dumped["source_info"]
@@ -1286,7 +1358,7 @@ class TestSchemaValidation:
                 ItemCreate(
                     temp_id="i1",
                     source_info=SourceInfo(source_id="sid", source_link="slink"),
-                    attrs=ItemBaseAttrs(type="Movie", name="名", overview="简介", tagline="标")
+                    attrs=MovieAttrs(type="Movie", name="名", overview="简介", tagline="标")
                 )
             ],
             files=[
@@ -1299,7 +1371,7 @@ class TestSchemaValidation:
                 ItemLinkCreate(link="i1", linked="i1", people_type="Actor", people_role="主演")
             ],
             file_links=[
-                FileLinkCreate(item="i1", file="f1", image_type="Primary")
+                ImageFileLink(item="i1", file="f1", link_type="Image", image_type="Primary")
             ]
         )
         dumped = data.model_dump()
@@ -1318,7 +1390,7 @@ class TestSchemaValidation:
     def test_validation_error_on_missing_type(self):
         """验证缺少 type 会抛出验证错误"""
         with pytest.raises(ValidationError):
-            ItemBaseAttrs(name="测试")
+            ItemCreate(temp_id="item-1", attrs={"name": "测试"})
 
     def test_file_type_required(self):
         """验证文件 type 必填"""

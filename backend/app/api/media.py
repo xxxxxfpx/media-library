@@ -11,9 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
 from database.core import get_db_session
 from app.api.deps import get_user_id, get_admin_id
-from app.services.media_service import get_media_list_cached, get_media_info, get_media_info_cached, get_media_stats, create_media_batch, invalidate_response_cache
+from app.services.media_service import (
+    get_media_list_cached, get_media_info, get_media_info_cached, get_media_stats,
+    create_media_batch, create_media_item, create_item_link, delete_item_link,
+    delete_media_item, invalidate_response_cache,
+)
 from app.schemas.media import MediaListResponse, MediaItemResponse, MediaStatsResponse
-from app.schemas.create import MediaBatchCreate
+from app.schemas.create import MediaBatchCreate, SingleItemCreate, SingleItemLinkCreate
 
 router = APIRouter(prefix="/api/media", tags=["媒体"])
 
@@ -85,3 +89,60 @@ async def create_batch(
         return result
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/items", status_code=201)
+async def create_item(
+    data: SingleItemCreate,
+    db: AsyncSession = Depends(get_db_session),
+    admin_id: int = Depends(get_admin_id),
+):
+    try:
+        result = await create_media_item(db, data)
+        invalidate_response_cache()
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.delete("/items/{item_id}", status_code=204)
+async def delete_item(
+    item_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    admin_id: int = Depends(get_admin_id),
+):
+    try:
+        await delete_media_item(db, item_id)
+        invalidate_response_cache()
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/items/{item_id}/links", status_code=201)
+async def add_item_link(
+    item_id: int,
+    data: SingleItemLinkCreate,
+    db: AsyncSession = Depends(get_db_session),
+    admin_id: int = Depends(get_admin_id),
+):
+    try:
+        result = await create_item_link(db, item_id, data)
+        invalidate_response_cache()
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.delete("/items/{item_id}/links/{linked_item_id}", status_code=204)
+async def remove_item_link(
+    item_id: int,
+    linked_item_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    admin_id: int = Depends(get_admin_id),
+):
+    removed = await delete_item_link(db, item_id, linked_item_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="关联不存在")
+    invalidate_response_cache()

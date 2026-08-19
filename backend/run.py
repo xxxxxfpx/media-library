@@ -40,9 +40,12 @@ def start_backend():
 
 
 def main():
+    from config import get_config
+    cfg = get_config()
     log("=" * 50)
     log("媒体库管理系统启动器")
-    log("后端: http://localhost:8000")
+    display_host = "localhost" if cfg.app.host in ("0.0.0.0", "127.0.0.1") else cfg.app.host
+    log(f"后端: http://{display_host}:{cfg.app.port}")
     log("=" * 50)
 
     backend_proc = None

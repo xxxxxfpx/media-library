@@ -51,8 +51,7 @@ MEDIAITEMS_KEY_COLUMNS = [
     "Status", "ChannelNumber",
     "DateCreated", "DateModified",
     "CreatedAt", "UpdatedAt", "IsDeleted",
-    "PresentationUniqueKey", "PreferredMetadataLanguage", "PreferredMetadataCountryCode", "LockedFields",
-    "ProductionLocations", "RemoteTrailers",
+    "PresentationUniqueKey", "LockedFields",
     "SourceId", "SourceLink", "SourceItemId",
 ]
 

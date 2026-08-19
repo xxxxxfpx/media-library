@@ -5,13 +5,14 @@ import time
 from collections import defaultdict
 from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, or_, text, and_
+from sqlalchemy import select, func, or_, text, and_, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType, FileLinkType
+from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType, FileLinkType, DriveFile
 from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata, serialize_item
 from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
+from app.schemas.create import ImageFileLink, ChapterFileLink, SingleItemCreate, SingleItemLinkCreate
 from config import config as _app_config
 
 logger = logging.getLogger(__name__)
@@ -29,15 +30,6 @@ def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
             except ValueError:
                 pass
     return result if result else None
-
-
-def _infer_link_type(image_type=None, chapter_index=None) -> FileLinkType:
-    """根据字段组合推断 FileLinkType：ChapterIndex 优先，其次 ImageType，否则 MediaSource"""
-    if chapter_index is not None:
-        return FileLinkType.Chapter
-    if image_type is not None:
-        return FileLinkType.Image
-    return FileLinkType.MediaSource
 
 
 async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[LinkItem]]:
@@ -526,7 +518,8 @@ async def get_media_list_cached(
 
 async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
     result = await db.execute(
-        select(MediaItem).where(MediaItem.Id == id, MediaItem.IsDeleted == False)
+        select(MediaItem)
+        .where(MediaItem.Id == id, MediaItem.IsDeleted == False)
     )
     item = result.scalar_one_or_none()
     if not item:
@@ -591,7 +584,7 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
         )
         source_name = src_result.scalar_one_or_none()
 
-    data = serialize_item(item).model_dump()
+    data = serialize_item(item, include_extra_fields=True).model_dump()
     data['source_name'] = source_name
     return MediaItemResponse(
         **data,
@@ -666,6 +659,81 @@ def _check_graph_connectivity(item_ids: set[str], item_links: list | None) -> li
     return isolated
 
 
+def _validate_import_topology(data: "MediaBatchCreate") -> None:
+    """校验批量导入的三种业务拓扑，避免仅凭图连通而落入错误结构。"""
+    metadata_types = {"Genre", "Person", "Studio", "Tag"}
+    hierarchy_types = {"Movie", "BoxSet", "Series", "Season", "Episode"}
+    item_types = {item.temp_id: item.attrs.type for item in data.items}
+    hierarchy_ids = {
+        temp_id for temp_id, item_type in item_types.items() if item_type in hierarchy_types
+    }
+
+    if not hierarchy_ids:
+        raise ValueError("导入至少需要一个 Movie、BoxSet、Series、Season 或 Episode")
+
+    if any(item_type not in hierarchy_types | metadata_types for item_type in item_types.values()):
+        raise ValueError("导入只允许三种媒体拓扑及 Genre、Person、Studio、Tag 元数据")
+
+    core_types = {item_types[temp_id] for temp_id in hierarchy_ids}
+    if "BoxSet" in core_types:
+        if core_types - {"BoxSet", "Movie"} or core_types != {"BoxSet", "Movie"}:
+            raise ValueError("集合电影拓扑必须同时包含 BoxSet 和 Movie，且不能混入剧集层级")
+        branch = "collection"
+    elif core_types & {"Series", "Season", "Episode"}:
+        if "Series" not in core_types:
+            raise ValueError("剧集拓扑必须以 Series 为根")
+        if core_types & {"Movie", "BoxSet"}:
+            raise ValueError("剧集拓扑不能混入 Movie 或 BoxSet")
+        branch = "series"
+    else:
+        if core_types != {"Movie"} or len(hierarchy_ids) != 1:
+            raise ValueError("裸电影拓扑只能包含一个 Movie")
+        branch = "movie"
+
+    core_edges: list[tuple[str, str]] = []
+    parent_count: dict[str, int] = defaultdict(int)
+    for link in data.item_links:
+        source_type = item_types.get(link.link)
+        target_type = item_types.get(link.linked)
+        if source_type is None or target_type is None:
+            continue
+        # Genre、Person、Studio、Tag 等辅助 Item 不参与主拓扑校验，
+        # 允许按业务需要创建、互相关联并挂接到主业务 Item。
+        if source_type not in hierarchy_types or target_type not in hierarchy_types:
+            continue
+
+        core_edges.append((source_type, target_type))
+        if branch == "movie":
+            raise ValueError("裸电影不允许媒体 Item 之间建立层级关系")
+        if branch == "collection" and (source_type, target_type) != ("BoxSet", "Movie"):
+            raise ValueError(
+                f"集合电影只允许 BoxSet -> Movie，实际为 {source_type} -> {target_type}"
+            )
+        if branch == "series" and (source_type, target_type) not in {
+            ("Series", "Season"),
+            ("Season", "Episode"),
+        }:
+            raise ValueError(
+                f"剧集只允许 Series -> Season -> Episode，实际为 {source_type} -> {target_type}"
+            )
+
+        if target_type in {"Movie", "Season", "Episode"}:
+            parent_count[link.linked] += 1
+            if parent_count[link.linked] > 1:
+                raise ValueError(f"层级 Item 不能有多个父级: {link.linked}")
+
+    if branch == "collection" and not any(
+        source_type == "BoxSet" and target_type == "Movie"
+        for source_type, target_type in core_edges
+    ):
+        raise ValueError("集合电影必须至少建立一条 BoxSet -> Movie 关系")
+    if branch == "series":
+        if "Season" in core_types and not any(edge == ("Series", "Season") for edge in core_edges):
+            raise ValueError("季必须通过 Series -> Season 关系连接")
+        if "Episode" in core_types and not any(edge == ("Season", "Episode") for edge in core_edges):
+            raise ValueError("集必须通过 Season -> Episode 关系连接")
+
+
 async def create_media_batch(
     db: AsyncSession,
     data: "MediaBatchCreate",
@@ -706,12 +774,17 @@ async def create_media_batch(
                 return None
         return None
 
-    # JSON 序列化辅助函数
+    # JSON 字段归一化：JSON 列应接收 Python 容器，字符串仅兼容已有 JSON 文本。
     def to_json(val):
         if val is None:
             return None
-        if isinstance(val, list):
-            return json.dumps(val, ensure_ascii=False)
+        if isinstance(val, (list, dict)):
+            return val
+        if isinstance(val, str):
+            try:
+                return json.loads(val)
+            except json.JSONDecodeError as exc:
+                raise ValueError("JSON 字段必须是合法的 JSON 文本") from exc
         return val
 
     # temp_id → real_id 映射
@@ -719,6 +792,8 @@ async def create_media_batch(
     file_temp_to_id: dict[str, int] = {}
 
     now = datetime.now(timezone.utc)
+
+    _validate_import_topology(data)
 
     # 0. 图连通性检查（strict_graph 模式）
     if strict_graph and data.items and len(data.items) > 0:
@@ -788,7 +863,10 @@ async def create_media_batch(
             )
             for key in uniq_keys
         ]
-        result = await db.execute(select(MediaItem).where(or_(*conditions)))
+        result = await db.execute(
+            select(MediaItem)
+            .where(or_(*conditions))
+        )
         for item in result.scalars().all():
             item_key_existing[(item.SourceId, item.Type)] = item
 
@@ -820,21 +898,11 @@ async def create_media_batch(
             if attrs.is_set("critic_rating"):
                 existing.CriticRating = attrs.critic_rating
             if attrs.is_set("premiere_date"):
-                existing.PremiereDate = parse_datetime(attrs.premiere_date)
+                existing.StartDate = parse_datetime(attrs.premiere_date)
             if attrs.is_set("end_date"):
                 existing.EndDate = parse_datetime(attrs.end_date)
-            if attrs.is_set("production_locations"):
-                existing.ProductionLocations = to_json(attrs.production_locations)
-            if attrs.is_set("remote_trailers"):
-                existing.RemoteTrailers = to_json(attrs.remote_trailers)
             if attrs.is_set("status"):
                 existing.Status = ItemStatus(attrs.status) if attrs.status else None
-            if attrs.is_set("preferred_metadata_language"):
-                existing.PreferredMetadataLanguage = attrs.preferred_metadata_language
-            if attrs.is_set("preferred_metadata_country_code"):
-                existing.PreferredMetadataCountryCode = attrs.preferred_metadata_country_code
-            if source_info and source_info.is_set("source_link"):
-                existing.SourceLink = source_link
             existing.DateModified = now
             await db.flush()
             item_temp_to_id[item_data.temp_id] = existing.Id
@@ -848,16 +916,11 @@ async def create_media_batch(
                 OfficialRating=attrs.official_rating if attrs.is_set("official_rating") else None,
                 CommunityRating=attrs.community_rating if attrs.is_set("community_rating") else None,
                 CriticRating=attrs.critic_rating if attrs.is_set("critic_rating") else None,
-                PremiereDate=parse_datetime(attrs.premiere_date) if attrs.is_set("premiere_date") else None,
+                StartDate=parse_datetime(attrs.premiere_date) if attrs.is_set("premiere_date") else None,
                 EndDate=parse_datetime(attrs.end_date) if attrs.is_set("end_date") else None,
-                ProductionLocations=to_json(attrs.production_locations) if attrs.is_set("production_locations") else None,
-                RemoteTrailers=to_json(attrs.remote_trailers) if attrs.is_set("remote_trailers") else None,
                 Status=ItemStatus(attrs.status) if attrs.status and attrs.is_set("status") else None,
-                PreferredMetadataLanguage=attrs.preferred_metadata_language if attrs.is_set("preferred_metadata_language") else None,
-                PreferredMetadataCountryCode=attrs.preferred_metadata_country_code if attrs.is_set("preferred_metadata_country_code") else None,
                 SourceItemId=source_item_id if source_id else None,
                 SourceId=source_id,
-                SourceLink=source_link,
             )
             try:
                 async with db.begin_nested():
@@ -867,7 +930,8 @@ async def create_media_batch(
                 # 并发场景：另一个请求已创建相同 source_name + source_id + item_type
                 # SAVEPOINT 已回滚当前 item，外层事务保持完整；重新查找并复用其 id
                 result = await db.execute(
-                    select(MediaItem).where(
+                    select(MediaItem)
+                    .where(
                         MediaItem.SourceItemId == source_item_id,
                         MediaItem.SourceId == source_id,
                         MediaItem.Type == item_type,
@@ -886,9 +950,11 @@ async def create_media_batch(
                 if dedup_key:
                     item_key_created[dedup_key] = item
 
-    # 预查询：按 Path 批量查找已存在的 Files
+    # 预查询：按 Path 或第三方 provider_file_id 批量查找已存在的 Files
     file_path_existing: dict[str, File] = {}
     file_path_created: dict[str, File] = {}
+    provider_file_existing: dict[tuple[str, str], File] = {}
+    provider_file_created: dict[tuple[str, str], File] = {}
     dedup_paths = [f.attrs.path for f in data.files if f.attrs.path is not None]
     if dedup_paths:
         result = await db.execute(
@@ -896,13 +962,34 @@ async def create_media_batch(
         )
         for file in result.scalars().all():
             file_path_existing[file.Path] = file
+    provider_keys = [
+        (f.attrs.provider, f.attrs.provider_file_id)
+        for f in data.files
+        if f.attrs.provider and f.attrs.provider_file_id
+    ]
+    if provider_keys:
+        conditions = [
+            and_(File.Provider == provider, File.ProviderFileId == provider_file_id)
+            for provider, provider_file_id in list(dict.fromkeys(provider_keys))
+        ]
+        result = await db.execute(select(File).where(or_(*conditions)))
+        for file in result.scalars().all():
+            provider_file_existing[(file.Provider, file.ProviderFileId)] = file
 
-    # 2. 创建 Files（按 Path 去重，重复提交幂等复用）
+    # 2. 创建 Files（本地 path 或第三方 provider_file_id 幂等复用）
     for file_data in data.files:
         attrs = file_data.attrs
+        provider_key = (attrs.provider, attrs.provider_file_id) if attrs.provider and attrs.provider_file_id else None
+        resolved_path = attrs.path
+        if provider_key and not resolved_path:
+            # Path remains a legacy local key; callers use provider_file_id as
+            # the stable external identity and never need to submit this path.
+            resolved_path = f"drive://{provider_key[0]}/{provider_key[1]}"
         existing = None
+        if provider_key:
+            existing = provider_file_existing.get(provider_key) or provider_file_created.get(provider_key)
         if attrs.path is not None:
-            existing = file_path_existing.get(attrs.path)
+            existing = existing or file_path_existing.get(attrs.path)
             if existing is None:
                 existing = file_path_created.get(attrs.path)
         if existing:
@@ -916,13 +1003,20 @@ async def create_media_batch(
                 existing.Type = FileType(attrs.type)
             if attrs.is_set("ffmpeg"):
                 existing.FFmpeg = to_json(attrs.ffmpeg)
+            if provider_key:
+                existing.Provider = provider_key[0]
+                existing.ProviderFileId = provider_key[1]
+                existing.CloudId = provider_key[1]
             existing.UpdatedAt = now
             await db.flush()
             file_temp_to_id[file_data.temp_id] = existing.Id
         else:
             file = File(
                 Name=attrs.name if attrs.is_set("name") else None,
-                Path=attrs.path if attrs.is_set("path") else None,
+                Path=resolved_path,
+                CloudId=provider_key[1] if provider_key else None,
+                Provider=provider_key[0] if provider_key else None,
+                ProviderFileId=provider_key[1] if provider_key else None,
                 Type=FileType(attrs.type) if attrs.is_set("type") else FileType.Other,
                 Size=attrs.size if attrs.is_set("size") else None,
                 Etag=attrs.etag if attrs.is_set("etag") else None,
@@ -940,16 +1034,56 @@ async def create_media_batch(
                         select(File).where(File.Path == attrs.path).limit(1)
                     )
                     existing_file = res.scalar_one_or_none()
+                elif provider_key:
+                    res = await db.execute(
+                        select(File).where(
+                            File.Provider == provider_key[0],
+                            File.ProviderFileId == provider_key[1],
+                        ).limit(1)
+                    )
+                    existing_file = res.scalar_one_or_none()
                 if existing_file:
                     file_temp_to_id[file_data.temp_id] = existing_file.Id
-                    if attrs.path is not None:
+                    if provider_key:
+                        provider_file_created[provider_key] = existing_file
+                    elif attrs.path is not None:
                         file_path_created[attrs.path] = existing_file
                     continue
                 raise
             else:
                 file_temp_to_id[file_data.temp_id] = file.Id
-                if attrs.path is not None:
+                if provider_key:
+                    provider_file_created[provider_key] = file
+                elif attrs.path is not None:
                     file_path_created[attrs.path] = file
+
+        if provider_key:
+            drive_file = await db.scalar(
+                select(DriveFile).where(
+                    DriveFile.Provider == provider_key[0],
+                    DriveFile.ProviderFileId == provider_key[1],
+                )
+            )
+            if drive_file is None:
+                drive_file = DriveFile(
+                    Provider=provider_key[0],
+                    ProviderFileId=provider_key[1],
+                    SourceUrl=attrs.url or "",
+                    PlaybackUrl=attrs.url,
+                    Mode="external",
+                    Name=attrs.name,
+                    Size=attrs.size,
+                    Status="ready",
+                )
+                db.add(drive_file)
+            else:
+                if attrs.is_set("url") and attrs.url:
+                    drive_file.PlaybackUrl = attrs.url
+                if attrs.is_set("name"):
+                    drive_file.Name = attrs.name
+                if attrs.is_set("size"):
+                    drive_file.Size = attrs.size
+            await db.flush()
 
     # 预查询：批量查找已存在的 ItemLinks
     link_existing: dict[tuple, ItemLinks] = {}
@@ -1015,25 +1149,30 @@ async def create_media_batch(
         if existing is None:
             existing = file_link_created.get(pair)
 
-        # 解析字段值
-        image_type_val = ImageType(f_link_data.image_type) if f_link_data.image_type and f_link_data.is_set("image_type") else None
-        chapter_index_val = f_link_data.chapter_index if f_link_data.is_set("chapter_index") else None
-
-        # 推断 LinkType
-        link_type = _infer_link_type(image_type_val, chapter_index_val)
+        image_type_val = (
+            ImageType(f_link_data.image_type)
+            if isinstance(f_link_data, ImageFileLink)
+            else None
+        )
+        chapter_index_val = (
+            f_link_data.chapter_index
+            if isinstance(f_link_data, ChapterFileLink)
+            else None
+        )
+        link_type = FileLinkType(f_link_data.link_type)
 
         if existing:
-            if f_link_data.is_set("image_type"):
+            if isinstance(f_link_data, ImageFileLink):
                 existing.ImageType = image_type_val
             if f_link_data.is_set("image_index"):
                 existing.ImageIndex = f_link_data.image_index
-            if f_link_data.is_set("chapter_index"):
+            if isinstance(f_link_data, ChapterFileLink):
                 existing.ChapterIndex = chapter_index_val
-            if f_link_data.is_set("chapter_name"):
+            if isinstance(f_link_data, ChapterFileLink) and f_link_data.is_set("chapter_name"):
                 existing.ChapterName = f_link_data.chapter_name
             if f_link_data.is_set("start_position_ticks"):
                 existing.StartPositionTicks = f_link_data.start_position_ticks
-            if f_link_data.is_set("marker_type"):
+            if isinstance(f_link_data, ChapterFileLink) and f_link_data.is_set("marker_type"):
                 existing.MarkerType = f_link_data.marker_type
             existing.LinkType = link_type
             existing.UpdatedAt = now
@@ -1043,11 +1182,11 @@ async def create_media_batch(
                 FileId=pair[1],
                 LinkType=link_type,
                 ImageType=image_type_val,
-                ImageIndex=f_link_data.image_index if f_link_data.is_set("image_index") else 0,
-                ChapterIndex=chapter_index_val,
-                ChapterName=f_link_data.chapter_name if f_link_data.is_set("chapter_name") else None,
-                StartPositionTicks=f_link_data.start_position_ticks if f_link_data.is_set("start_position_ticks") else None,
-                MarkerType=f_link_data.marker_type if f_link_data.is_set("marker_type") else None,
+                 ImageIndex=f_link_data.image_index if f_link_data.is_set("image_index") else 0,
+                 ChapterIndex=chapter_index_val,
+                 ChapterName=f_link_data.chapter_name if isinstance(f_link_data, ChapterFileLink) and f_link_data.is_set("chapter_name") else None,
+                 StartPositionTicks=f_link_data.start_position_ticks if f_link_data.is_set("start_position_ticks") else None,
+                 MarkerType=f_link_data.marker_type if isinstance(f_link_data, ChapterFileLink) and f_link_data.is_set("marker_type") else None,
             )
             db.add(new_fl)
             file_link_created[pair] = new_fl
@@ -1065,6 +1204,142 @@ async def create_media_batch(
         "items": {temp_id: real_id for temp_id, real_id in item_temp_to_id.items()},
         "files": {temp_id: real_id for temp_id, real_id in file_temp_to_id.items()},
     }
+
+
+METADATA_ITEM_TYPES = frozenset({MediaType.Genre, MediaType.Person, MediaType.Studio, MediaType.Tag})
+
+
+async def create_media_item(db: AsyncSession, data: SingleItemCreate) -> dict:
+    """创建一个 Item，并复用批量导入的来源和字段语义。"""
+    source_result = await db.execute(
+        select(MediaItem).where(
+            MediaItem.Name == data.source_name,
+            MediaItem.Type == MediaType.Source,
+            MediaItem.IsDeleted == False,
+        )
+    )
+    source = source_result.scalar_one_or_none()
+    if source is None:
+        source = MediaItem(Type=MediaType.Source, Name=data.source_name)
+        db.add(source)
+        await db.flush()
+
+    attrs = data.attrs
+    source_id = data.source_info.source_id if data.source_info.is_set("source_id") else None
+    source_link = data.source_info.source_link if data.source_info.is_set("source_link") else None
+    item_type = MediaType(attrs.type)
+    existing = None
+    if source_id:
+        existing = await db.scalar(
+            select(MediaItem).where(
+                MediaItem.SourceItemId == source.Id,
+                MediaItem.SourceId == source_id,
+                MediaItem.Type == item_type,
+                MediaItem.IsDeleted == False,
+            )
+        )
+    if existing is not None:
+        raise ValueError("相同来源和 source_id 的 Item 已存在，请使用批量接口更新")
+
+    item = MediaItem(
+        Type=item_type,
+        Name=attrs.name,
+        Overview=attrs.overview,
+        Tagline=attrs.tagline,
+        OfficialRating=attrs.official_rating,
+        CommunityRating=attrs.community_rating,
+        CriticRating=attrs.critic_rating,
+        SourceItemId=source.Id if source_id else None,
+        SourceId=source_id,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return {"id": item.Id, "type": item.Type.value, "source_link": source_link}
+
+
+def _validate_link_types(source_type: MediaType, target_type: MediaType) -> None:
+    """校验单条增量关联不会违反核心媒体拓扑。"""
+    if source_type in METADATA_ITEM_TYPES or target_type in METADATA_ITEM_TYPES:
+        return
+    if source_type == MediaType.Movie or target_type == MediaType.Movie:
+        if source_type not in {MediaType.BoxSet, MediaType.Movie} or target_type not in {MediaType.BoxSet, MediaType.Movie}:
+            raise ValueError("Movie 只能参与 BoxSet -> Movie 关系")
+        if (source_type, target_type) != (MediaType.BoxSet, MediaType.Movie):
+            raise ValueError("Movie 只能被 BoxSet 关联，不能建立其他核心关系")
+    if source_type == MediaType.Series and target_type not in {MediaType.Season}:
+        raise ValueError("Series 只能关联 Season")
+    if source_type == MediaType.Season and target_type != MediaType.Episode:
+        raise ValueError("Season 只能关联 Episode")
+    if source_type == MediaType.Episode and target_type in {
+        MediaType.Movie, MediaType.BoxSet, MediaType.Series, MediaType.Season, MediaType.Episode,
+    }:
+        raise ValueError("Episode 不能作为核心层级关系的源项")
+    if target_type == MediaType.Series:
+        raise ValueError("Series 不能作为核心层级关系的目标项")
+
+
+async def create_item_link(db: AsyncSession, item_id: int, data: SingleItemLinkCreate) -> dict:
+    source = await db.scalar(select(MediaItem).where(MediaItem.Id == item_id, MediaItem.IsDeleted == False))
+    target = await db.scalar(select(MediaItem).where(MediaItem.Id == data.linked_item_id, MediaItem.IsDeleted == False))
+    if source is None or target is None:
+        raise ValueError("Item 不存在")
+    _validate_link_types(source.Type, target.Type)
+
+    link = await db.scalar(
+        select(ItemLinks).where(ItemLinks.ItemId == item_id, ItemLinks.LinkedItemId == data.linked_item_id)
+    )
+    if link is None and target.Type in {MediaType.Movie, MediaType.Season, MediaType.Episode}:
+        parent_count = await db.scalar(
+            select(func.count())
+            .select_from(ItemLinks)
+            .join(MediaItem, MediaItem.Id == ItemLinks.ItemId)
+            .where(
+                ItemLinks.LinkedItemId == data.linked_item_id,
+                MediaItem.IsDeleted == False,
+                MediaItem.Type.in_({MediaType.BoxSet, MediaType.Series, MediaType.Season}),
+            )
+        )
+        if parent_count:
+            raise ValueError("层级 Item 不能有多个父级")
+    if link is None:
+        link = ItemLinks(ItemId=item_id, LinkedItemId=data.linked_item_id)
+        db.add(link)
+    if data.people_type is not None:
+        from database.models import PersonType
+        try:
+            link.PeopleType = PersonType(data.people_type)
+        except ValueError as exc:
+            raise ValueError(f"无效的 people_type: {data.people_type}") from exc
+    if data.people_role is not None:
+        link.PeopleRole = data.people_role
+    await db.commit()
+    return {"id": link.Id, "item_id": item_id, "linked_item_id": data.linked_item_id}
+
+
+async def delete_item_link(db: AsyncSession, item_id: int, linked_item_id: int) -> bool:
+    result = await db.execute(
+        delete(ItemLinks).where(ItemLinks.ItemId == item_id, ItemLinks.LinkedItemId == linked_item_id)
+    )
+    await db.commit()
+    return result.rowcount > 0
+
+
+async def delete_media_item(db: AsyncSession, item_id: int) -> None:
+    item = await db.scalar(select(MediaItem).where(MediaItem.Id == item_id, MediaItem.IsDeleted == False))
+    if item is None:
+        raise LookupError("媒体项不存在")
+    if item.Type in METADATA_ITEM_TYPES:
+        raise PermissionError("Genre、Person、Studio、Tag 只能取消关联，不能删除")
+    if item.Type == MediaType.Source:
+        raise PermissionError("Source 不能删除")
+
+    # 使用软删除保留审计数据，同时显式清理双向关联，避免遗留不可见关系。
+    item.IsDeleted = True
+    await db.execute(
+        delete(ItemLinks).where(or_(ItemLinks.ItemId == item_id, ItemLinks.LinkedItemId == item_id))
+    )
+    await db.commit()
 
 
 async def get_media_stats(db: AsyncSession) -> dict:

@@ -1,6 +1,6 @@
 """媒体数据序列化 Schema"""
 
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 
@@ -50,7 +50,7 @@ class FileInfoDetail(BaseModel):
     item_id: int
     image_type: Optional[str] = None
     image_index: Optional[int] = None
-    size: int
+    size: Optional[int] = None
     etag: Optional[str] = None
     ffmpeg: Optional[str] = None
 
@@ -140,7 +140,7 @@ def serialize_links(links_result, primary_images_map: dict[int, str] | None = No
                 type=linked_item.Type.value if linked_item.Type else None,
                 overview=linked_item.Overview,
                 tagline=linked_item.Tagline,
-                premiere_date=linked_item.PremiereDate.isoformat() if linked_item.PremiereDate else None,
+                premiere_date=linked_item.StartDate.isoformat() if linked_item.StartDate else None,
                 official_rating=linked_item.OfficialRating,
                 community_rating=linked_item.CommunityRating,
                 primary_image=primary_image,
@@ -198,25 +198,31 @@ def serialize_userdata(ud) -> Optional[UserDataInfo]:
     )
 
 
-def serialize_item(item) -> MediaItemSummary:
-    """序列化媒体项基本信息"""
-    return MediaItemSummary(
-        id=item.Id,
-        name=item.Name,
-        type=item.Type.value if item.Type else None,
-        overview=item.Overview,
-        tagline=item.Tagline,
-        premiere_date=item.PremiereDate.isoformat() if item.PremiereDate else None,
-        end_date=item.EndDate.isoformat() if item.EndDate else None,
-        official_rating=item.OfficialRating,
-        community_rating=item.CommunityRating,
-        critic_rating=item.CriticRating,
-        date_created=item.DateCreated.isoformat() if item.DateCreated else None,
-        date_modified=item.DateModified.isoformat() if item.DateModified else None,
-        source_id=item.SourceId,
-        source_link=item.SourceLink,
-        source_name=None,
-    )
+def serialize_item(item, include_extra_fields: bool = False) -> MediaItemSummary:
+    """序列化媒体项基本信息
+    
+    Args:
+        item: MediaItem ORM 对象
+        include_extra_fields: 是否包含扩展字段（详情接口为 True，列表接口为 False）
+    """
+    data = {
+        "id": item.Id,
+        "name": item.Name,
+        "type": item.Type.value if item.Type else None,
+        "overview": item.Overview,
+        "tagline": item.Tagline,
+        "premiere_date": item.StartDate.isoformat() if item.StartDate else None,
+        "end_date": item.EndDate.isoformat() if item.EndDate else None,
+        "official_rating": item.OfficialRating,
+        "community_rating": item.CommunityRating,
+        "critic_rating": item.CriticRating,
+        "date_created": item.DateCreated.isoformat() if item.DateCreated else None,
+        "date_modified": item.DateModified.isoformat() if item.DateModified else None,
+        "source_id": item.SourceId,
+        "source_name": None,
+    }
+
+    return MediaItemSummary(**data)
 
 
 def serialize_file_info(file, file_link) -> FileInfoDetail:

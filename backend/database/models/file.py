@@ -65,6 +65,8 @@ class File(Base):
     SortName = Column("SortName", Text, nullable=True, comment="排序名称 - 用于排序的文件名")
     Path = Column("Path", Text, nullable=False, comment="文件路径 - 唯一键，用于标识文件")
     CloudId = Column("CloudId", String(255), nullable=True, comment="云盘文件 ID - 唯一键，可为空")
+    Provider = Column("Provider", String(64), nullable=True, comment="第三方存储提供商")
+    ProviderFileId = Column("ProviderFileId", String(255), nullable=True, comment="第三方存储文件 ID")
     Type = Column("Type", SQLEnum(FileType, name="file_type_enum", create_type=False, values_callable=lambda x: [e.value for e in x]), nullable=False, comment="文件类型")
     FFmpeg = Column("FFmpeg", JSON, nullable=True, comment="ffprobe 完整输出 - JSON 格式，前端自行解析流信息")
 
@@ -75,6 +77,7 @@ class File(Base):
         Index("idx_files_etag", "Etag"),
         Index("idx_files_path", "Path", unique=True),
         Index("idx_files_cloud_id", "CloudId", unique=True),
+        Index("idx_files_provider_file", "Provider", "ProviderFileId", unique=True),
     )
     FileLinks = relationship("FileLink", back_populates="File", cascade="all, delete")
 

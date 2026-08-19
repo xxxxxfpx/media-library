@@ -10,11 +10,11 @@ import diskcache
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 
-from database.models import File, FileLink, FileType
+from database.models import DriveFile, File, FileLink, FileType
 from database.core import get_db_session
 from app.api.deps import get_user_id, get_user_id_from_token
 from app.schemas.media import FileInfoDetail
@@ -131,6 +131,27 @@ async def get_file_data(
 ):
     _trace = _file_data_logger
     _trace.info("=== START ===", extra={'file_id': file_id})
+
+    # Provider-backed files already have a temporary playback URL recorded by
+    # the provider integration; do not route them through the WebDAV fallback.
+    provider_result = await db.execute(
+        select(File, DriveFile)
+        .outerjoin(
+            DriveFile,
+            and_(
+                DriveFile.Provider == File.Provider,
+                DriveFile.ProviderFileId == File.ProviderFileId,
+            ),
+        )
+        .where(File.Id == file_id)
+    )
+    provider_row = provider_result.one_or_none()
+    if not provider_row:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    file, drive_file = provider_row
+    if file.Provider and drive_file and drive_file.PlaybackUrl:
+        _trace.info("→ 使用第三方云盘播放地址", extra={'file_id': file_id})
+        return RedirectResponse(url=drive_file.PlaybackUrl)
 
     cache_key = f"file_url_{file_id}"
 

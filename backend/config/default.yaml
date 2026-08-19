@@ -27,7 +27,8 @@ app:
     username: admin
     password: ""
   # 服务器配置
-  host: "127.0.0.1"
+  # 允许局域网客户端访问后端（如 Flutter 手机端）。
+  host: "0.0.0.0"
   port: 8000
   # 磁盘监控路径
   disk_path: "C:\\"  # Windows, Linux 使用 "/"

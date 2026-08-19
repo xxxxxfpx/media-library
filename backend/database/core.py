@@ -16,10 +16,11 @@ Database Core - 数据库核心配置
 版本：3.1.0 (移除未使用的 SessionManager，统一 get_db_session)
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import event, text
+import json
 from typing import AsyncGenerator
+
+from sqlalchemy import event, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from config import config
 from database.fts_ddl import FTS5_CREATE_SQL
@@ -31,6 +32,11 @@ else:
     DATABASE_URL = f"postgresql+asyncpg://{config.database.username}:{config.database.password}@{config.database.host}:{config.database.port}/{config.database.database}"
 
 # ==================== 引擎配置 ====================
+def _json_serializer(value):
+    """统一 JSON 存储格式，保留非 ASCII 字符以兼容现有 SQLite 数据。"""
+    return json.dumps(value, ensure_ascii=False)
+
+
 if config.database.type == "sqlite":
     # SQLite 单写者模型：小连接池即可，WAL 支持多读并发
     engine = create_async_engine(
@@ -41,6 +47,7 @@ if config.database.type == "sqlite":
         max_overflow=5,
         pool_timeout=30,
         connect_args={"check_same_thread": False},
+        json_serializer=_json_serializer,
     )
 
     @event.listens_for(engine.sync_engine, "connect")
@@ -62,6 +69,7 @@ else:
         pool_timeout=30,
         pool_recycle=3600,
         pool_pre_ping=True,
+        json_serializer=_json_serializer,
     )
 
 # ==================== 会话工厂 ====================

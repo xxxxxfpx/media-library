@@ -44,9 +44,6 @@ class MediaType(str, Enum):
     def type_code(self) -> int:
         """
         获取原生 Emby SQLite 数据库的 type 整数值
-
-        Returns:
-            int: 原生 Emby 的 type 值
         """
         type_code_map = {
             MediaType.Source: 4,
@@ -66,12 +63,6 @@ class MediaType(str, Enum):
     def from_type_code(cls, code: int) -> "MediaType":
         """
         从原生 Emby type 整数值获取 MediaType 枚举
-
-        Args:
-            code: 原生 Emby 的 type 值
-
-        Returns:
-            MediaType: 对应的 MediaType 枚举值
         """
         code_to_type = {
             4: cls.Source,

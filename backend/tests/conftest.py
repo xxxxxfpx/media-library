@@ -57,10 +57,21 @@ async def clean_db():
 
 
 @pytest.fixture(scope="function")
-async def init_database(clean_db):
-    """重新初始化数据库表结构（如果需要），并确保 admin 用户存在"""
+async def init_database():
+    """完全重建数据库表结构，确保 schema 与 ORM 模型一致"""
     try:
         async with engine.begin() as conn:
+            # 先删除所有表
+            await conn.execute(text("PRAGMA foreign_keys = OFF"))
+            for table in reversed(["UserItemShares", "Aliases", "ItemLinks", "FileLinks",
+                                    "UserData", "Files", "MediaItems", "Users"]):
+                try:
+                    await conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+                except Exception:
+                    pass
+            await conn.execute(text("PRAGMA foreign_keys = ON"))
+
+            # 重新创建所有表
             await conn.run_sync(Base.metadata.create_all)
 
         # 确保 admin 用户存在
