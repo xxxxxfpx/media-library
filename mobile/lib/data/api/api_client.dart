@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants.dart';
 import '../../core/token_cache.dart';
+import '../../core/app_logger.dart';
 
 class ApiClient {
   late Dio _dio;
@@ -14,7 +15,8 @@ class ApiClient {
   final List<_PendingRequest> _pendingRequests = [];
 
   ApiClient(this._prefs) {
-    _baseUrl = _prefs.getString(AppConstants.storageKeyBaseUrl) ??
+    _baseUrl =
+        _prefs.getString(AppConstants.storageKeyBaseUrl) ??
         AppConstants.defaultBaseUrl;
     _dio = _createDio();
     TokenCache.set(_prefs.getString(AppConstants.storageKeyAccessToken));
@@ -25,120 +27,177 @@ class ApiClient {
   ApiClient.withDio(this._dio, this._prefs) : _baseUrl = null;
 
   Dio _createDio() {
-    final dio = Dio(BaseOptions(
-      baseUrl: _baseUrl!,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {'Content-Type': 'application/json'},
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: _baseUrl!,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {'Content-Type': 'application/json'},
+      ),
+    );
 
-    dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        final token =
-            _prefs.getString(AppConstants.storageKeyAccessToken);
-        if (token != null && !options.path.contains('/api/user/login')) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        handler.next(options);
-      },
-      onError: (error, handler) async {
-        if (error.response?.statusCode != 401) {
-          return handler.next(error);
-        }
-
-        final request = error.requestOptions;
-
-        // Replayed requests must not start a second refresh cycle if the new
-        // access token is rejected. The original error is propagated instead.
-        if (request.extra['_skipAuthRefresh'] == true) {
-          return handler.next(error);
-        }
-
-        // Don't retry the refresh endpoint itself
-        if (request.path.contains('/api/user/refresh')) {
-          _clearTokens();
-          return handler.next(error);
-        }
-
-        // Don't retry login
-        if (request.path.contains('/api/user/login')) {
-          return handler.next(error);
-        }
-
-        if (_isRefreshing) {
-          final completer = Completer<Response>();
-          _pendingRequests.add(_PendingRequest(completer, request));
-          try {
-            final result = await completer.future;
-            return handler.resolve(result);
-          } catch (_) {
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          AppLogger.debug(
+            'request_started',
+            category: 'api',
+            fields: {'method': options.method, 'path': _safeUri(options.uri)},
+          );
+          final token = _prefs.getString(AppConstants.storageKeyAccessToken);
+          if (token != null && !options.path.contains('/api/user/login')) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          AppLogger.debug(
+            'request_succeeded',
+            category: 'api',
+            fields: {
+              'method': response.requestOptions.method,
+              'path': _safeUri(response.requestOptions.uri),
+              'status': response.statusCode,
+            },
+          );
+          handler.next(response);
+        },
+        onError: (error, handler) async {
+          if (error.response?.statusCode != 401) {
+            AppLogger.error(
+              'request_failed',
+              error: error.error ?? error,
+              stackTrace: error.stackTrace,
+              category: 'api',
+              fields: {
+                'method': error.requestOptions.method,
+                'path': _safeUri(error.requestOptions.uri),
+                'status': error.response?.statusCode,
+                'type': error.type.name,
+              },
+            );
+          }
+          if (error.response?.statusCode != 401) {
             return handler.next(error);
           }
-        }
 
-        _isRefreshing = true;
-        try {
-          final refreshToken =
-              _prefs.getString(AppConstants.storageKeyRefreshToken);
-          if (refreshToken == null) {
-            throw Exception('No refresh token');
+          final request = error.requestOptions;
+
+          // Replayed requests must not start a second refresh cycle if the new
+          // access token is rejected. The original error is propagated instead.
+          if (request.extra['_skipAuthRefresh'] == true) {
+            return handler.next(error);
           }
 
-          final refreshDio = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
-          final refreshResponse = await refreshDio.post(
-            '/api/user/refresh',
-            data: {'refresh_token': refreshToken},
-          );
-
-          final newAccess = refreshResponse.data['access_token'] as String?;
-          final newRefresh = refreshResponse.data['refresh_token'] as String?;
-
-          if (newAccess == null || newRefresh == null) {
-            throw Exception('Invalid refresh response');
+          // Don't retry the refresh endpoint itself
+          if (request.path.contains('/api/user/refresh')) {
+            AppLogger.warning('token_refresh_rejected', category: 'auth');
+            _clearTokens();
+            return handler.next(error);
           }
 
-          await _prefs.setString(
-              AppConstants.storageKeyAccessToken, newAccess);
-          await _prefs.setString(
-              AppConstants.storageKeyRefreshToken, newRefresh);
-          TokenCache.set(newAccess);
+          // Don't retry login
+          if (request.path.contains('/api/user/login')) {
+            AppLogger.warning(
+              'authenticated_request_rejected',
+              category: 'auth',
+            );
+            return handler.next(error);
+          }
 
-          // Replay all queued requests
-          final pending = List<_PendingRequest>.from(_pendingRequests);
-          _pendingRequests.clear();
-
-           for (final p in pending) {
-             p.request.headers['Authorization'] = 'Bearer $newAccess';
-             p.request.extra['_skipAuthRefresh'] = true;
+          if (_isRefreshing) {
+            final completer = Completer<Response>();
+            _pendingRequests.add(_PendingRequest(completer, request));
             try {
-              final result = await _dio.fetch(p.request);
-              p.completer.complete(result);
-            } catch (e) {
-              p.completer.completeError(e);
+              final result = await completer.future;
+              return handler.resolve(result);
+            } catch (_) {
+              return handler.next(error);
             }
           }
 
-          // Retry original request
-           request.headers['Authorization'] = 'Bearer $newAccess';
-           request.extra['_skipAuthRefresh'] = true;
-           final retryResponse = await _dio.fetch(request);
-           return handler.resolve(retryResponse);
-         } catch (refreshError) {
-           for (final pendingRequest in _pendingRequests) {
-             if (!pendingRequest.completer.isCompleted) {
-               pendingRequest.completer.completeError(refreshError);
-             }
-           }
-           _pendingRequests.clear();
-           _clearTokens();
-           return handler.next(error);
-        } finally {
-          _isRefreshing = false;
-        }
-      },
-    ));
+          _isRefreshing = true;
+          try {
+            AppLogger.info('token_refresh_started', category: 'auth');
+            final refreshToken = _prefs.getString(
+              AppConstants.storageKeyRefreshToken,
+            );
+            if (refreshToken == null) {
+              throw Exception('No refresh token');
+            }
+
+            final refreshDio = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
+            final refreshResponse = await refreshDio.post(
+              '/api/user/refresh',
+              data: {'refresh_token': refreshToken},
+            );
+
+            final newAccess = refreshResponse.data['access_token'] as String?;
+            final newRefresh = refreshResponse.data['refresh_token'] as String?;
+
+            if (newAccess == null || newRefresh == null) {
+              throw Exception('Invalid refresh response');
+            }
+
+            await _prefs.setString(
+              AppConstants.storageKeyAccessToken,
+              newAccess,
+            );
+            await _prefs.setString(
+              AppConstants.storageKeyRefreshToken,
+              newRefresh,
+            );
+            TokenCache.set(newAccess);
+            AppLogger.info('token_refresh_succeeded', category: 'auth');
+
+            // Replay all queued requests
+            final pending = List<_PendingRequest>.from(_pendingRequests);
+            _pendingRequests.clear();
+
+            for (final p in pending) {
+              p.request.headers['Authorization'] = 'Bearer $newAccess';
+              p.request.extra['_skipAuthRefresh'] = true;
+              try {
+                final result = await _dio.fetch(p.request);
+                p.completer.complete(result);
+              } catch (e) {
+                p.completer.completeError(e);
+              }
+            }
+
+            // Retry original request
+            request.headers['Authorization'] = 'Bearer $newAccess';
+            request.extra['_skipAuthRefresh'] = true;
+            final retryResponse = await _dio.fetch(request);
+            return handler.resolve(retryResponse);
+          } catch (refreshError) {
+            AppLogger.error(
+              'token_refresh_failed',
+              error: refreshError,
+              stackTrace: StackTrace.current,
+              category: 'auth',
+            );
+            for (final pendingRequest in _pendingRequests) {
+              if (!pendingRequest.completer.isCompleted) {
+                pendingRequest.completer.completeError(refreshError);
+              }
+            }
+            _pendingRequests.clear();
+            _clearTokens();
+            return handler.next(error);
+          } finally {
+            _isRefreshing = false;
+          }
+        },
+      ),
+    );
 
     return dio;
+  }
+
+  static String _safeUri(Uri uri) {
+    // Query strings may contain media access tokens, so only log the path.
+    return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
   }
 
   void _clearTokens() {
@@ -157,24 +216,29 @@ class ApiClient {
 
   String? get accessToken =>
       TokenCache.accessToken ??
-          _prefs.getString(AppConstants.storageKeyAccessToken);
+      _prefs.getString(AppConstants.storageKeyAccessToken);
 
-  Future<Response> get(String path,
-      {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     return _dio.get(path, queryParameters: queryParameters);
   }
 
   /// 获取重定向 URL，不跟随重定向
   ///
   /// 用于文件流媒体地址获取，避免 Dio 跟随重定向下载整个文件。
-  Future<String> getRedirectUrl(String path,
-      {Map<String, dynamic>? queryParameters}) async {
+  Future<String> getRedirectUrl(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     final response = await _dio.get(
       path,
       queryParameters: queryParameters,
       options: Options(
         followRedirects: false,
-        validateStatus: (status) => status != null && status >= 200 && status < 400,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
       ),
     );
     final location = response.headers.value('location');

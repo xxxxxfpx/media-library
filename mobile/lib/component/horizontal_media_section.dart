@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/media.dart';
+import '../core/app_logger.dart';
 import '../providers/settings_provider.dart';
 import 'media_card.dart';
 
@@ -20,10 +21,16 @@ class SectionHeader extends StatelessWidget {
       onTap: onViewAll,
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(width: 4),
-          Icon(Icons.chevron_right, size: 20,
-            color: onViewAll != null ? cs.onSurface : cs.onSurfaceVariant),
+          Icon(
+            Icons.chevron_right,
+            size: 20,
+            color: onViewAll != null ? cs.onSurface : cs.onSurfaceVariant,
+          ),
         ],
       ),
     );
@@ -39,7 +46,6 @@ class HorizontalMediaSection extends ConsumerStatefulWidget {
   final Future<MediaListResponse> Function(int offset, int limit) fetchData;
   final int pageSize;
   final EdgeInsetsGeometry? contentPadding;
-  final MediaListRequest? request;
 
   const HorizontalMediaSection({
     super.key,
@@ -50,21 +56,22 @@ class HorizontalMediaSection extends ConsumerStatefulWidget {
     this.itemHeight = 220,
     this.pageSize = 30,
     this.contentPadding,
-    this.request,
   });
 
   @override
-  ConsumerState<HorizontalMediaSection> createState() => _HorizontalMediaSectionState();
+  ConsumerState<HorizontalMediaSection> createState() =>
+      _HorizontalMediaSectionState();
 }
 
-class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection> {
+class _HorizontalMediaSectionState
+    extends ConsumerState<HorizontalMediaSection> {
   final ScrollController _scrollController = ScrollController();
   List<MediaItem> _items = [];
   bool _isLoading = false;
   bool _hasMore = true;
   bool _isError = false;
   int _offset = 0;
-  double _pullOffset = 0.0;      // 当前拉动距离
+  double _pullOffset = 0.0; // 当前拉动距离
   bool _willRefreshOnRelease = false; // 松手时是否刷新
   Timer? _retryTimer;
   int _retryCount = 0;
@@ -88,7 +95,7 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
   void _scheduleRetry() {
     // 从设置中获取重试间隔
     final retryInterval = ref.getMediaRetryInterval();
-    
+
     _retryTimer?.cancel();
     _retryTimer = Timer(Duration(seconds: retryInterval), () {
       if (mounted && _isError) {
@@ -125,7 +132,17 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
         _offset = _items.length;
         _hasMore = _offset < response.total;
       });
-    } catch (e) {
+    } catch (error, stackTrace) {
+      final nextRetry = _retryCount + 1;
+      if (nextRetry == 1 || nextRetry % 10 == 0) {
+        AppLogger.warning(
+          'media_section_load_failed',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'media',
+          fields: {'section': widget.title, 'retry_count': nextRetry},
+        );
+      }
       if (!mounted) return;
       setState(() {
         _isError = true;
@@ -156,7 +173,7 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
       }
       return false;
     }
-    
+
     return false;
   }
 
@@ -178,7 +195,10 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
       children: [
         Padding(
           padding: widget.contentPadding ?? EdgeInsets.zero,
-          child: SectionHeader(title: widget.title, onViewAll: widget.onViewAll),
+          child: SectionHeader(
+            title: widget.title,
+            onViewAll: widget.onViewAll,
+          ),
         ),
         const SizedBox(height: 12),
         _buildBody(),
@@ -213,15 +233,13 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
                 const SizedBox(height: 8),
               ],
               Text(
-                _retryTimer != null 
-                    ? '加载失败，自动重试中...'
-                    : '加载失败，点击重试',
+                _retryTimer != null ? '加载失败，自动重试中...' : '加载失败，点击重试',
                 style: TextStyle(color: cs.onSurfaceVariant),
               ),
               if (_retryCount > 0) ...[
                 const SizedBox(height: 4),
                 Text(
-                  '已重试 ${_retryCount} 次',
+                  '已重试 $_retryCount 次',
                   style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                 ),
               ],
@@ -248,7 +266,10 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
             borderRadius: BorderRadius.circular(12),
           ),
           child: Center(
-            child: Text('暂无内容，点击刷新', style: TextStyle(color: cs.onSurfaceVariant)),
+            child: Text(
+              '暂无内容，点击刷新',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
           ),
         ),
       );
@@ -327,8 +348,11 @@ class _HorizontalMediaSectionState extends ConsumerState<HorizontalMediaSection>
                                   color: cs.onPrimary,
                                 ),
                               )
-                            : Icon(Icons.arrow_back,
-                                color: cs.onPrimary, size: 20),
+                            : Icon(
+                                Icons.arrow_back,
+                                color: cs.onPrimary,
+                                size: 20,
+                              ),
                       ),
                     ),
                   ),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../../core/constants.dart';
+import '../../core/app_logger.dart';
 
 class MediaItem {
   final int id;
@@ -76,10 +77,13 @@ class MediaItem {
   }
 
   MediaType get mediaType {
-    if (type == null){
+    if (type == null) {
       return MediaType.unknown;
-    }else{
-      return MediaType.values.firstWhere((e) => e.name == type, orElse: () => MediaType.unknown);
+    } else {
+      return MediaType.values.firstWhere(
+        (e) => e.name == type,
+        orElse: () => MediaType.unknown,
+      );
     }
   }
 
@@ -105,18 +109,21 @@ class MediaItem {
       author: json['author'] as String?,
       publisher: json['publisher'] as String?,
       publisherYear: json['publisher_year'] as String?,
-      files: (json['files'] as List<dynamic>?)
+      files:
+          (json['files'] as List<dynamic>?)
               ?.map((e) => FileInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      links: (json['links'] as List<dynamic>?)
+      links:
+          (json['links'] as List<dynamic>?)
               ?.map((e) => LinkInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       userdata: json['userdata'] != null
           ? UserData.fromJson(json['userdata'] as Map<String, dynamic>)
           : null,
-      alias: (json['alias'] as List<dynamic>?)
+      alias:
+          (json['alias'] as List<dynamic>?)
               ?.map((e) => AliasInfo.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -216,7 +223,16 @@ class FileInfo {
       try {
         final decoded = jsonDecode(value);
         if (decoded is Map<String, dynamic>) return decoded;
-      } catch (_) {}
+      } catch (error) {
+        AppLogger.debug(
+          'ffmpeg_metadata_parse_failed',
+          category: 'model',
+          fields: {
+            'value_type': value.runtimeType.toString(),
+            'error_type': error.runtimeType.toString(),
+          },
+        );
+      }
     }
     return null;
   }
@@ -228,7 +244,12 @@ class LinkInfo {
   final String? sourceLink;
   final LinkedItem? linkedItem;
 
-  LinkInfo({this.peopleType, this.peopleRole, this.sourceLink, this.linkedItem});
+  LinkInfo({
+    this.peopleType,
+    this.peopleRole,
+    this.sourceLink,
+    this.linkedItem,
+  });
 
   factory LinkInfo.fromJson(Map<String, dynamic> json) {
     return LinkInfo(
@@ -379,14 +400,14 @@ class UpdateUserDataRequest {
   });
 
   Map<String, dynamic> toJson() => {
-        'item_id': itemId,
-        if (playbackPosition != null) 'playback_position': playbackPosition,
-        if (playbackRate != null) 'playback_rate': playbackRate,
-        if (isFavorite != null) 'is_favorite': isFavorite,
-        if (isPlayed != null) 'is_played': isPlayed,
-        if (playCount != null) 'play_count': playCount,
-        if (clearRating) 'rating': null else if (rating != null) 'rating': rating,
-      };
+    'item_id': itemId,
+    if (playbackPosition != null) 'playback_position': playbackPosition,
+    if (playbackRate != null) 'playback_rate': playbackRate,
+    if (isFavorite != null) 'is_favorite': isFavorite,
+    if (isPlayed != null) 'is_played': isPlayed,
+    if (playCount != null) 'play_count': playCount,
+    if (clearRating) 'rating': null else if (rating != null) 'rating': rating,
+  };
 }
 
 /// 媒体列表请求参数
@@ -415,16 +436,16 @@ class MediaListRequest {
 
   /// 序列化为 API 查询参数（仅筛选字段，不含分页参数）
   Map<String, dynamic> toQueryParams() => {
-        if (types != null && types!.isNotEmpty)
-          'types': types!.map((t) => t.name).join(','),
-        if (favorite) 'favorite': true,
-        if (hasPlayback) 'has_playback': true,
-        if (hasRating) 'has_rating': true,
-        if (sortBy != null) 'sort_by': sortBy,
-        if (itemIds != null) 'item_ids': itemIds,
-        if (linkedItemIds != null) 'linked_item_ids': linkedItemIds,
-        if (search != null) 'search': search,
-      };
+    if (types != null && types!.isNotEmpty)
+      'types': types!.map((t) => t.name).join(','),
+    if (favorite) 'favorite': true,
+    if (hasPlayback) 'has_playback': true,
+    if (hasRating) 'has_rating': true,
+    if (sortBy != null) 'sort_by': sortBy,
+    if (itemIds != null) 'item_ids': itemIds,
+    if (linkedItemIds != null) 'linked_item_ids': linkedItemIds,
+    if (search != null) 'search': search,
+  };
 
   MediaListRequest copyWith({
     Set<MediaType>? types,
@@ -439,16 +460,16 @@ class MediaListRequest {
     bool clearItemIds = false,
     bool clearLinkedItemIds = false,
     bool clearSearch = false,
-  }) =>
-      MediaListRequest(
-        types: clearTypes ? null : (types ?? this.types),
-        favorite: favorite ?? this.favorite,
-        hasPlayback: hasPlayback ?? this.hasPlayback,
-        hasRating: hasRating ?? this.hasRating,
-        sortBy: sortBy ?? this.sortBy,
-        itemIds: clearItemIds ? null : (itemIds ?? this.itemIds),
-        linkedItemIds:
-            clearLinkedItemIds ? null : (linkedItemIds ?? this.linkedItemIds),
-        search: clearSearch ? null : (search ?? this.search),
-      );
+  }) => MediaListRequest(
+    types: clearTypes ? null : (types ?? this.types),
+    favorite: favorite ?? this.favorite,
+    hasPlayback: hasPlayback ?? this.hasPlayback,
+    hasRating: hasRating ?? this.hasRating,
+    sortBy: sortBy ?? this.sortBy,
+    itemIds: clearItemIds ? null : (itemIds ?? this.itemIds),
+    linkedItemIds: clearLinkedItemIds
+        ? null
+        : (linkedItemIds ?? this.linkedItemIds),
+    search: clearSearch ? null : (search ?? this.search),
+  );
 }

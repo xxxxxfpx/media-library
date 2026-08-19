@@ -14,17 +14,11 @@ void main() {
       // 在 CI 环境可能会失败，所以用 try-catch
       try {
         final androidInfo = await deviceInfo.androidInfo;
-        print('设备: ${androidInfo.device}');
-        print('型号: ${androidInfo.model}');
-        print('品牌: ${androidInfo.brand}');
-        print('系统: Android ${androidInfo.version.release}');
-        print('SDK: ${androidInfo.version.sdkInt}');
 
         // 基本字段验证
         expect(androidInfo.device, isNotEmpty);
         expect(androidInfo.model, isNotEmpty);
-      } catch (e) {
-        print('Android 设备信息获取失败 (非 Android 环境): $e');
+      } catch (_) {
         // 非 Android 环境跳过
       }
     });

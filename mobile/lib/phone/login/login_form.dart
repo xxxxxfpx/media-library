@@ -1,6 +1,7 @@
 // 登录表单 UI 组件
 import 'package:flutter/material.dart';
 import '../../core/auth_service.dart';
+import '../../core/app_logger.dart';
 import '../home/view.dart';
 
 Widget buildGlowIcon(BuildContext context) {
@@ -99,16 +100,14 @@ Widget buildLoginForm({
           if (username.isEmpty || password.isEmpty) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('请输入用户名和密码'),
-                backgroundColor: cs.error,
-              ),
-            );
+                SnackBar(content: Text('请输入用户名和密码'), backgroundColor: cs.error),
+              );
             }
             return;
           }
 
           try {
+            AppLogger.info('login_submitted', category: 'ui');
             await AuthService().login(username: username, password: password);
             if (context.mounted) {
               onLoginSuccess?.call();
@@ -119,19 +118,24 @@ Widget buildLoginForm({
                 );
               }
             }
-          } catch (e) {
+          } catch (_) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('登录失败: ${e.toString()}'),
-                backgroundColor: cs.error,
-              ),
-            );
+                SnackBar(
+                  content: const Text('登录失败，请检查账号或服务器连接'),
+                  backgroundColor: cs.error,
+                ),
+              );
             }
           }
         },
-        style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-        child: const Text('登录', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(double.infinity, 50),
+        ),
+        child: const Text(
+          '登录',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
       ),
     ],
   );

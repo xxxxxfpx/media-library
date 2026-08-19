@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/api/api_client.dart';
 import '../../data/api/media_api.dart';
 import '../../data/models/media.dart';
+import '../../core/app_logger.dart';
 
 class HomeTabHome extends StatefulWidget {
   const HomeTabHome({super.key});
@@ -38,7 +39,13 @@ class _HomeTabHomeState extends State<HomeTabHome> {
           _isStatsLoading = false;
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'home_stats_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'home',
+      );
       if (mounted) setState(() => _isStatsLoading = false);
     }
   }
@@ -59,7 +66,14 @@ class _HomeTabHomeState extends State<HomeTabHome> {
           }
           if (ip != '未知') break;
         }
-      } catch (_) {}
+      } catch (error, stackTrace) {
+        AppLogger.debug(
+          'network_interface_unavailable',
+          category: 'device',
+          fields: {'error_type': error.runtimeType.toString()},
+        );
+        AppLogger.debug('$stackTrace', category: 'device');
+      }
 
       final memMb = (ProcessInfo.currentRss / 1024 / 1024).toStringAsFixed(1);
 
@@ -67,13 +81,25 @@ class _HomeTabHomeState extends State<HomeTabHome> {
       try {
         final stat = await File('/proc/stat').readAsString();
         final firstLine = stat.split('\n').first;
-        final parts = firstLine.split(RegExp(r'\s+')).skip(1).map((e) => int.tryParse(e) ?? 0).toList();
+        final parts = firstLine
+            .split(RegExp(r'\s+'))
+            .skip(1)
+            .map((e) => int.tryParse(e) ?? 0)
+            .toList();
         if (parts.length >= 5) {
           final total = parts.fold(0, (a, b) => a + b);
           final idle = parts[3];
-          cpu = total > 0 ? '${((1 - idle / total) * 100).toStringAsFixed(1)}%' : '未知';
+          cpu = total > 0
+              ? '${((1 - idle / total) * 100).toStringAsFixed(1)}%'
+              : '未知';
         }
-      } catch (_) {}
+      } catch (error) {
+        AppLogger.debug(
+          'cpu_usage_unavailable',
+          category: 'device',
+          fields: {'error_type': error.runtimeType.toString()},
+        );
+      }
 
       setState(() {
         final infoType = info.runtimeType.toString();
@@ -90,7 +116,9 @@ class _HomeTabHomeState extends State<HomeTabHome> {
             '内存': '$memMb MB',
             'CPU': cpu,
           };
-        } else if (infoType.contains('Ios') || infoType.contains('IOS') || infoType.contains('Apple')) {
+        } else if (infoType.contains('Ios') ||
+            infoType.contains('IOS') ||
+            infoType.contains('Apple')) {
           final iosInfo = info as dynamic;
           _deviceData = {
             '平台': 'iOS',
@@ -102,13 +130,24 @@ class _HomeTabHomeState extends State<HomeTabHome> {
             '内存': '$memMb MB',
           };
         } else {
-          _deviceData = {'平台': infoType, 'IP': ip, '内存': '$memMb MB', 'CPU': cpu};
+          _deviceData = {
+            '平台': infoType,
+            'IP': ip,
+            '内存': '$memMb MB',
+            'CPU': cpu,
+          };
         }
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'device_info_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'device',
+      );
       setState(() {
-        _deviceData = {'错误': e.toString()};
+        _deviceData = {'错误': '设备信息加载失败'};
         _isLoading = false;
       });
     }
@@ -127,16 +166,16 @@ class _HomeTabHomeState extends State<HomeTabHome> {
         onRefresh: _onRefresh,
         color: cs.primary,
         child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildStatSection(),
-            const SizedBox(height: 24),
-            _buildSystemSection(),
-          ],
-        ),
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatSection(),
+              const SizedBox(height: 24),
+              _buildSystemSection(),
+            ],
+          ),
         ),
       ),
     );
@@ -147,7 +186,14 @@ class _HomeTabHomeState extends State<HomeTabHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('媒体统计', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(
+          '媒体统计',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
         if (_isStatsLoading)
           const SizedBox(
@@ -157,18 +203,38 @@ class _HomeTabHomeState extends State<HomeTabHome> {
         else
           Row(
             children: [
-              _buildStatCard('视频', '${_stats?.videoCount ?? 0}', Icons.videocam, cs.primary),
+              _buildStatCard(
+                '视频',
+                '${_stats?.videoCount ?? 0}',
+                Icons.videocam,
+                cs.primary,
+              ),
               const SizedBox(width: 12),
-              _buildStatCard('音乐', '${_stats?.audioCount ?? 0}', Icons.music_note, cs.secondary),
+              _buildStatCard(
+                '音乐',
+                '${_stats?.audioCount ?? 0}',
+                Icons.music_note,
+                cs.secondary,
+              ),
               const SizedBox(width: 12),
-              _buildStatCard('图片', '${_stats?.imageCount ?? 0}', Icons.image, cs.tertiary),
+              _buildStatCard(
+                '图片',
+                '${_stats?.imageCount ?? 0}',
+                Icons.image,
+                cs.tertiary,
+              ),
             ],
           ),
       ],
     );
   }
 
-  Widget _buildStatCard(String label, String count, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String label,
+    String count,
+    IconData icon,
+    Color color,
+  ) {
     final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: Container(
@@ -189,8 +255,18 @@ class _HomeTabHomeState extends State<HomeTabHome> {
           children: [
             Icon(icon, size: 22, color: color),
             const SizedBox(height: 4),
-            Text(count, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
-            Text(label, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            Text(
+              count,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: cs.onSurface,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
           ],
         ),
       ),
@@ -202,7 +278,14 @@ class _HomeTabHomeState extends State<HomeTabHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('设备信息', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(
+          '设备信息',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
@@ -221,22 +304,34 @@ class _HomeTabHomeState extends State<HomeTabHome> {
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   children: _deviceData.entries
-                      .map((e) => Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 3),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(e.key, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                                Flexible(
-                                  child: Text(
-                                    e.value,
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurface),
-                                    textAlign: TextAlign.end,
-                                  ),
+                      .map(
+                        (e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                e.key,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: cs.onSurfaceVariant,
                                 ),
-                              ],
-                            ),
-                          ))
+                              ),
+                              Flexible(
+                                child: Text(
+                                  e.value,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: cs.onSurface,
+                                  ),
+                                  textAlign: TextAlign.end,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                       .toList(),
                 ),
         ),

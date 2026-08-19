@@ -6,6 +6,7 @@ import '../data/api/api_client.dart';
 import '../data/api/media_api.dart';
 import '../data/models/media.dart';
 import '../core/constants.dart';
+import '../core/app_logger.dart';
 import '../component/media_card.dart';
 
 class MediaGridPage extends StatefulWidget {
@@ -150,7 +151,14 @@ class _MediaGridPageState extends State<MediaGridPage> {
           _isInitialLoading = false;
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'media_grid_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+        fields: {'offset': _offset},
+      );
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -203,10 +211,10 @@ class _MediaGridPageState extends State<MediaGridPage> {
     super.dispose();
   }
 
-	@override
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     if (_isInitialLoading) {
       return Scaffold(
         backgroundColor: cs.surface,
@@ -217,129 +225,155 @@ class _MediaGridPageState extends State<MediaGridPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       body: Column(
-      children: [
-        _buildNavBar(),
-        if (_showTypeSelector) _buildTypeSelector(),
-        Expanded(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: Row(
-                  children: [
-                    _buildSortDropdown(),
-                    const SizedBox(width: 6),
-                    _buildIconButton(
-                      LucideIcons.list_filter,
-                      () => setState(() => _showTypeSelector = !_showTypeSelector),
-                      isActive: _selectedTypes.isNotEmpty,
-                      narrow: true,
-                    ),
-                    const Spacer(),
-                    if (_items.isNotEmpty)
-                      Text(
-                        '共 $_totalCount 项 · 显示 ${_items.length} 项',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontSize: 12,
+        children: [
+          _buildNavBar(),
+          if (_showTypeSelector) _buildTypeSelector(),
+          Expanded(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Row(
+                    children: [
+                      _buildSortDropdown(),
+                      const SizedBox(width: 6),
+                      _buildIconButton(
+                        LucideIcons.list_filter,
+                        () => setState(
+                          () => _showTypeSelector = !_showTypeSelector,
                         ),
+                        isActive: _selectedTypes.isNotEmpty,
+                        narrow: true,
                       ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ColoredBox(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      _refreshData();
-                      await _apiReady.future;
-                      await Future.doWhile(() {
-                        return Future.delayed(const Duration(milliseconds: 50), () => _isLoading);
-                      });
-                    },
-                    displacement: 40,
-                    child: CustomScrollView(
-                      controller: _scrollCtrl,
-                      slivers: [
-                      if (_items.isEmpty)
-                        SliverFillRemaining(
-                          child: Center(
-                            child: _isLoading
-                                ? const CircularProgressIndicator(strokeWidth: 2.5)
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(LucideIcons.inbox, size: 48,
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant),
-                                      const SizedBox(height: 12),
-                                      Text(
-                                        '暂无数据',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      TextButton(
-                                        onPressed: _resetAndLoad,
-                                        child: const Text('重置筛选条件'),
-                                      ),
-                                    ],
-                                  ),
-                          ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          sliver: SliverGrid(
-                            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 140,
-                              mainAxisSpacing: 16,
-                              crossAxisSpacing: 8,
-                              childAspectRatio: 0.55,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) => MediaCard(
-                                media: _items[index],
-                                config: const CardConfig(),
-                              ),
-                              childCount: _items.length,
-                            ),
+                      const Spacer(),
+                      if (_items.isNotEmpty)
+                        Text(
+                          '共 $_totalCount 项 · 显示 ${_items.length} 项',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            fontSize: 12,
                           ),
                         ),
-                      if (_isLoading)
-                        const SliverToBoxAdapter(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
-                          ),
-                        ),
-                      if (!_hasMore && _items.isNotEmpty)
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: Text(
-                                '已加载全部',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SliverToBoxAdapter(child: SizedBox(height: 80)),
                     ],
                   ),
                 ),
-              ),
-              ),
-            ],
+                Expanded(
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        _refreshData();
+                        await _apiReady.future;
+                        await Future.doWhile(() {
+                          return Future.delayed(
+                            const Duration(milliseconds: 50),
+                            () => _isLoading,
+                          );
+                        });
+                      },
+                      displacement: 40,
+                      child: CustomScrollView(
+                        controller: _scrollCtrl,
+                        slivers: [
+                          if (_items.isEmpty)
+                            SliverFillRemaining(
+                              child: Center(
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                      )
+                                    : Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            LucideIcons.inbox,
+                                            size: 48,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Text(
+                                            '暂无数据',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          TextButton(
+                                            onPressed: _resetAndLoad,
+                                            child: const Text('重置筛选条件'),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    SliverGridDelegateWithMaxCrossAxisExtent(
+                                      maxCrossAxisExtent: 140,
+                                      mainAxisSpacing: 16,
+                                      crossAxisSpacing: 8,
+                                      childAspectRatio: 0.55,
+                                    ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) => MediaCard(
+                                    media: _items[index],
+                                    config: const CardConfig(),
+                                  ),
+                                  childCount: _items.length,
+                                ),
+                              ),
+                            ),
+                          if (_isLoading)
+                            const SliverToBoxAdapter(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (!_hasMore && _items.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '已加载全部',
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -360,7 +394,9 @@ class _MediaGridPageState extends State<MediaGridPage> {
                 const BackButton(),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: _showSearch ? _buildSearchField() : _buildSearchButton(),
+                  child: _showSearch
+                      ? _buildSearchField()
+                      : _buildSearchButton(),
                 ),
               ],
             ),
@@ -370,8 +406,12 @@ class _MediaGridPageState extends State<MediaGridPage> {
     );
   }
 
-  Widget _buildIconButton(IconData icon, VoidCallback onPressed,
-      {bool isActive = false, bool narrow = true}) {
+  Widget _buildIconButton(
+    IconData icon,
+    VoidCallback onPressed, {
+    bool isActive = false,
+    bool narrow = true,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
@@ -465,8 +505,10 @@ class _MediaGridPageState extends State<MediaGridPage> {
           children: [
             Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
             const SizedBox(width: 8),
-            Text('搜索媒体名称...',
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+            Text(
+              '搜索媒体名称...',
+              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+            ),
           ],
         ),
       ),
@@ -492,15 +534,21 @@ class _MediaGridPageState extends State<MediaGridPage> {
             value: opt.$1,
             child: Row(
               children: [
-                Icon(opt.$3, size: 18,
-                    color: isSelected ? cs.primary : cs.onSurfaceVariant),
+                Icon(
+                  opt.$3,
+                  size: 18,
+                  color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                ),
                 const SizedBox(width: 10),
-                Text(opt.$2,
-                    style: TextStyle(
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.normal,
-                      color: isSelected ? cs.primary : null,
-                    )),
+                Text(
+                  opt.$2,
+                  style: TextStyle(
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color: isSelected ? cs.primary : null,
+                  ),
+                ),
                 if (isSelected) ...[
                   const Spacer(),
                   Icon(Icons.check, size: 16, color: cs.primary),
@@ -520,17 +568,31 @@ class _MediaGridPageState extends State<MediaGridPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _sortOptions.firstWhere((o) => o.$1 == _sortBy, orElse: () => _sortOptions[0]).$3,
+                _sortOptions
+                    .firstWhere(
+                      (o) => o.$1 == _sortBy,
+                      orElse: () => _sortOptions[0],
+                    )
+                    .$3,
                 size: 14,
                 color: cs.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
-                _sortOptions.firstWhere((o) => o.$1 == _sortBy, orElse: () => _sortOptions[0]).$2,
+                _sortOptions
+                    .firstWhere(
+                      (o) => o.$1 == _sortBy,
+                      orElse: () => _sortOptions[0],
+                    )
+                    .$2,
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(width: 2),
-              Icon(LucideIcons.chevron_down, size: 16, color: cs.onSurfaceVariant),
+              Icon(
+                LucideIcons.chevron_down,
+                size: 16,
+                color: cs.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -568,10 +630,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
                       },
                       child: Text(
                         '清除筛选',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.primary,
-                        ),
+                        style: TextStyle(fontSize: 12, color: cs.primary),
                       ),
                     ),
                 ],
@@ -603,7 +662,9 @@ class _MediaGridPageState extends State<MediaGridPage> {
                       type.labelZH,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+                        fontWeight: selected
+                            ? FontWeight.w500
+                            : FontWeight.normal,
                         color: selected ? cs.onPrimary : cs.onSurfaceVariant,
                       ),
                     ),

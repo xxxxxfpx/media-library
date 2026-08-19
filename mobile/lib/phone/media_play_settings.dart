@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/constants.dart';
+import '../core/app_logger.dart';
 import '../data/api/api_client.dart';
 import '../data/api/user_api.dart';
 
@@ -12,7 +13,8 @@ class MediaPlaySettingsPage extends ConsumerStatefulWidget {
   const MediaPlaySettingsPage({super.key});
 
   @override
-  ConsumerState<MediaPlaySettingsPage> createState() => _MediaPlaySettingsPageState();
+  ConsumerState<MediaPlaySettingsPage> createState() =>
+      _MediaPlaySettingsPageState();
 }
 
 class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
@@ -50,9 +52,10 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
       setState(() {
         _autoPlay = prefs.getBool(AppConstants.storageKeyAutoPlay) ?? true;
         _muted = prefs.getBool(AppConstants.storageKeyMuted) ?? false;
-        _watchedThreshold = prefs.getDouble(AppConstants.storageKeyWatchedThreshold) ?? 0.9;
+        _watchedThreshold =
+            prefs.getDouble(AppConstants.storageKeyWatchedThreshold) ?? 0.9;
       });
-      
+
       // 加载云端设置
       final client = ApiClient(prefs);
       final userApi = UserApi(client);
@@ -66,17 +69,24 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
         _cacheMode = settings.cacheMode ?? 'memory';
         _forwardCacheSizeMb = settings.forwardCacheSizeMb ?? 32;
         _backwardCacheSizeMb = settings.backwardCacheSizeMb ?? 32;
-        _enableHardwareAcceleration = settings.enableHardwareAcceleration ?? true;
+        _enableHardwareAcceleration =
+            settings.enableHardwareAcceleration ?? true;
         _defaultPlaybackRate = settings.defaultPlaybackRate ?? 1.0;
         _resumePlayback = settings.resumePlayback ?? true;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'playback_settings_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'settings',
+      );
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载设置失败：$e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('加载设置失败，请稍后重试')));
       }
     }
   }
@@ -85,7 +95,10 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(AppConstants.storageKeyAutoPlay, _autoPlay);
     await prefs.setBool(AppConstants.storageKeyMuted, _muted);
-    await prefs.setDouble(AppConstants.storageKeyWatchedThreshold, _watchedThreshold);
+    await prefs.setDouble(
+      AppConstants.storageKeyWatchedThreshold,
+      _watchedThreshold,
+    );
   }
 
   @override
@@ -247,7 +260,11 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                   children: [
                     Text(
                       '主题模式',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     SegmentedButton<String>(
@@ -259,7 +276,8 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                       selected: {_themeMode ?? 'system'},
                       onSelectionChanged: (Set<String> selected) {
                         setState(() => _themeMode = selected.first);
-                        ref.read(settingsProvider.notifier).themeMode = selected.first;
+                        ref.read(settingsProvider.notifier).themeMode =
+                            selected.first;
                       },
                       showSelectedIcon: false,
                     ),
@@ -284,7 +302,11 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                   children: [
                     Text(
                       '主题色',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -296,7 +318,8 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                         return GestureDetector(
                           onTap: () {
                             setState(() => _primaryColor = hex);
-                            ref.read(settingsProvider.notifier).primaryColor = hex;
+                            ref.read(settingsProvider.notifier).primaryColor =
+                                hex;
                           },
                           child: Container(
                             width: 36,
@@ -308,11 +331,23 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                                   ? Border.all(color: cs.onSurface, width: 3)
                                   : null,
                               boxShadow: isSelected
-                                  ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 8, spreadRadius: 1)]
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withValues(alpha: 0.5),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      ),
+                                    ]
                                   : null,
                             ),
                             child: isSelected
-                                ? Icon(Icons.check, color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white, size: 18)
+                                ? Icon(
+                                    Icons.check,
+                                    color: color.computeLuminance() > 0.5
+                                        ? Colors.black
+                                        : Colors.white,
+                                    size: 18,
+                                  )
                                 : null,
                           ),
                         );
@@ -348,7 +383,11 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                   children: [
                     Text(
                       '缓存模式',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     SegmentedButton<String>(
@@ -359,7 +398,8 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                       selected: {_cacheMode ?? 'memory'},
                       onSelectionChanged: (Set<String> selected) {
                         setState(() => _cacheMode = selected.first);
-                        ref.read(settingsProvider.notifier).cacheMode = selected.first;
+                        ref.read(settingsProvider.notifier).cacheMode =
+                            selected.first;
                       },
                       showSelectedIcon: false,
                     ),
@@ -409,7 +449,7 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
   }) {
     final cs = Theme.of(context).colorScheme;
     final cacheSizes = [16, 32, 64, 128, 256, 512, 1024];
-    
+
     // 找到最接近的缓存大小索引
     int currentIndex = cacheSizes.indexOf(value);
     if (currentIndex == -1) {
@@ -426,7 +466,7 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
         currentIndex = cacheSizes.length - 1;
       }
     }
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
@@ -442,9 +482,22 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface)),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -464,16 +517,22 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                   onChanged: (v) {
                     onChanged(cacheSizes[v.toInt()]);
                   },
-                  onChangeEnd: onChangeEnd != null ? (v) {
-                    onChangeEnd(cacheSizes[v.toInt()]);
-                  } : null,
+                  onChangeEnd: onChangeEnd != null
+                      ? (v) {
+                          onChangeEnd(cacheSizes[v.toInt()]);
+                        }
+                      : null,
                 ),
               ),
               SizedBox(
                 width: 60,
                 child: Text(
                   '${cacheSizes[currentIndex]}MB',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.primary),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.primary,
+                  ),
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -601,8 +660,18 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
     final cs = Theme.of(context).colorScheme;
     return ListTile(
       leading: Icon(icon, color: cs.primary),
-      title: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: cs.onSurface,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+      ),
       trailing: Switch(
         value: value,
         onChanged: onChanged,
@@ -636,10 +705,20 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: cs.onSurface)),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface,
+                  ),
+                ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  Text(
+                    subtitle,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                 ],
                 Row(
                   children: [
@@ -659,7 +738,11 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
                       width: 60,
                       child: Text(
                         displayFormat(value),
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.primary),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: cs.primary,
+                        ),
                         textAlign: TextAlign.right,
                       ),
                     ),

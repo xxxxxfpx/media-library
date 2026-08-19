@@ -8,9 +8,11 @@ import '../../data/api/api_client.dart';
 import '../../data/api/auth_api.dart';
 import '../../data/api/user_api.dart';
 import '../media_play_settings.dart';
+import 'guangyapan_settings.dart';
 import '../login/view.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/sync_service.dart';
+import '../../core/app_logger.dart';
 
 class HomeTabMy extends ConsumerStatefulWidget {
   const HomeTabMy({super.key});
@@ -38,34 +40,55 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
       final dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
       if (!mounted) return;
       setState(() {
-        _lastSyncTime = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        _lastSyncTime =
+            '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
       });
     }
   }
 
   Future<void> _handleSyncSettings() async {
+    AppLogger.info('settings_sync_submitted', category: 'ui');
     setState(() => _isSyncing = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final client = ApiClient(prefs);
       final userApi = UserApi(client);
       final settings = await userApi.getSetting();
-      await prefs.setString('user_settings_json', jsonEncode(settings.toJson()));
+      await prefs.setString(
+        'user_settings_json',
+        jsonEncode(settings.toJson()),
+      );
       if (mounted) {
         ref.read(settingsProvider.notifier).updateLocal(settings);
       }
-      await prefs.setInt('last_settings_sync_time', DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        'last_settings_sync_time',
+        DateTime.now().millisecondsSinceEpoch,
+      );
       await _loadLastSyncTime();
-      
+
       if (mounted) {
+        AppLogger.info('settings_sync_succeeded', category: 'settings');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('设置已同步'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('设置已同步'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'settings_sync_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'settings',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步失败：$e'), duration: const Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('同步失败，请稍后重试'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } finally {
@@ -84,7 +107,13 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
       if (mounted) {
         setState(() => _username = info.username);
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'user_info_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'account',
+      );
       // 加载用户信息失败，保持默认
     }
   }
@@ -95,7 +124,13 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
       final client = ApiClient(prefs);
       final authApi = AuthApi(client);
       await authApi.logout();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'logout_request_failed_continue_local_logout',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'auth',
+      );
       // 即使服务端 logout 失败也清除本地 token
     }
 
@@ -103,6 +138,7 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
     await prefs.remove(AppConstants.storageKeyAccessToken);
     await prefs.remove(AppConstants.storageKeyRefreshToken);
     SyncService().stop();
+    AppLogger.info('logout_succeeded', category: 'auth');
 
     if (mounted) {
       Navigator.pushReplacement(
@@ -134,7 +170,12 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('账户', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        Text(
+          '账户',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
@@ -154,10 +195,14 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
                 color: Colors.transparent,
                 child: ListTile(
                   leading: Icon(Icons.person_outline, color: cs.primary),
-                  title: Text(_username.isNotEmpty ? _username : '未登录',
-                      style: TextStyle(fontSize: 16, color: cs.onSurface)),
-                  subtitle: Text('点击退出登录',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  title: Text(
+                    _username.isNotEmpty ? _username : '未登录',
+                    style: TextStyle(fontSize: 16, color: cs.onSurface),
+                  ),
+                  subtitle: Text(
+                    '点击退出登录',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                   trailing: const Icon(Icons.logout, size: 20),
                   onTap: () async {
                     final confirm = await showDialog<bool>(
@@ -200,11 +245,18 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('设置', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              '设置',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             if (_lastSyncTime != null)
               Text(
                 '上次同步：$_lastSyncTime',
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
           ],
         ),
@@ -227,14 +279,45 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
                 color: Colors.transparent,
                 child: ListTile(
                   leading: Icon(Icons.play_circle_outline, color: cs.primary),
-                  title: Text('媒体播放设置', style: TextStyle(fontSize: 16, color: cs.onSurface)),
-                  subtitle: Text('自动播放、默认静音',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  title: Text(
+                    '媒体播放设置',
+                    style: TextStyle(fontSize: 16, color: cs.onSurface),
+                  ),
+                  subtitle: Text(
+                    '自动播放、默认静音',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                   trailing: const Icon(Icons.chevron_right, size: 20),
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const MediaPlaySettingsPage()),
+                      MaterialPageRoute(
+                        builder: (_) => const MediaPlaySettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const Divider(height: 1, indent: 56),
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: Icon(Icons.cloud_outlined, color: cs.primary),
+                  title: Text(
+                    '光芽云盘设置',
+                    style: TextStyle(fontSize: 16, color: cs.onSurface),
+                  ),
+                  subtitle: Text(
+                    '配置 Token 和默认上传目录',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const GuangYaPanSettingsPage(),
+                      ),
                     );
                   },
                 ),
@@ -244,14 +327,22 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
                 color: Colors.transparent,
                 child: ListTile(
                   leading: Icon(Icons.sync, color: cs.primary),
-                  title: Text('同步云端设置', style: TextStyle(fontSize: 16, color: cs.onSurface)),
-                  subtitle: Text('从服务器获取最新设置',
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  title: Text(
+                    '同步云端设置',
+                    style: TextStyle(fontSize: 16, color: cs.onSurface),
+                  ),
+                  subtitle: Text(
+                    '从服务器获取最新设置',
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
                   trailing: _isSyncing
                       ? SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.primary,
+                          ),
                         )
                       : const Icon(Icons.refresh, size: 20),
                   onTap: _isSyncing ? null : _handleSyncSettings,

@@ -10,6 +10,7 @@ import '../data/api/media_api.dart';
 import '../data/api/user_api.dart';
 import '../data/models/media.dart';
 import '../core/constants.dart';
+import '../core/app_logger.dart';
 import '../core/token_cache.dart';
 import '../component/media_card.dart';
 import 'video_play.dart';
@@ -39,14 +40,18 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
   List<FileInfo> get _videoFiles {
     final m = _media;
     if (m == null) return [];
-    return m.files.where((f) => f.type == 'Video' || f.type == 'video').toList();
+    return m.files
+        .where((f) => f.type == 'Video' || f.type == 'video')
+        .toList();
   }
 
   String? get _sourceUrl {
     final m = _media;
     if (m == null) return null;
     for (final link in m.links) {
-      if (link.sourceLink != null && link.sourceLink!.isNotEmpty) return link.sourceLink;
+      if (link.sourceLink != null && link.sourceLink!.isNotEmpty) {
+        return link.sourceLink;
+      }
     }
     return null;
   }
@@ -64,7 +69,8 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
   }
 
   void _updateAppBarOpacity() {
-    final renderBox = _imageKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox =
+        _imageKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null || !renderBox.hasSize) {
       if (_appBarOpacity.value != 1.0) {
         _appBarOpacity.value = 1.0;
@@ -119,11 +125,18 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
           _updateAppBarOpacity();
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'media_detail_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+        fields: {'media_id': widget.mediaId},
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('加载失败')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('加载失败')));
         Navigator.pop(context);
       }
     }
@@ -134,17 +147,21 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     setState(() => _isFavorite = newValue);
     try {
       await _userApi?.updateUserData(
-        UpdateUserDataRequest(
-          itemId: widget.mediaId,
-          isFavorite: newValue,
-        ),
+        UpdateUserDataRequest(itemId: widget.mediaId, isFavorite: newValue),
       );
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'favorite_update_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+        fields: {'media_id': widget.mediaId, 'favorite': newValue},
+      );
       if (mounted) {
         setState(() => _isFavorite = !newValue);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('操作失败，请稍后重试')));
       }
     }
   }
@@ -159,12 +176,19 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
           clearRating: rating == null,
         ),
       );
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'rating_update_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+        fields: {'media_id': widget.mediaId, 'has_rating': rating != null},
+      );
       if (mounted) {
         setState(() => _ratingValue = previousValue);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('评分保存失败: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('评分保存失败，请稍后重试')));
       }
     }
   }
@@ -218,21 +242,24 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: cs.onSurface))
           : _media == null
-              ? Center(child: Text('加载失败', style: TextStyle(color: cs.onSurfaceVariant)))
-              : SafeArea(
-                  top: !hasImage,
-                  bottom: false,
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    child: Column(
-                      children: [
-                        if (_media!.getPrimaryImageUrl() != null) _buildImageSection(),
-                        _buildActorsSection(),
-                        _buildDetailSection(),
-                      ],
-                    ),
-                  ),
+          ? Center(
+              child: Text('加载失败', style: TextStyle(color: cs.onSurfaceVariant)),
+            )
+          : SafeArea(
+              top: !hasImage,
+              bottom: false,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                child: Column(
+                  children: [
+                    if (_media!.getPrimaryImageUrl() != null)
+                      _buildImageSection(),
+                    _buildActorsSection(),
+                    _buildDetailSection(),
+                  ],
                 ),
+              ),
+            ),
     );
   }
 
@@ -240,25 +267,25 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     return Center(
       key: _imageKey,
       child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 350),
-          child: MediaCard(
-            media: _media!,
-            config: const CardConfig(
-              enableClick: false,
-              showProgress: false,
-              showScore: false,
-              showTitle: false,
-              showType: false,
-            ),
+        constraints: const BoxConstraints(maxHeight: 350),
+        child: MediaCard(
+          media: _media!,
+          config: const CardConfig(
+            enableClick: false,
+            showProgress: false,
+            showScore: false,
+            showTitle: false,
+            showType: false,
           ),
+        ),
       ),
     );
   }
 
   Widget _buildActorsSection() {
-    final actors = _media!.links.where((l) =>
-      l.peopleType == 'Actor' || l.peopleRole == 'Actor'
-    ).toList();
+    final actors = _media!.links
+        .where((l) => l.peopleType == 'Actor' || l.peopleRole == 'Actor')
+        .toList();
     if (actors.isEmpty) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
@@ -270,7 +297,14 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Text('演员', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+            child: Text(
+              '演员',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: cs.onSurface,
+              ),
+            ),
           ),
           SizedBox(
             height: 110,
@@ -283,9 +317,12 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 final item = link.linkedItem;
                 if (item == null) return const SizedBox.shrink();
 
-                final baseUrl = _mediaApi?.baseUrl ?? AppConstants.defaultBaseUrl;
+                final baseUrl =
+                    _mediaApi?.baseUrl ?? AppConstants.defaultBaseUrl;
                 final imgUrl = item.primaryImage != null
-                    ? TokenCache.withToken('$baseUrl/api/file/data?file_id=${item.primaryImage}')
+                    ? TokenCache.withToken(
+                        '$baseUrl/api/file/data?file_id=${item.primaryImage}',
+                      )
                     : null;
 
                 return Padding(
@@ -299,8 +336,12 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                           width: 70,
                           height: 70,
                           child: imgUrl != null
-                              ? Image.network(imgUrl, fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => _buildActorPlaceholder())
+                              ? Image.network(
+                                  imgUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) =>
+                                      _buildActorPlaceholder(),
+                                )
                               : _buildActorPlaceholder(),
                         ),
                       ),
@@ -309,7 +350,10 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                         width: 70,
                         child: Text(
                           item.name ?? '未知',
-                          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -329,7 +373,10 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
   Widget _buildActorPlaceholder() {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        shape: BoxShape.circle,
+      ),
       child: Icon(Icons.person, color: cs.onSurfaceVariant, size: 32),
     );
   }
@@ -342,38 +389,26 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: sectionPadding,
-            child: _buildDetailInfo(),
-          ),
+          Padding(padding: sectionPadding, child: _buildDetailInfo()),
           if (_videoFiles.isNotEmpty) ...[
             Padding(
               padding: sectionPadding,
               child: Divider(color: cs.outlineVariant, height: 32),
             ),
-            Padding(
-              padding: sectionPadding,
-              child: _buildPlaySection(),
-            ),
+            Padding(padding: sectionPadding, child: _buildPlaySection()),
           ],
           if (_media!.userdata != null) ...[
             Padding(
               padding: sectionPadding,
               child: Divider(color: cs.outlineVariant, height: 32),
             ),
-            Padding(
-              padding: sectionPadding,
-              child: _buildUserMediaData(),
-            ),
+            Padding(padding: sectionPadding, child: _buildUserMediaData()),
             Padding(
               padding: sectionPadding,
               child: Divider(color: cs.outlineVariant, height: 32),
             ),
           ],
-          Padding(
-            padding: sectionPadding,
-            child: _buildLinksSection(),
-          ),
+          Padding(padding: sectionPadding, child: _buildLinksSection()),
           if (_media!.files.isNotEmpty) ...[
             Padding(
               padding: sectionPadding,
@@ -389,10 +424,6 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
             HorizontalMediaSection(
               title: '包含的媒体',
               contentPadding: sectionPadding,
-              request: MediaListRequest(
-                linkedItemIds: _media!.id.toString(),
-                sortBy: _media!.type == 'BoxSet' ? 'order' : null,
-              ),
               onViewAll: () {
                 Navigator.push(
                   context,
@@ -430,7 +461,12 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       try {
         final date = DateTime.parse(dateString);
         return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      } catch (e) {
+      } catch (error) {
+        AppLogger.debug(
+          'media_date_parse_failed',
+          category: 'media',
+          fields: {'error_type': error.runtimeType.toString()},
+        );
         return null;
       }
     }
@@ -438,23 +474,53 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(m.name ?? '未知标题', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(
+          m.name ?? '未知标题',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
         if (m.alias.isNotEmpty) ...[
           const SizedBox(height: 6),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             alignment: WrapAlignment.start,
-            children: m.alias.map((a) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(4)),
-              child: Text(a.name ?? '', style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-            )).toList(),
+            children: m.alias
+                .map(
+                  (a) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      a.name ?? '',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ],
         if (m.tagline != null) ...[
           const SizedBox(height: 4),
-          Text(m.tagline!, style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: cs.onSurfaceVariant)),
+          Text(
+            m.tagline!,
+            style: TextStyle(
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
         ],
         const SizedBox(height: 12),
         Wrap(
@@ -465,9 +531,15 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
             if (m.communityRating != null)
               _buildTag(m.communityRating!.toStringAsFixed(1), Colors.amber),
             _buildTag('#${_media!.id}', Colors.grey),
-            if (m.officialRating != null) _buildTag(m.officialRating!, Colors.orange),
-            if (m.productionYear != null) _buildTag('${m.productionYear}', Colors.blue),
-            if (m.runTimeTicks != null) _buildTag('${(m.runTimeTicks! / 600000000).round()} 分钟', Colors.green),
+            if (m.officialRating != null)
+              _buildTag(m.officialRating!, Colors.orange),
+            if (m.productionYear != null)
+              _buildTag('${m.productionYear}', Colors.blue),
+            if (m.runTimeTicks != null)
+              _buildTag(
+                '${(m.runTimeTicks! / 600000000).round()} 分钟',
+                Colors.green,
+              ),
             _buildTag(_media!.mediaType.labelZH, cs.primary),
           ],
         ),
@@ -480,9 +552,19 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('发布日期', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                    Text(
+                      '发布日期',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(formatDate(m.premiereDate) ?? m.premiereDate!, style: TextStyle(fontSize: 13, color: cs.onSurface)),
+                    Text(
+                      formatDate(m.premiereDate) ?? m.premiereDate!,
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                    ),
                   ],
                 ),
               ),
@@ -493,9 +575,19 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('加入日期', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
+                    Text(
+                      '加入日期',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(formatDate(m.dateCreated) ?? m.dateCreated!, style: TextStyle(fontSize: 13, color: cs.onSurface)),
+                    Text(
+                      formatDate(m.dateCreated) ?? m.dateCreated!,
+                      style: TextStyle(fontSize: 13, color: cs.onSurface),
+                    ),
                   ],
                 ),
               ),
@@ -504,9 +596,25 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
         ),
         if (m.overview != null && m.overview!.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('简介', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: cs.onSurfaceVariant)),
+          Text(
+            '简介',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(m.overview!, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant, height: 1.5), maxLines: 5, overflow: TextOverflow.ellipsis),
+          Text(
+            m.overview!,
+            style: TextStyle(
+              fontSize: 13,
+              color: cs.onSurfaceVariant,
+              height: 1.5,
+            ),
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ],
     );
@@ -526,8 +634,12 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
     }
 
-    final runtimeSeconds = _media!.runTimeTicks != null ? _media!.runTimeTicks! ~/ 10000000 : 0;
-    final playedSeconds = userdata.playbackPositionTicks != null ? userdata.playbackPositionTicks! ~/ 10000000 : 0;
+    final runtimeSeconds = _media!.runTimeTicks != null
+        ? _media!.runTimeTicks! ~/ 10000000
+        : 0;
+    final playedSeconds = userdata.playbackPositionTicks != null
+        ? userdata.playbackPositionTicks! ~/ 10000000
+        : 0;
     final progress = runtimeSeconds > 0 ? playedSeconds / runtimeSeconds : 0.0;
 
     return Column(
@@ -539,11 +651,23 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
               _buildInfoChip(Icons.favorite, '已收藏', Colors.red),
             if (userdata.favoritedAt != null) const SizedBox(width: 12),
             if (userdata.rating != null)
-              _buildInfoChip(Icons.star, userdata.rating!.toStringAsFixed(1), Colors.amber),
+              _buildInfoChip(
+                Icons.star,
+                userdata.rating!.toStringAsFixed(1),
+                Colors.amber,
+              ),
             if (userdata.rating != null) const SizedBox(width: 12),
-            _buildInfoChip(Icons.play_arrow, '播放 ${userdata.playCount ?? 0} 次', Colors.green),
+            _buildInfoChip(
+              Icons.play_arrow,
+              '播放 ${userdata.playCount ?? 0} 次',
+              Colors.green,
+            ),
             const SizedBox(width: 12),
-            _buildInfoChip(Icons.history, userdata.lastPlayedDisplay ?? '未播放', cs.primary),
+            _buildInfoChip(
+              Icons.history,
+              userdata.lastPlayedDisplay ?? '未播放',
+              cs.primary,
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -552,22 +676,36 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
           const SizedBox(height: 10),
           Row(
             children: [
-              Text(formatTicks(userdata.playbackPositionTicks),
-                  style: TextStyle(fontSize: 12, color: cs.primary)),
+              Text(
+                formatTicks(userdata.playbackPositionTicks),
+                style: TextStyle(fontSize: 12, color: cs.primary),
+              ),
               if (runtimeSeconds > 0) ...[
-                Text(' / ', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-                Text(formatTicks(_media!.runTimeTicks),
-                    style: TextStyle(fontSize: 12, color: cs.primary)),
+                Text(
+                  ' / ',
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+                Text(
+                  formatTicks(_media!.runTimeTicks),
+                  style: TextStyle(fontSize: 12, color: cs.primary),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(value: progress, backgroundColor: cs.surfaceContainerHighest, valueColor: AlwaysStoppedAnimation(cs.primary), minHeight: 6),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(cs.primary),
+                      minHeight: 6,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text('${(progress * 100).toStringAsFixed(0)}%',
-                    style: TextStyle(fontSize: 12, color: cs.primary)),
+                Text(
+                  '${(progress * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(fontSize: 12, color: cs.primary),
+                ),
               ],
             ],
           ),
@@ -611,7 +749,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: hasRating ? Colors.amber : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                  color: hasRating
+                      ? Colors.amber
+                      : cs.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
               ),
             ),
@@ -624,7 +764,6 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
             // 滑块中心可移动范围：从 thumbRadius 到 sliderWidth - thumbRadius
             final trackStart = thumbRadius;
             final trackEnd = sliderWidth - thumbRadius;
-            final trackLength = trackEnd - trackStart;
             // 评分区域从 nullZoneWidth 开始
             final ratingZoneStart = nullZoneWidth;
             final ratingZoneLength = trackEnd - ratingZoneStart;
@@ -651,7 +790,8 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 if (dx <= ratingZoneStart) {
                   setState(() => _ratingValue = null);
                 } else {
-                  final ratio = ((dx - ratingZoneStart) / ratingZoneLength).clamp(0.0, 1.0);
+                  final ratio = ((dx - ratingZoneStart) / ratingZoneLength)
+                      .clamp(0.0, 1.0);
                   final value = ratio * 10.0;
                   setState(() => _ratingValue = (value * 10).round() / 10.0);
                 }
@@ -664,7 +804,8 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 if (dx <= ratingZoneStart) {
                   setState(() => _ratingValue = null);
                 } else {
-                  final ratio = ((dx - ratingZoneStart) / ratingZoneLength).clamp(0.0, 1.0);
+                  final ratio = ((dx - ratingZoneStart) / ratingZoneLength)
+                      .clamp(0.0, 1.0);
                   final value = ratio * 10.0;
                   setState(() => _ratingValue = (value * 10).round() / 10.0);
                 }
@@ -698,7 +839,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                           height: trackHeight,
                           decoration: BoxDecoration(
                             color: Colors.amber,
-                            borderRadius: BorderRadius.circular(trackHeight / 2),
+                            borderRadius: BorderRadius.circular(
+                              trackHeight / 2,
+                            ),
                           ),
                         ),
                       ),
@@ -725,7 +868,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                               '$i',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
                             ),
                         ],
@@ -741,10 +886,7 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: hasRating ? Colors.amber : cs.onSurfaceVariant,
-                          border: Border.all(
-                            color: cs.surface,
-                            width: 2,
-                          ),
+                          border: Border.all(color: cs.surface, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.2),
@@ -771,11 +913,14 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
   }
 
   Widget _buildInfoChip(IconData icon, String label, Color color) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 14, color: color),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 12, color: color)),
-    ]);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: color)),
+      ],
+    );
   }
 
   static const _linkTypeNames = {
@@ -810,10 +955,11 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     final groupedLinks = <String, List<LinkInfo>>{};
     for (final link in _media!.links) {
       if (link.peopleType == 'Actor' || link.peopleRole == 'Actor') continue;
-      final key = link.peopleType ??
-                  link.peopleRole ??
-                  link.linkedItem?.type ??
-                  'Other';
+      final key =
+          link.peopleType ??
+          link.peopleRole ??
+          link.linkedItem?.type ??
+          'Other';
       final label = _linkTypeNames[key] ?? key;
       groupedLinks.putIfAbsent(label, () => []).add(link);
     }
@@ -821,9 +967,18 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('关联内容', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(
+          '关联内容',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
-        ...groupedLinks.entries.map((entry) => _buildLinkGroup(entry.key, entry.value)),
+        ...groupedLinks.entries.map(
+          (entry) => _buildLinkGroup(entry.key, entry.value),
+        ),
       ],
     );
   }
@@ -846,24 +1001,34 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
         children: [
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.primary)),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.primary,
+              ),
+            ),
           ),
           if (tagItems.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.spaceBetween,
-                  runAlignment: WrapAlignment.start,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
+                alignment: WrapAlignment.spaceBetween,
+                runAlignment: WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: tagItems.map((link) {
                   final item = link.linkedItem;
                   if (item == null) return const SizedBox.shrink();
                   return MediaTag(
                     media: MediaItem(
-                      id: item.id, name: item.name, type: item.type,
-                      overview: item.overview, tagline: item.tagline,
+                      id: item.id,
+                      name: item.name,
+                      type: item.type,
+                      overview: item.overview,
+                      tagline: item.tagline,
                       premiereDate: item.premiereDate,
                       officialRating: item.officialRating,
                       communityRating: item.communityRating,
@@ -888,15 +1053,20 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                       width: 90,
                       child: MediaCard(
                         media: MediaItem(
-                          id: item.id, name: item.name, type: item.type,
-                          overview: item.overview, tagline: item.tagline,
+                          id: item.id,
+                          name: item.name,
+                          type: item.type,
+                          overview: item.overview,
+                          tagline: item.tagline,
                           premiereDate: item.premiereDate,
                           officialRating: item.officialRating,
                           communityRating: item.communityRating,
                         ),
                         config: const CardConfig(
-                          showProgress: false, showScore: false,
-                          showTitle: true, showType: false,
+                          showProgress: false,
+                          showScore: false,
+                          showTitle: true,
+                          showType: false,
                         ),
                       ),
                     ),
@@ -914,8 +1084,13 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     final w = f.ffmpeg?['width'];
     final h = f.ffmpeg?['height'];
     final resolution = w != null && h != null ? '${w}x$h' : '';
-    final parts = [if (codec.isNotEmpty) codec, if (resolution.isNotEmpty) resolution];
-    return parts.isNotEmpty ? '${f.name ?? ''} (${parts.join(', ')})' : (f.name ?? '未知');
+    final parts = [
+      if (codec.isNotEmpty) codec,
+      if (resolution.isNotEmpty) resolution,
+    ];
+    return parts.isNotEmpty
+        ? '${f.name ?? ''} (${parts.join(', ')})'
+        : (f.name ?? '未知');
   }
 
   Widget _buildPlaySection() {
@@ -923,7 +1098,14 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('播放', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+        Text(
+          '播放',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -944,7 +1126,10 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                       items: List.generate(_videoFiles.length, (i) {
                         return DropdownMenuItem(
                           value: i,
-                          child: Text(_videoLabel(_videoFiles[i]), overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            _videoLabel(_videoFiles[i]),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         );
                       }),
                       onChanged: (v) {
@@ -982,7 +1167,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           ],
@@ -999,7 +1186,14 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text('文件', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)),
+          child: Text(
+            '文件',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: cs.onSurface,
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -1020,7 +1214,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     final cs = Theme.of(context).colorScheme;
     final sizeStr = file.size != null ? _formatFileSize(file.size!) : '未知大小';
     final codec = file.ffmpeg != null ? (file.ffmpeg!['codec'] ?? '') : '';
-    final fileUrl = TokenCache.withToken('${_mediaApi?.baseUrl ?? AppConstants.defaultBaseUrl}/api/file/data?file_id=${file.id}');
+    final fileUrl = TokenCache.withToken(
+      '${_mediaApi?.baseUrl ?? AppConstants.defaultBaseUrl}/api/file/data?file_id=${file.id}',
+    );
     return Container(
       width: 180,
       margin: const EdgeInsets.only(right: 12),
@@ -1033,12 +1229,28 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(file.name ?? '未知文件', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: cs.onSurface, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
+          Text(
+            file.name ?? '未知文件',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: cs.onSurface,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 6),
           if (file.type != null)
-            Text(file.type!, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            Text(
+              file.type!,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
           if (sizeStr.isNotEmpty)
-            Text(sizeStr, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            Text(
+              sizeStr,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
           if (codec.isNotEmpty)
             Text(codec, style: TextStyle(fontSize: 11, color: cs.primary)),
           const Spacer(),
@@ -1046,14 +1258,16 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
             children: [
               _buildFileAction(Icons.content_copy, '复制链接', () {
                 Clipboard.setData(ClipboardData(text: fileUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('链接已复制')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('链接已复制')));
               }),
               const SizedBox(width: 8),
               _buildFileAction(Icons.download, '下载', () {
                 final uri = Uri.tryParse(fileUrl);
-                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (uri != null) {
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
               }),
             ],
           ),
@@ -1062,7 +1276,11 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
     );
   }
 
-  Widget _buildFileAction(IconData icon, String tooltip, VoidCallback onPressed) {
+  Widget _buildFileAction(
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed,
+  ) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox(
       width: 32,
@@ -1083,13 +1301,22 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   Widget _buildTag(String text, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: color.withValues(alpha: 0.4))),
-    child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+    ),
   );
 }

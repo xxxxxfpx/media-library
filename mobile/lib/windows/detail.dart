@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/constants.dart';
+import '../core/app_logger.dart';
 import '../core/token_cache.dart';
 import '../data/api/api_client.dart';
 import '../data/api/media_api.dart';
@@ -29,14 +30,18 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   List<FileInfo> get _videoFiles {
     final m = _media;
     if (m == null) return [];
-    return m.files.where((f) => f.type == 'Video' || f.type == 'video').toList();
+    return m.files
+        .where((f) => f.type == 'Video' || f.type == 'video')
+        .toList();
   }
 
   String? get _sourceUrl {
     final m = _media;
     if (m == null) return null;
     for (final link in m.links) {
-      if (link.sourceLink != null && link.sourceLink!.isNotEmpty) return link.sourceLink;
+      if (link.sourceLink != null && link.sourceLink!.isNotEmpty) {
+        return link.sourceLink;
+      }
     }
     return null;
   }
@@ -59,7 +64,14 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           _isLoading = false;
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'windows_media_detail_load_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+        fields: {'media_id': widget.mediaId},
+      );
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -77,29 +89,31 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
           : _media == null
-              ? const Center(child: Text('加载失败', style: TextStyle(color: Colors.white54)))
-              : SafeArea(
-                  top: false,
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        _buildMediaInfoSection(),
-              if (_videoFiles.isNotEmpty) ...[
-                const Divider(color: Colors.white12, height: 1),
-                _buildPlaySection(),
-              ],
-              const Divider(color: Colors.white12, height: 1),
-              SizedBox(height: 48, child: _buildUserMediaData()),
-              const Divider(color: Colors.white12, height: 1),
-              _buildLinksSection(),
-              if (_media!.files.isNotEmpty) ...[
-                const Divider(color: Colors.white12, height: 1),
-                _buildFilesSection(),
-              ],
-            ],
-          ),
-        ),
-      ),
+          ? const Center(
+              child: Text('加载失败', style: TextStyle(color: Colors.white54)),
+            )
+          : SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildMediaInfoSection(),
+                    if (_videoFiles.isNotEmpty) ...[
+                      const Divider(color: Colors.white12, height: 1),
+                      _buildPlaySection(),
+                    ],
+                    const Divider(color: Colors.white12, height: 1),
+                    SizedBox(height: 48, child: _buildUserMediaData()),
+                    const Divider(color: Colors.white12, height: 1),
+                    _buildLinksSection(),
+                    if (_media!.files.isNotEmpty) ...[
+                      const Divider(color: Colors.white12, height: 1),
+                      _buildFilesSection(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -108,23 +122,27 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildImageSection(),
-        Expanded(child: Padding(padding: const EdgeInsets.all(16), child: _buildBasicInfo())),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: _buildBasicInfo(),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildImageSection() {
-    final url = _media!.getPrimaryImageUrl();
     return Padding(
-        padding: const EdgeInsets.only(left: 12, top: 12),
-        child: MediaCard(
-          media: _media!,
-          config: const CardConfig(
-            showProgress: false,
-            showScore: true,
-            showTitle: false,
-          ),
+      padding: const EdgeInsets.only(left: 12, top: 12),
+      child: MediaCard(
+        media: _media!,
+        config: const CardConfig(
+          showProgress: false,
+          showScore: true,
+          showTitle: false,
         ),
+      ),
     );
   }
 
@@ -137,7 +155,16 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           crossAxisAlignment: CrossAxisAlignment.baseline,
           textBaseline: TextBaseline.alphabetic,
           children: [
-            Flexible(child: Text(m.name ?? '未知标题', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white))),
+            Flexible(
+              child: Text(
+                m.name ?? '未知标题',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
             const SizedBox(width: 8),
             if (_sourceUrl != null)
               GestureDetector(
@@ -153,16 +180,24 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.white54, width: 1),
                   ),
-                  child: const Icon(Icons.language, size: 16, color: Colors.white70),
+                  child: const Icon(
+                    Icons.language,
+                    size: 16,
+                    color: Colors.white70,
+                  ),
                 ),
               ),
             const SizedBox(width: 6),
             GestureDetector(
-              onTap: () { _toggleFavorite(); },
+              onTap: () {
+                _toggleFavorite();
+              },
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: _isFavorite ? Colors.red.withValues(alpha: 0.8) : Colors.transparent,
+                  color: _isFavorite
+                      ? Colors.red.withValues(alpha: 0.8)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _isFavorite ? Colors.red : Colors.white54,
@@ -184,16 +219,39 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
             spacing: 6,
             runSpacing: 6,
             alignment: WrapAlignment.start,
-            children: m.alias.map((a) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(4)),
-              child: Text(a.name ?? '', style: const TextStyle(fontSize: 11, color: Colors.white70)),
-            )).toList(),
+            children: m.alias
+                .map(
+                  (a) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      a.name ?? '',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
           ),
         ],
         if (m.tagline != null) ...[
           const SizedBox(height: 4),
-          Text(m.tagline!, style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Colors.white54)),
+          Text(
+            m.tagline!,
+            style: const TextStyle(
+              fontSize: 14,
+              fontStyle: FontStyle.italic,
+              color: Colors.white54,
+            ),
+          ),
         ],
         const SizedBox(height: 12),
         Wrap(
@@ -201,17 +259,39 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           runSpacing: 8,
           alignment: WrapAlignment.start,
           children: [
-            if (m.officialRating != null) _buildTag(m.officialRating!, Colors.orange),
-            if (m.productionYear != null) _buildTag('${m.productionYear}', Colors.blue),
-            if (m.runTimeTicks != null) _buildTag('${(m.runTimeTicks! / 600000000).round()} 分钟', Colors.green),
+            if (m.officialRating != null)
+              _buildTag(m.officialRating!, Colors.orange),
+            if (m.productionYear != null)
+              _buildTag('${m.productionYear}', Colors.blue),
+            if (m.runTimeTicks != null)
+              _buildTag(
+                '${(m.runTimeTicks! / 600000000).round()} 分钟',
+                Colors.green,
+              ),
             if (m.type != null) _buildTag(m.type!, Colors.purple),
           ],
         ),
         if (m.overview != null && m.overview!.isNotEmpty) ...[
           const SizedBox(height: 16),
-          const Text('简介', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white70)),
+          const Text(
+            '简介',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(m.overview!, style: const TextStyle(fontSize: 13, color: Colors.white54, height: 1.5), maxLines: 5, overflow: TextOverflow.ellipsis),
+          Text(
+            m.overview!,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.white54,
+              height: 1.5,
+            ),
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ],
     );
@@ -227,19 +307,26 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   }
 
   Widget _buildInfoChip(IconData icon, String label, Color color) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 14, color: color),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 12, color: color)),
-    ]);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 12, color: color)),
+      ],
+    );
   }
 
   Widget _buildUserMediaData() {
     final userdata = _media!.userdata;
     if (userdata == null) return const SizedBox.shrink();
 
-    final runtimeSeconds = _media!.runTimeTicks != null ? _media!.runTimeTicks! ~/ 10000000 : 0;
-    final playedSeconds = userdata.playbackPositionTicks != null ? userdata.playbackPositionTicks! ~/ 10000000 : 0;
+    final runtimeSeconds = _media!.runTimeTicks != null
+        ? _media!.runTimeTicks! ~/ 10000000
+        : 0;
+    final playedSeconds = userdata.playbackPositionTicks != null
+        ? userdata.playbackPositionTicks! ~/ 10000000
+        : 0;
     final progress = runtimeSeconds > 0 ? playedSeconds / runtimeSeconds : 0.0;
 
     return Padding(
@@ -253,33 +340,59 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                 _buildInfoChip(Icons.favorite, '已收藏', Colors.red),
               if (userdata.favoritedAt != null) const SizedBox(width: 12),
               if (userdata.rating != null)
-                _buildInfoChip(Icons.star, userdata.rating!.toStringAsFixed(1), Colors.amber),
+                _buildInfoChip(
+                  Icons.star,
+                  userdata.rating!.toStringAsFixed(1),
+                  Colors.amber,
+                ),
               if (userdata.rating != null) const SizedBox(width: 12),
-              _buildInfoChip(Icons.play_arrow, '播放 ${userdata.playCount ?? 0} 次', Colors.green),
+              _buildInfoChip(
+                Icons.play_arrow,
+                '播放 ${userdata.playCount ?? 0} 次',
+                Colors.green,
+              ),
               const SizedBox(width: 12),
-              _buildInfoChip(Icons.history, userdata.lastPlayedDisplay ?? '未播放', Colors.blue),
+              _buildInfoChip(
+                Icons.history,
+                userdata.lastPlayedDisplay ?? '未播放',
+                Colors.blue,
+              ),
             ],
           ),
           if (runtimeSeconds > 0 || playedSeconds > 0) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Text(_formatTicks(userdata.playbackPositionTicks),
-                    style: const TextStyle(fontSize: 12, color: Colors.purple)),
+                Text(
+                  _formatTicks(userdata.playbackPositionTicks),
+                  style: const TextStyle(fontSize: 12, color: Colors.purple),
+                ),
                 if (runtimeSeconds > 0) ...[
-                  const Text(' / ', style: TextStyle(fontSize: 12, color: Colors.white30)),
-                  Text(_formatTicks(_media!.runTimeTicks),
-                      style: const TextStyle(fontSize: 12, color: Colors.purple)),
+                  const Text(
+                    ' / ',
+                    style: TextStyle(fontSize: 12, color: Colors.white30),
+                  ),
+                  Text(
+                    _formatTicks(_media!.runTimeTicks),
+                    style: const TextStyle(fontSize: 12, color: Colors.purple),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(value: progress, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation(Colors.purple), minHeight: 6),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.white12,
+                        valueColor: const AlwaysStoppedAnimation(Colors.purple),
+                        minHeight: 6,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('${(progress * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(fontSize: 12, color: Colors.purple)),
+                  Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(fontSize: 12, color: Colors.purple),
+                  ),
                 ],
               ],
             ),
@@ -319,10 +432,11 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   Widget _buildLinksSection() {
     final groupedLinks = <String, List<LinkInfo>>{};
     for (final link in _media!.links) {
-      final key = link.peopleType ??
-                  link.peopleRole ??
-                  link.linkedItem?.type ??
-                  'Other';
+      final key =
+          link.peopleType ??
+          link.peopleRole ??
+          link.linkedItem?.type ??
+          'Other';
       final label = _linkTypeNames[key] ?? key;
       groupedLinks.putIfAbsent(label, () => []).add(link);
     }
@@ -331,9 +445,18 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('关联内容', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text(
+            '关联内容',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 12),
-          ...groupedLinks.entries.map((entry) => _buildLinkGroup(entry.key, entry.value)),
+          ...groupedLinks.entries.map(
+            (entry) => _buildLinkGroup(entry.key, entry.value),
+          ),
         ],
       ),
     );
@@ -354,7 +477,14 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.purple)),
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.purple,
+            ),
+          ),
         ),
         if (tagItems.isNotEmpty)
           Padding(
@@ -368,8 +498,11 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                 if (item == null) return const SizedBox.shrink();
                 return MediaTag(
                   media: MediaItem(
-                    id: item.id, name: item.name, type: item.type,
-                    overview: item.overview, tagline: item.tagline,
+                    id: item.id,
+                    name: item.name,
+                    type: item.type,
+                    overview: item.overview,
+                    tagline: item.tagline,
                     premiereDate: item.premiereDate,
                     officialRating: item.officialRating,
                     communityRating: item.communityRating,
@@ -425,8 +558,13 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
     final w = f.ffmpeg?['width'];
     final h = f.ffmpeg?['height'];
     final resolution = w != null && h != null ? '${w}x$h' : '';
-    final parts = [if (codec.isNotEmpty) codec, if (resolution.isNotEmpty) resolution];
-    return parts.isNotEmpty ? '${f.name ?? ''} (${parts.join(', ')})' : (f.name ?? '未知');
+    final parts = [
+      if (codec.isNotEmpty) codec,
+      if (resolution.isNotEmpty) resolution,
+    ];
+    return parts.isNotEmpty
+        ? '${f.name ?? ''} (${parts.join(', ')})'
+        : (f.name ?? '未知');
   }
 
   Widget _buildPlaySection() {
@@ -435,7 +573,14 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('播放', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text(
+            '播放',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -452,15 +597,23 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                         value: _selectedVideoIndex,
                         isExpanded: true,
                         dropdownColor: const Color(0xFF2A2A2A),
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
                         items: List.generate(_videoFiles.length, (i) {
                           return DropdownMenuItem(
                             value: i,
-                            child: Text(_videoLabel(_videoFiles[i]), overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              _videoLabel(_videoFiles[i]),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }),
                         onChanged: (v) {
-                          if (v != null) setState(() => _selectedVideoIndex = v);
+                          if (v != null) {
+                            setState(() => _selectedVideoIndex = v);
+                          }
                         },
                       ),
                     ),
@@ -494,7 +647,9 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.purple,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ],
@@ -511,7 +666,14 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('文件', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text(
+            '文件',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
           const SizedBox(height: 12),
           SizedBox(
             height: 180,
@@ -530,7 +692,9 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   Widget _buildFileCard(FileInfo file) {
     final sizeStr = file.size != null ? _formatFileSize(file.size!) : '未知大小';
     final codec = file.ffmpeg != null ? (file.ffmpeg!['codec'] ?? '') : '';
-    final fileUrl = TokenCache.withToken('${AppConstants.defaultBaseUrl}/api/file/data?file_id=${file.id}');
+    final fileUrl = TokenCache.withToken(
+      '${AppConstants.defaultBaseUrl}/api/file/data?file_id=${file.id}',
+    );
     return Container(
       width: 180,
       margin: const EdgeInsets.only(right: 12),
@@ -543,27 +707,48 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(file.name ?? '未知文件', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white, height: 1.3), maxLines: 2, overflow: TextOverflow.ellipsis),
+          Text(
+            file.name ?? '未知文件',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              height: 1.3,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 6),
           if (file.type != null)
-            Text(file.type!, style: const TextStyle(fontSize: 11, color: Colors.white54)),
+            Text(
+              file.type!,
+              style: const TextStyle(fontSize: 11, color: Colors.white54),
+            ),
           if (sizeStr.isNotEmpty)
-            Text(sizeStr, style: const TextStyle(fontSize: 11, color: Colors.white54)),
+            Text(
+              sizeStr,
+              style: const TextStyle(fontSize: 11, color: Colors.white54),
+            ),
           if (codec.isNotEmpty)
-            Text(codec, style: const TextStyle(fontSize: 11, color: Colors.purple)),
+            Text(
+              codec,
+              style: const TextStyle(fontSize: 11, color: Colors.purple),
+            ),
           const Spacer(),
           Row(
             children: [
               _buildFileAction(Icons.content_copy, '复制链接', () {
                 Clipboard.setData(ClipboardData(text: fileUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('链接已复制')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('链接已复制')));
               }),
               const SizedBox(width: 8),
               _buildFileAction(Icons.download, '下载', () {
                 final uri = Uri.tryParse(fileUrl);
-                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (uri != null) {
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
               }),
             ],
           ),
@@ -572,7 +757,11 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
     );
   }
 
-  Widget _buildFileAction(IconData icon, String tooltip, VoidCallback onPressed) {
+  Widget _buildFileAction(
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed,
+  ) {
     return SizedBox(
       width: 32,
       height: 32,
@@ -592,13 +781,22 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   Widget _buildTag(String text, Color color) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(4), border: Border.all(color: color.withValues(alpha: 0.4))),
-    child: Text(text, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+    ),
   );
 }

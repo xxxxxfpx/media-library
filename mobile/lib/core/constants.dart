@@ -1,3 +1,6 @@
+// Enum values mirror backend API values and intentionally use PascalCase.
+// ignore_for_file: constant_identifier_names
+
 import 'package:flutter/material.dart';
 import 'package:flutter_lucide/flutter_lucide.dart';
 
@@ -7,35 +10,50 @@ class AppConstants {
 
   /// 本地存储键：访问令牌
   static const String storageKeyAccessToken = 'access_token';
+
   /// 本地存储键：刷新令牌
   static const String storageKeyRefreshToken = 'refresh_token';
+
   /// 本地存储键：基础 URL
   static const String storageKeyBaseUrl = 'base_url';
+
   /// 本地存储键：主题模式
   static const String storageKeyTheme = 'theme_mode';
+
   /// 本地存储键：自动播放
   static const String storageKeyAutoPlay = 'auto_play';
+
   /// 本地存储键：静音
   static const String storageKeyMuted = 'muted';
+
   /// 本地存储键：同步间隔
   static const String storageKeySyncInterval = 'sync_interval';
+
   /// 本地存储键：标记已观看阈值
   static const String storageKeyWatchedThreshold = 'watched_threshold';
 
   /// 默认后端 API 地址
-  static const String defaultBaseUrl = 'https://xmedia.iepose.cn';
+  static const String defaultBaseUrl = 'http://192.168.1.5:8000';
 }
 
-
-
 /// 媒体类型枚举，定义所有支持的媒体类型
-/// 
+///
 /// 枚举名称与后端 API 返回的 MediaType.value 完全一致
 enum MediaType {
-  Movie("电影"),       Series("剧集"),        Season("季"),     Episode("集"),
-  Audio("音乐"),       Photo("图片"),         Book("电子书"),   Person("人物"),
-  Source("来源"),      Studio("工作室"),      Genre("类型"),    Tag("标签"),
-  BoxSet("集合"),      unknown("未知"); 
+  Movie("电影"),
+  Series("剧集"),
+  Season("季"),
+  Episode("集"),
+  Audio("音乐"),
+  Photo("图片"),
+  Book("电子书"),
+  Person("人物"),
+  Source("来源"),
+  Studio("工作室"),
+  Genre("类型"),
+  Tag("标签"),
+  BoxSet("集合"),
+  unknown("未知");
 
   const MediaType(this.labelZH);
   final String labelZH;
@@ -45,17 +63,13 @@ enum MediaType {
 enum ViewMode { grid, list }
 
 /// 文件类型枚举
-enum FileType { 
-  image, video, audio, subtitle, nfo, data, attachment }
-
-
-
-
+enum FileType { image, video, audio, subtitle, nfo, data, attachment }
 
 /// 文件类型信息类，存储图标和颜色
 class FileTypeInfo {
   /// 文件类型对应的图标
   final IconData icon;
+
   /// 文件类型对应的颜色
   final Color color;
   const FileTypeInfo(this.icon, this.color);
@@ -72,8 +86,6 @@ const Map<FileType, FileTypeInfo> fileTypeInfo = {
   FileType.attachment: FileTypeInfo(LucideIcons.paperclip, Color(0xFF795548)),
 };
 
-
-
 /// 媒体数据类型枚举，用于统计数据卡片
 enum MediaDataType { videoCount, audioCount, imageCount, ebookCount }
 
@@ -81,10 +93,13 @@ enum MediaDataType { videoCount, audioCount, imageCount, ebookCount }
 class StatCardConfig {
   /// 卡片图标
   final IconData icon;
+
   /// 卡片颜色
   final Color color;
+
   /// 卡片显示文本
   final String label;
+
   /// 对应的数据类型键
   final MediaDataType dataKey;
 

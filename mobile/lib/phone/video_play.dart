@@ -11,6 +11,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants.dart';
+import '../core/app_logger.dart';
 import '../data/api/api_client.dart';
 import '../data/api/user_api.dart';
 import '../data/models/media.dart';
@@ -57,7 +58,10 @@ class _DouyinSeekBarState extends State<DouyinSeekBar> {
     super.dispose();
   }
 
-  void _onLongPressStart(LongPressStartDetails details, BoxConstraints constraints) {
+  void _onLongPressStart(
+    LongPressStartDetails details,
+    BoxConstraints constraints,
+  ) {
     setState(() {
       _isDragging = true;
       _dragValue = widget.value;
@@ -67,7 +71,10 @@ class _DouyinSeekBarState extends State<DouyinSeekBar> {
     HapticFeedback.lightImpact();
   }
 
-  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details, BoxConstraints constraints) {
+  void _onLongPressMoveUpdate(
+    LongPressMoveUpdateDetails details,
+    BoxConstraints constraints,
+  ) {
     if (!_isDragging) return;
 
     final currentPosition = details.localPosition;
@@ -110,8 +117,10 @@ class _DouyinSeekBarState extends State<DouyinSeekBar> {
       builder: (context, constraints) {
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onLongPressStart: (details) => _onLongPressStart(details, constraints),
-          onLongPressMoveUpdate: (details) => _onLongPressMoveUpdate(details, constraints),
+          onLongPressStart: (details) =>
+              _onLongPressStart(details, constraints),
+          onLongPressMoveUpdate: (details) =>
+              _onLongPressMoveUpdate(details, constraints),
           onLongPressEnd: _onLongPressEnd,
           child: Container(
             padding: EdgeInsets.only(top: 6, bottom: 6),
@@ -175,7 +184,7 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
     with WidgetsBindingObserver {
   late final Player _player;
   late final VideoController _controller;
-  
+
   bool _isInitialized = false;
   bool _isLoadingUrl = true;
   String? _error;
@@ -200,7 +209,7 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
   String? _speedLabelText;
   Timer? _speedLabelTimer;
   bool _speedLabelVisible = false;
-  
+
   static const List<double> _speeds = [0.5, 1.0, 1.5, 2.0, 3.0];
 
   bool _isLongPressActive = false;
@@ -222,7 +231,8 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
   Timer? _reportTimer;
   double _watchedThreshold = 0.9;
   bool _reportedAsPlayed = false;
-  
+  int _progressFailureCount = 0;
+
   bool _showRestartButton = false;
   Timer? _restartButtonTimer;
 
@@ -271,7 +281,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
       final client = ApiClient(prefs);
 
       final results = await Future.wait([
-        client.getRedirectUrl('/api/file/data', queryParameters: {'file_id': widget.fileId}),
+        client.getRedirectUrl(
+          '/api/file/data',
+          queryParameters: {'file_id': widget.fileId},
+        ),
         client.get('/api/media/info', queryParameters: {'id': widget.itemId}),
         ScreenBrightness().current,
       ]);
@@ -331,9 +344,18 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
         final np = _player.platform as NativePlayer;
         await np.setProperty('hwdec', hwEnabled ? 'auto' : 'no');
         await np.setProperty('cache', 'yes');
-        await np.setProperty('cache-on-disk', cacheMode == 'disk' ? 'yes' : 'no');
-        await np.setProperty('demuxer-max-bytes', (forwardSize * 1024 * 1024).toString());
-        await np.setProperty('demuxer-max-back-bytes', (backwardSize * 1024 * 1024).toString());
+        await np.setProperty(
+          'cache-on-disk',
+          cacheMode == 'disk' ? 'yes' : 'no',
+        );
+        await np.setProperty(
+          'demuxer-max-bytes',
+          (forwardSize * 1024 * 1024).toString(),
+        );
+        await np.setProperty(
+          'demuxer-max-back-bytes',
+          (backwardSize * 1024 * 1024).toString(),
+        );
         await np.setProperty('network-timeout', '10');
       }
 
@@ -342,12 +364,18 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
       // 等待 duration 可用（表示媒体已加载完成）
       try {
         if (_player.state.duration <= Duration.zero) {
-          await _player.stream.duration.firstWhere(
-            (d) => d > Duration.zero,
-          ).timeout(const Duration(seconds: 15));
+          await _player.stream.duration
+              .firstWhere((d) => d > Duration.zero)
+              .timeout(const Duration(seconds: 15));
         }
-      } catch (_) {
-        // 超时继续，seek 会排队等待
+      } catch (error, stackTrace) {
+        AppLogger.warning(
+          'duration_unavailable_continue_playback',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'player',
+          fields: {'item_id': widget.itemId},
+        );
       }
 
       if (resumeEnabled && resumePosition > Duration.zero) {
@@ -376,7 +404,8 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
         _player.setVolume(100);
         _volume = 1.0;
       }
-      _watchedThreshold = prefs.getDouble(AppConstants.storageKeyWatchedThreshold) ?? 0.9;
+      _watchedThreshold =
+          prefs.getDouble(AppConstants.storageKeyWatchedThreshold) ?? 0.9;
 
       if (mounted) {
         setState(() {
@@ -387,21 +416,21 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
         _userApi = UserApi(client);
         _startProgressReporting();
       }
-    } catch (e) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'player_initialization_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'player',
+        fields: {'item_id': widget.itemId, 'file_id': widget.fileId},
+      );
       if (mounted) {
         setState(() {
           _isLoadingUrl = false;
-          _error = e.toString();
+          _error = '视频加载失败，请检查网络连接后重试';
         });
       }
     }
-  }
-
-  void _showControls() {
-    if (!_controlsVisible && mounted) {
-      setState(() => _controlsVisible = true);
-    }
-    _resetControlsTimer();
   }
 
   void _resetControlsTimer() {
@@ -468,7 +497,31 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
           isPlayed: isPlayed,
         ),
       );
-    } catch (_) {
+      if (_progressFailureCount > 0) {
+        AppLogger.info(
+          'playback_progress_recovered',
+          category: 'player',
+          fields: {
+            'item_id': widget.itemId,
+            'failed_updates': _progressFailureCount,
+          },
+        );
+        _progressFailureCount = 0;
+      }
+    } catch (error, stackTrace) {
+      _progressFailureCount++;
+      if (_progressFailureCount == 1 || _progressFailureCount % 10 == 0) {
+        AppLogger.warning(
+          'playback_progress_update_failed',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'player',
+          fields: {
+            'item_id': widget.itemId,
+            'consecutive_failures': _progressFailureCount,
+          },
+        );
+      }
     }
   }
 
@@ -521,18 +574,18 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
     _speedLabelTimer?.cancel();
     _reportTimer?.cancel();
     _restartButtonTimer?.cancel();
-    
+
     _playingSubscription?.cancel();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();
     _rateSubscription?.cancel();
-    
+
     _player.dispose();
     _exitFullscreen();
     unawaited(_reportProgress());
     super.dispose();
   }
-  
+
   void _restartFromBeginning() {
     _player.seek(Duration.zero);
     setState(() {
@@ -593,8 +646,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
           children: [
             CircularProgressIndicator(color: cs.primary),
             SizedBox(height: 16),
-            Text('正在获取视频地址...',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14)),
+            Text(
+              '正在获取视频地址...',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+            ),
           ],
         ),
       );
@@ -605,9 +660,7 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
     }
 
     if (!_isInitialized) {
-      return Center(
-        child: CircularProgressIndicator(color: cs.primary),
-      );
+      return Center(child: CircularProgressIndicator(color: cs.primary));
     }
 
     return Stack(
@@ -686,7 +739,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
               duration: const Duration(milliseconds: 200),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(12),
@@ -713,7 +769,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
             child: IgnorePointer(
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(16),
@@ -730,7 +789,7 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
               ),
             ),
           ),
-          
+
         if (_showRestartButton)
           Positioned(
             right: 16,
@@ -741,7 +800,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
               child: GestureDetector(
                 onTap: _restartFromBeginning,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black54,
                     borderRadius: BorderRadius.circular(8),
@@ -770,10 +832,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
             icon: _showBrightnessIndicator! <= 0.2
                 ? LucideIcons.moon
                 : _showBrightnessIndicator! <= 0.5
-                    ? LucideIcons.sun_dim
-                    : _showBrightnessIndicator! <= 0.8
-                        ? LucideIcons.sun_medium
-                        : LucideIcons.sun,
+                ? LucideIcons.sun_dim
+                : _showBrightnessIndicator! <= 0.8
+                ? LucideIcons.sun_medium
+                : LucideIcons.sun,
             value: _showBrightnessIndicator!,
             alignment: Alignment.centerRight,
           ),
@@ -783,10 +845,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
             icon: _showVolumeIndicator! == 0
                 ? LucideIcons.volume_x
                 : _showVolumeIndicator! <= 0.33
-                    ? LucideIcons.volume
-                    : _showVolumeIndicator! <= 0.66
-                        ? LucideIcons.volume_1
-                        : LucideIcons.volume_2,
+                ? LucideIcons.volume
+                : _showVolumeIndicator! <= 0.66
+                ? LucideIcons.volume_1
+                : LucideIcons.volume_2,
             value: _showVolumeIndicator!,
             alignment: Alignment.centerLeft,
           ),
@@ -821,14 +883,15 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
           children: [
             Icon(Icons.error_outline, color: cs.error, size: 48),
             SizedBox(height: 16),
-            Text('加载失败',
-                style: TextStyle(color: cs.onSurface, fontSize: 16)),
+            Text('加载失败', style: TextStyle(color: cs.onSurface, fontSize: 16)),
             SizedBox(height: 8),
-            Text(_error!,
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                textAlign: TextAlign.center,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis),
+            Text(
+              _error!,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
             SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () {
@@ -867,197 +930,196 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
       },
       onDoubleTap: () {
         _togglePlayPause();
-        // _showControls();
       },
       onVerticalDragStart: (details) {
         if (_isLongPressActive) return;
         _controlsTimer?.cancel();
       },
-        onVerticalDragUpdate: (details) {
-          if (_isLongPressActive) return;
+      onVerticalDragUpdate: (details) {
+        if (_isLongPressActive) return;
 
-          final half = context.size!.width / 2;
-          if (details.localPosition.dx < half) {
-            final newBrightness =
-                (_showBrightnessValue - details.delta.dy / 160).clamp(0.0, 1.0);
+        final half = context.size!.width / 2;
+        if (details.localPosition.dx < half) {
+          final newBrightness = (_showBrightnessValue - details.delta.dy / 160)
+              .clamp(0.0, 1.0);
 
-            setState(() {
-              _showBrightnessValue = newBrightness;
-              _showBrightnessIndicator = newBrightness;
-            });
-
-            final oldBlock =
-                ((_showBrightnessValue + details.delta.dy / 160) * 20)
-                    .floor()
-                    .clamp(0, 19);
-            final newBlock =
-                (newBrightness * 20).floor().clamp(0, 19);
-            if (oldBlock != newBlock) {
-              HapticFeedback.selectionClick();
-            }
-
-            ScreenBrightness()
-                .setScreenBrightness(newBrightness)
-                .catchError((_) {});
-          } else {
-            final oldVolume = _volume;
-            _volume =
-                (oldVolume - details.delta.dy / 160).clamp(0.0, 1.0);
-            _player.setVolume(_volume * 100);
-            setState(() => _showVolumeIndicator = _volume);
-
-            final oldBlock = (oldVolume * 20).floor().clamp(0, 19);
-            final newBlock =
-                (_volume * 20).floor().clamp(0, 19);
-            if (oldBlock != newBlock) {
-              HapticFeedback.selectionClick();
-            }
-          }
-        },
-        onVerticalDragEnd: (_) {
-          if (mounted) {
-            setState(() {
-              _showBrightnessIndicator = null;
-              _showVolumeIndicator = null;
-            });
-          }
-          _resetControlsTimer();
-        },
-        onVerticalDragCancel: () {
-        },
-        onLongPressStart: (details) {
-          setState(() => _isLongPressActive = true);
-          _speedBeforeLongPress = _speed;
-          final speed = 3.0;
-          _player.setRate(speed);
-          _speedLabelTimer?.cancel();
-          _speedLabelTimer = Timer(const Duration(milliseconds: 500), () {
-            if (mounted) {
-              setState(() => _speedLabelVisible = false);
-            }
-          });
           setState(() {
-            _speed = speed;
-            _speedLabelText = '${speed.toStringAsFixed(1)}x';
-            _speedLabelVisible = true;
-            _lastSpeedPosition = details.localPosition;
+            _showBrightnessValue = newBrightness;
+            _showBrightnessIndicator = newBrightness;
           });
-        },
-        onLongPressMoveUpdate: (details) {
-          final currentPosition = details.localPosition;
-          final dy = currentPosition.dy - _lastSpeedPosition.dy;
-          _lastSpeedPosition = currentPosition;
 
-          final oldSpeed = _speed;
-          final newSpeed = (_speed - dy / 50).clamp(0.0, 9.0);
-
-          final oldBlock = (oldSpeed * 2).floor().clamp(0, 18);
-          final newBlock = (newSpeed * 2).floor().clamp(0, 18);
+          final oldBlock =
+              ((_showBrightnessValue + details.delta.dy / 160) * 20)
+                  .floor()
+                  .clamp(0, 19);
+          final newBlock = (newBrightness * 20).floor().clamp(0, 19);
           if (oldBlock != newBlock) {
             HapticFeedback.selectionClick();
           }
 
-          final rounded = (newSpeed * 100).roundToDouble() / 100;
-          _player.setRate(rounded);
+          ScreenBrightness()
+              .setScreenBrightness(newBrightness)
+              .catchError((_) {});
+        } else {
+          final oldVolume = _volume;
+          _volume = (oldVolume - details.delta.dy / 160).clamp(0.0, 1.0);
+          _player.setVolume(_volume * 100);
+          setState(() => _showVolumeIndicator = _volume);
 
-          final newText = '${rounded.toStringAsFixed(1)}x';
-          if (newText != _speedLabelText) {
-            _speedLabelTimer?.cancel();
-            _speedLabelTimer = Timer(const Duration(milliseconds: 500), () {
-              if (mounted) {
-                setState(() {
-                  _speedLabelVisible = false;
-                });
-              }
-            });
-            setState(() {
-              _speedLabelText = newText;
-              _speedLabelVisible = true;
-            });
+          final oldBlock = (oldVolume * 20).floor().clamp(0, 19);
+          final newBlock = (_volume * 20).floor().clamp(0, 19);
+          if (oldBlock != newBlock) {
+            HapticFeedback.selectionClick();
           }
-
+        }
+      },
+      onVerticalDragEnd: (_) {
+        if (mounted) {
           setState(() {
-            _speed = rounded;
+            _showBrightnessIndicator = null;
+            _showVolumeIndicator = null;
           });
-        },
-        onLongPressEnd: (_) {
-          setState(() => _isLongPressActive = false);
+        }
+        _resetControlsTimer();
+      },
+      onVerticalDragCancel: () {},
+      onLongPressStart: (details) {
+        setState(() => _isLongPressActive = true);
+        _speedBeforeLongPress = _speed;
+        final speed = 3.0;
+        _player.setRate(speed);
+        _speedLabelTimer?.cancel();
+        _speedLabelTimer = Timer(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() => _speedLabelVisible = false);
+          }
+        });
+        setState(() {
+          _speed = speed;
+          _speedLabelText = '${speed.toStringAsFixed(1)}x';
+          _speedLabelVisible = true;
+          _lastSpeedPosition = details.localPosition;
+        });
+      },
+      onLongPressMoveUpdate: (details) {
+        final currentPosition = details.localPosition;
+        final dy = currentPosition.dy - _lastSpeedPosition.dy;
+        _lastSpeedPosition = currentPosition;
+
+        final oldSpeed = _speed;
+        final newSpeed = (_speed - dy / 50).clamp(0.0, 9.0);
+
+        final oldBlock = (oldSpeed * 2).floor().clamp(0, 18);
+        final newBlock = (newSpeed * 2).floor().clamp(0, 18);
+        if (oldBlock != newBlock) {
+          HapticFeedback.selectionClick();
+        }
+
+        final rounded = (newSpeed * 100).roundToDouble() / 100;
+        _player.setRate(rounded);
+
+        final newText = '${rounded.toStringAsFixed(1)}x';
+        if (newText != _speedLabelText) {
           _speedLabelTimer?.cancel();
-          _player.setRate(_speedBeforeLongPress);
-          setState(() {
-            _speedLabelVisible = false;
-            _speed = _speedBeforeLongPress;
-            _speedLabelText = null;
+          _speedLabelTimer = Timer(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              setState(() {
+                _speedLabelVisible = false;
+              });
+            }
           });
-        },
-        onLongPressCancel: () {
-          setState(() => _isLongPressActive = false);
-          _speedLabelTimer?.cancel();
-          _player.setRate(_speedBeforeLongPress);
           setState(() {
-            _speedLabelVisible = false;
-            _speed = _speedBeforeLongPress;
-            _speedLabelText = null;
+            _speedLabelText = newText;
+            _speedLabelVisible = true;
           });
-        },
-        onHorizontalDragStart: (details) {
-          if (_duration == Duration.zero) return;
-          setState(() {
-            _isSeeking = true;
-            _wasPlayingBeforeSeek = _isPlaying;
-            _seekStartPos = _position;
-            _seekPosition = _position;
-            _lastSeekToPosition = _position;
-            _totalHorizontalDx = 0.0;
-            _verticalDragOffset = 0.0;
-            _seekSensitivity = 1.0;
-          });
-          _controlsTimer?.cancel();
-          if (_wasPlayingBeforeSeek) {
-            HapticFeedback.lightImpact();
-          }
-        },
-        onHorizontalDragUpdate: (details) {
-          if (!_isSeeking) return;
+        }
 
-          _verticalDragOffset += details.delta.dy;
-          setState(() {
-            _seekSensitivity = 1.0 - (_verticalDragOffset / 200);
-            _seekSensitivity = _seekSensitivity.clamp(_minSensitivity, _maxSensitivity);
-          });
-
-          _totalHorizontalDx += details.delta.dx;
-          final seconds = (_totalHorizontalDx / 50) * 10 * _seekSensitivity;
-          var newPos = _seekStartPos + Duration(seconds: seconds.round());
-          if (newPos < Duration.zero) newPos = Duration.zero;
-          if (newPos > _duration) newPos = _duration;
-          _seekPosition = newPos;
-          if ((newPos - _lastSeekToPosition).abs() >= const Duration(seconds: 1)) {
-            _player.seek(newPos);
-            _lastSeekToPosition = newPos;
-          }
-        },
-        onHorizontalDragEnd: (details) {
-          if (!_isSeeking) return;
-          _player.seek(_seekPosition);
-          if (_wasPlayingBeforeSeek) {
-            _player.play();
-          }
-          setState(() => _isSeeking = false);
-          _wasPlayingBeforeSeek = false;
-          _resetControlsTimer();
+        setState(() {
+          _speed = rounded;
+        });
+      },
+      onLongPressEnd: (_) {
+        setState(() => _isLongPressActive = false);
+        _speedLabelTimer?.cancel();
+        _player.setRate(_speedBeforeLongPress);
+        setState(() {
+          _speedLabelVisible = false;
+          _speed = _speedBeforeLongPress;
+          _speedLabelText = null;
+        });
+      },
+      onLongPressCancel: () {
+        setState(() => _isLongPressActive = false);
+        _speedLabelTimer?.cancel();
+        _player.setRate(_speedBeforeLongPress);
+        setState(() {
+          _speedLabelVisible = false;
+          _speed = _speedBeforeLongPress;
+          _speedLabelText = null;
+        });
+      },
+      onHorizontalDragStart: (details) {
+        if (_duration == Duration.zero) return;
+        setState(() {
+          _isSeeking = true;
+          _wasPlayingBeforeSeek = _isPlaying;
+          _seekStartPos = _position;
+          _seekPosition = _position;
+          _lastSeekToPosition = _position;
+          _totalHorizontalDx = 0.0;
+          _verticalDragOffset = 0.0;
+          _seekSensitivity = 1.0;
+        });
+        _controlsTimer?.cancel();
+        if (_wasPlayingBeforeSeek) {
           HapticFeedback.lightImpact();
-        },
-        onHorizontalDragCancel: () {
-          if (!_isSeeking) return;
-          if (_wasPlayingBeforeSeek) {
-            _player.play();
-          }
-          setState(() => _isSeeking = false);
-          _wasPlayingBeforeSeek = false;
-          _resetControlsTimer();
-        },
-        child: Container(color: cs.surface.withValues(alpha: 0.0)),
+        }
+      },
+      onHorizontalDragUpdate: (details) {
+        if (!_isSeeking) return;
+
+        _verticalDragOffset += details.delta.dy;
+        setState(() {
+          _seekSensitivity = 1.0 - (_verticalDragOffset / 200);
+          _seekSensitivity = _seekSensitivity.clamp(
+            _minSensitivity,
+            _maxSensitivity,
+          );
+        });
+
+        _totalHorizontalDx += details.delta.dx;
+        final seconds = (_totalHorizontalDx / 50) * 10 * _seekSensitivity;
+        var newPos = _seekStartPos + Duration(seconds: seconds.round());
+        if (newPos < Duration.zero) newPos = Duration.zero;
+        if (newPos > _duration) newPos = _duration;
+        _seekPosition = newPos;
+        if ((newPos - _lastSeekToPosition).abs() >=
+            const Duration(seconds: 1)) {
+          _player.seek(newPos);
+          _lastSeekToPosition = newPos;
+        }
+      },
+      onHorizontalDragEnd: (details) {
+        if (!_isSeeking) return;
+        _player.seek(_seekPosition);
+        if (_wasPlayingBeforeSeek) {
+          _player.play();
+        }
+        setState(() => _isSeeking = false);
+        _wasPlayingBeforeSeek = false;
+        _resetControlsTimer();
+        HapticFeedback.lightImpact();
+      },
+      onHorizontalDragCancel: () {
+        if (!_isSeeking) return;
+        if (_wasPlayingBeforeSeek) {
+          _player.play();
+        }
+        setState(() => _isSeeking = false);
+        _wasPlayingBeforeSeek = false;
+        _resetControlsTimer();
+      },
+      child: Container(color: cs.surface.withValues(alpha: 0.0)),
     );
   }
 
@@ -1089,8 +1151,7 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     child: LinearProgressIndicator(
                       value: value,
                       backgroundColor: cs.onSurface.withValues(alpha: 0.2),
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(cs.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                     ),
                   ),
                 ),
@@ -1142,7 +1203,11 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(_fitModeIcons[_fitMode]!, color: cs.onSurface, size: 12),
+                    Icon(
+                      _fitModeIcons[_fitMode]!,
+                      color: cs.onSurface,
+                      size: 12,
+                    ),
                     const SizedBox(width: 2),
                     Text(
                       _fitModeLabels[_fitMode]!,
@@ -1162,8 +1227,9 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
     final cs = Theme.of(context).colorScheme;
     final positionMs = _position.inMilliseconds.toDouble();
     final durationMs = _duration.inMilliseconds.toDouble();
-    final sliderValue =
-        durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final sliderValue = durationMs > 0
+        ? (positionMs / durationMs).clamp(0.0, 1.0)
+        : 0.0;
 
     return SafeArea(
       top: false,
@@ -1173,15 +1239,17 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             DouyinSeekBar(
-                value: sliderValue,
-                buffered: _duration.inMilliseconds > 0
-                    ? (_player.state.buffer.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
-                    : 0.0,
-                position: _position,
-                duration: _duration,
-                onSeek: _seekTo,
-                onSeekUpdate: _seekUpdate,
-                onSeekStart: () {
+              value: sliderValue,
+              buffered: _duration.inMilliseconds > 0
+                  ? (_player.state.buffer.inMilliseconds /
+                            _duration.inMilliseconds)
+                        .clamp(0.0, 1.0)
+                  : 0.0,
+              position: _position,
+              duration: _duration,
+              onSeek: _seekTo,
+              onSeekUpdate: _seekUpdate,
+              onSeekStart: () {
                 setState(() {
                   _isSeeking = true;
                   _wasPlayingBeforeSeek = _isPlaying;
@@ -1211,10 +1279,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     _volume == 0
                         ? LucideIcons.volume_x
                         : _volume <= 0.33
-                            ? LucideIcons.volume
-                            : _volume <= 0.66
-                                ? LucideIcons.volume_1
-                                : LucideIcons.volume_2,
+                        ? LucideIcons.volume
+                        : _volume <= 0.66
+                        ? LucideIcons.volume_1
+                        : LucideIcons.volume_2,
                     color: cs.onSurface,
                     size: 20,
                   ),
@@ -1230,7 +1298,10 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                       prefs.setBool('muted', false);
                     }
                   },
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   padding: EdgeInsets.zero,
                 ),
                 const SizedBox(width: 2),
@@ -1264,9 +1335,14 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     );
                   }).toList(),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      border: Border.all(color: cs.outline.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: cs.outline.withValues(alpha: 0.3),
+                      ),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1283,13 +1359,16 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     size: 24,
                   ),
                   onPressed: _togglePlayPause,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   padding: EdgeInsets.zero,
                 ),
                 IconButton(
                   icon: Icon(
-                  Icons.screen_rotation,
-                  color: cs.onSurface,
+                    Icons.screen_rotation,
+                    color: cs.onSurface,
                     size: 20,
                   ),
                   onPressed: _toggleRotation,

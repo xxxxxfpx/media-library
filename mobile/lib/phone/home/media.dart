@@ -4,6 +4,7 @@ import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../component/horizontal_media_section.dart';
 import '../../core/constants.dart';
+import '../../core/app_logger.dart';
 import '../../data/api/api_client.dart';
 import '../../data/api/media_api.dart';
 import '../../data/models/media.dart';
@@ -33,7 +34,13 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
       final prefs = await SharedPreferences.getInstance();
       final client = ApiClient(prefs);
       _mediaApi = MediaApi(client);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'media_api_initialize_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'media',
+      );
     }
     _apiReady.complete();
     if (mounted) setState(() {});
@@ -45,7 +52,11 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
     await Future.delayed(const Duration(milliseconds: 300));
   }
 
-  Future<MediaListResponse> _fetch(Future<MediaListResponse> Function(MediaApi) call, int offset, int limit) async {
+  Future<MediaListResponse> _fetch(
+    Future<MediaListResponse> Function(MediaApi) call,
+    int offset,
+    int limit,
+  ) async {
     await _apiReady.future;
     return call(_mediaApi!);
   }
@@ -76,11 +87,21 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
               key: ValueKey('recent_$_refreshKey'),
               title: '最近添加',
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              request: const MediaListRequest(),
-              fetchData: (offset, limit) => _fetch((api) => api.getList(const MediaListRequest(), limit: limit, offset: offset), offset, limit),
+              fetchData: (offset, limit) => _fetch(
+                (api) => api.getList(
+                  const MediaListRequest(),
+                  limit: limit,
+                  offset: offset,
+                ),
+                offset,
+                limit,
+              ),
               onViewAll: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const MediaGridPage(initialRequest: MediaListRequest())),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const MediaGridPage(initialRequest: MediaListRequest()),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -88,11 +109,24 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
               key: ValueKey('library_$_refreshKey'),
               title: '我的媒体库',
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              request: const MediaListRequest(types: {MediaType.Source}),
-              fetchData: (offset, limit) => _fetch((api) => api.getList(const MediaListRequest(types: {MediaType.Source}), limit: limit, offset: offset), offset, limit),
+              fetchData: (offset, limit) => _fetch(
+                (api) => api.getList(
+                  const MediaListRequest(types: {MediaType.Source}),
+                  limit: limit,
+                  offset: offset,
+                ),
+                offset,
+                limit,
+              ),
               onViewAll: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => MediaGridPage(initialRequest: const MediaListRequest(types: {MediaType.Source}))),
+                MaterialPageRoute(
+                  builder: (_) => MediaGridPage(
+                    initialRequest: const MediaListRequest(
+                      types: {MediaType.Source},
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -100,11 +134,28 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
               key: ValueKey('favorite_$_refreshKey'),
               title: '我的收藏',
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              request: const MediaListRequest(favorite: true, sortBy: 'favorited_at'),
-              fetchData: (offset, limit) => _fetch((api) => api.getList(const MediaListRequest(favorite: true, sortBy: 'favorited_at'), limit: limit, offset: offset), offset, limit),
+              fetchData: (offset, limit) => _fetch(
+                (api) => api.getList(
+                  const MediaListRequest(
+                    favorite: true,
+                    sortBy: 'favorited_at',
+                  ),
+                  limit: limit,
+                  offset: offset,
+                ),
+                offset,
+                limit,
+              ),
               onViewAll: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => MediaGridPage(initialRequest: const MediaListRequest(favorite: true, sortBy: 'favorited_at'))),
+                MaterialPageRoute(
+                  builder: (_) => MediaGridPage(
+                    initialRequest: const MediaListRequest(
+                      favorite: true,
+                      sortBy: 'favorited_at',
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -112,11 +163,28 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
               key: ValueKey('history_$_refreshKey'),
               title: '观看记录',
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              request: const MediaListRequest(hasPlayback: true, sortBy: 'last_played'),
-              fetchData: (offset, limit) => _fetch((api) => api.getList(const MediaListRequest(hasPlayback: true, sortBy: 'last_played'), limit: limit, offset: offset), offset, limit),
+              fetchData: (offset, limit) => _fetch(
+                (api) => api.getList(
+                  const MediaListRequest(
+                    hasPlayback: true,
+                    sortBy: 'last_played',
+                  ),
+                  limit: limit,
+                  offset: offset,
+                ),
+                offset,
+                limit,
+              ),
               onViewAll: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => MediaGridPage(initialRequest: const MediaListRequest(hasPlayback: true, sortBy: 'last_played'))),
+                MaterialPageRoute(
+                  builder: (_) => MediaGridPage(
+                    initialRequest: const MediaListRequest(
+                      hasPlayback: true,
+                      sortBy: 'last_played',
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -124,11 +192,28 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
               key: ValueKey('user_rating_$_refreshKey'),
               title: '我的评分',
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              request: const MediaListRequest(hasRating: true, sortBy: 'user_rating'),
-              fetchData: (offset, limit) => _fetch((api) => api.getList(const MediaListRequest(hasRating: true, sortBy: 'user_rating'), limit: limit, offset: offset), offset, limit),
+              fetchData: (offset, limit) => _fetch(
+                (api) => api.getList(
+                  const MediaListRequest(
+                    hasRating: true,
+                    sortBy: 'user_rating',
+                  ),
+                  limit: limit,
+                  offset: offset,
+                ),
+                offset,
+                limit,
+              ),
               onViewAll: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => MediaGridPage(initialRequest: const MediaListRequest(hasRating: true, sortBy: 'user_rating'))),
+                MaterialPageRoute(
+                  builder: (_) => MediaGridPage(
+                    initialRequest: const MediaListRequest(
+                      hasRating: true,
+                      sortBy: 'user_rating',
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 80),

@@ -39,7 +39,7 @@ class Config {
         (layout?['landscape_threshold'] as num?)?.toDouble() ?? 1.25;
 
     final api = map['api'] as YamlMap?;
-    config._baseUrl = (api?['base_url'] as String?) ?? 'https://xmedia.iepose.cn';
+    config._baseUrl = (api?['base_url'] as String?) ?? 'http://192.168.1.5:8000';
     config._connectTimeout =
         (api?['connect_timeout_seconds'] as num?)?.toInt() ?? 15;
     config._receiveTimeout =

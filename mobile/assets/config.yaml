@@ -11,7 +11,7 @@ layout:
 
 # API 配置
 api:
-  base_url: "http://localhost:8000"
+  base_url: "http://192.168.1.5:8000"
   connect_timeout_seconds: 15
   receive_timeout_seconds: 30
 
