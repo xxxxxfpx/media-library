@@ -14,6 +14,8 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 COPY requirements.txt .
+# 服务器端构建时默认 PyPI 源很慢，改用国内镜像加速（仅影响构建阶段）
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app

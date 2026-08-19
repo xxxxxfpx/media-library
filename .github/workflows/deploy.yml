@@ -140,6 +140,7 @@ jobs:
           host: ${{ secrets.HOST || 'mz727.top' }}
           username: ${{ secrets.USERNAME || 'dev' }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          command_timeout: 30m
           script: |
             set -euo pipefail
             export DOCKER_BUILDKIT=1
@@ -158,8 +159,9 @@ jobs:
               -t media-library-backend:latest \
               backend
 
-            # 构建前端产物（服务器需已安装 Node；如未安装，建议在 runner 构建后打包 dist）
+            # 构建前端产物（服务器需已安装 Node；使用国内镜像加速）
             cd "$DEPLOY_DIR/build/frontend"
+            npm config set registry https://registry.npmmirror.com
             npm ci
             npm run build
 
