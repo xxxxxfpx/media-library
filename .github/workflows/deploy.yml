@@ -205,7 +205,7 @@ jobs:
             docker rm -f media-library 2>/dev/null || true
 
             # 服务器上可能存在旧容器（如旧 compose 项目名）仍占用 1999 端口，一并清理
-            OLD=$(docker ps -aq --filter "publish=127.0.0.1:1999")
+            OLD=$(docker ps -aq --filter "publish=1999")
             if [ -n "$OLD" ]; then
               echo "移除占用 1999 端口的旧容器: $OLD"
               docker rm -f $OLD
