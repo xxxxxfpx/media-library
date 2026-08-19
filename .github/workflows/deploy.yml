@@ -169,31 +169,33 @@ jobs:
             # 服务器访问 GitHub raw 常被墙，改为 heredoc 内嵌写入
             if [ ! -f "docker-compose.yml" ]; then
               echo "docker-compose.yml 不存在，自动生成模板…"
-              cat > docker-compose.yml <<'EOF'
-# 单镜像部署：镜像内含 FastAPI + SPA 静态资源，服务器无需 Node/Gradle
-services:
-  media:
-    image: ${IMAGE:-crpi-7r0bt0szn4xpndx8.cn-hangzhou.personal.cr.aliyuncs.com/xiemingzhe/media:latest}
-    container_name: media-library
-    restart: unless-stopped
-    pull_policy: always
-    # .env 可选：未创建时容器入口脚本会自动生成随机密钥
-    env_file:
-      - path: .env
-        required: false
-    volumes:
-      - ${CONFIG_DIR:-./config}:/app/config:ro
-      - ${SECRETS_DIR:-./secrets}:/app/secrets:rw
-      - ${DATA_DIR:-./data}:/app/data
-    ports:
-      - "${BACKEND_PORT:-1999}:8000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-EOF
+              cat > docker-compose.yml.tmp <<'EOF'
+            services:
+              media:
+                image: ${IMAGE:-crpi-7r0bt0szn4xpndx8.cn-hangzhou.personal.cr.aliyuncs.com/xiemingzhe/media:latest}
+                container_name: media-library
+                restart: unless-stopped
+                pull_policy: always
+                # .env 可选：未创建时容器入口脚本会自动生成随机密钥
+                env_file:
+                  - path: .env
+                    required: false
+                volumes:
+                  - ${CONFIG_DIR:-./config}:/app/config:ro
+                  - ${SECRETS_DIR:-./secrets}:/app/secrets:rw
+                  - ${DATA_DIR:-./data}:/app/data
+                ports:
+                  - "${BACKEND_PORT:-1999}:8000"
+                healthcheck:
+                  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+                  interval: 30s
+                  timeout: 5s
+                  retries: 3
+                  start_period: 10s
+            EOF
+              # 去掉 YAML 块标量带来的公共缩进（12 空格）
+              sed 's/^            //' docker-compose.yml.tmp > docker-compose.yml
+              rm -f docker-compose.yml.tmp
             fi
 
             # 拉取最新镜像
