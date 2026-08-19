@@ -165,11 +165,11 @@ jobs:
             # 确保必要目录存在
             mkdir -p config secrets data
 
-            # docker-compose.yml 必须存在（本地仓库 deploy/ 目录下有模板）
+            # docker-compose.yml 若不存在，自动从仓库拉取模板（首次部署自动初始化）
             if [ ! -f "docker-compose.yml" ]; then
-              echo "ERROR: docker-compose.yml 不存在"
-              echo "      首次部署需手动拷贝：cp /path/to/repo/deploy/docker-compose.yml ./"
-              exit 1
+              echo "docker-compose.yml 不存在，自动拉取模板…"
+              curl -fsSL --max-time 30 -o docker-compose.yml \
+                "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/deploy/docker-compose.yml"
             fi
 
             # 拉取最新镜像
