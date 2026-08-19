@@ -13,7 +13,6 @@ import oss2
 
 from app.services.drive_contracts import SavedFile, SaveMode
 
-
 ACCOUNT_BASE_URL = "https://account.guangyapan.com"
 API_BASE_URL = "https://api.guangyapan.com"
 
@@ -90,7 +89,7 @@ class GuangYaPanClient:
     async def close(self) -> None:
         await self.client.aclose()
 
-    async def __aenter__(self) -> "GuangYaPanClient":
+    async def __aenter__(self) -> GuangYaPanClient:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

@@ -6,14 +6,13 @@ is missing. This keeps ``alembic upgrade head`` safe to run from an empty
 database as well as against a ``Base.metadata.create_all`` schema.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "add_filelink_type"
-down_revision: Union[str, Sequence[str], None] = "sync_media_source_columns"
+down_revision: str | Sequence[str] | None = "sync_media_source_columns"
 branch_labels = None
 depends_on = None
 

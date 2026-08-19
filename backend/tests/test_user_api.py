@@ -1,18 +1,16 @@
-# coding: utf-8
 """
 用户 API 测试
 =============
 测试 /api/user 下的所有端点
 """
 
+
 import pytest
-from datetime import datetime
 
 from tests.utils.db_helper import (
     query_user_by_id,
     query_user_by_name,
     query_userdata,
-    count_table_rows,
 )
 
 
@@ -145,7 +143,6 @@ class TestUserAPI:
             }
         )
         assert response.status_code == 200
-        data = response.json()
 
         # 数据库验证
         info_response = await app_client.get("/api/user/info", headers=auth_headers)

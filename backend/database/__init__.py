@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 Database Package - 数据库包
 ============================
@@ -12,30 +11,29 @@ Emby Server 数据库访问层，提供：
 版本：3.0.0 (移除 UserLike，精简枚举导出)
 """
 
-from .models import (
-    Base,
-    MediaItem,
-    ItemLinks,
-    UserData,
-    User,
-    File,
-    FileLink,
-    Alias,
-    MediaType,
-    PersonType,
-    ChapterMarkerType,
-    ItemStatus,
-    ShareLevel,
-    FileType,
-    ImageType,
-    FileLinkType,
+from database.core import (
+    AsyncSessionLocal,
+    engine,
+    get_db_session,
 )
 
-from database.core import (
-    engine,
-    AsyncSessionLocal,
+from .models import (
+    Alias,
     Base,
-    get_db_session,
+    ChapterMarkerType,
+    File,
+    FileLink,
+    FileLinkType,
+    FileType,
+    ImageType,
+    ItemLinks,
+    ItemStatus,
+    MediaItem,
+    MediaType,
+    PersonType,
+    ShareLevel,
+    User,
+    UserData,
 )
 
 __all__ = [

@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 Alias Model - 媒体别名表
 =========================
@@ -23,7 +22,7 @@ Alias Model - 媒体别名表
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, Text, ForeignKey, Index, PrimaryKeyConstraint, DateTime
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, PrimaryKeyConstraint, Text
 from sqlalchemy.orm import relationship
 
 from .base import Base

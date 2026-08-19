@@ -1,24 +1,23 @@
 """File API - 文件相关接口"""
 
-import hashlib
+import logging
 import os
 import random
-import logging
 import time
 from urllib.parse import quote
-import diskcache
 
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import RedirectResponse, JSONResponse
+import diskcache
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
 
-from database.models import DriveFile, File, FileLink, FileType
-from database.core import get_db_session
 from app.api.deps import get_user_id, get_user_id_from_token
 from app.schemas.media import FileInfoDetail
 from config import config
+from database.core import get_db_session
+from database.models import DriveFile, File, FileLink, FileType
 
 logger = logging.getLogger(__name__)
 _file_data_logger = logging.getLogger("file_data.trace")
@@ -80,7 +79,7 @@ async def get_webdav_redirect_url(file_path: str) -> str:
 
 def _get_url_expire(url: str) -> float:
     """从 URL 参数 t 获取过期时间戳"""
-    from urllib.parse import urlparse, parse_qs
+    from urllib.parse import parse_qs, urlparse
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
     expire_ts = params.get('t', ['0'])[0]
@@ -186,7 +185,7 @@ async def get_file_data(
                 _trace.info(f"  WebDAV 响应耗时={t5 - t4:.3f}s | 结果={'SUCCESS' if redirect_url else 'EMPTY'}", extra={'file_id': file_id})
                 if redirect_url:
                     _cache_url(redirect_url, file_id)
-                    _trace.info(f"  URL 已写入缓存", extra={'file_id': file_id})
+                    _trace.info("  URL 已写入缓存", extra={'file_id': file_id})
             except Exception as e:
                 t5 = time.perf_counter()
                 _trace.warning(f"  WebDAV 请求失败 | 耗时={t5 - t4:.3f}s | 错误={e}", extra={'file_id': file_id})
@@ -208,4 +207,4 @@ async def get_file_data(
 
     _trace.info(f"=== END === | 最终URL={redirect_url}", extra={'file_id': file_id})
     return RedirectResponse(url=redirect_url)
- 
+

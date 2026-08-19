@@ -2,11 +2,10 @@
 认证服务层
 """
 
-import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional
-from jose import jwt, JWTError
+
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +19,7 @@ class AuthService:
     """认证服务"""
 
     @staticmethod
-    def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
         """创建访问令牌"""
         to_encode = data.copy()
         expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=config.jwt.access_token_expire_minutes))
@@ -36,7 +35,7 @@ class AuthService:
         return jwt.encode(to_encode, config.app.secret_key, algorithm=config.jwt.algorithm)
 
     @staticmethod
-    def decode_token(token: str) -> Optional[dict]:
+    def decode_token(token: str) -> dict | None:
         """解码令牌"""
         try:
             payload = jwt.decode(token, config.app.secret_key, algorithms=[config.jwt.algorithm])
@@ -45,7 +44,7 @@ class AuthService:
             return None
 
     @staticmethod
-    async def authenticate_user(db: AsyncSession, username: str, password: str) -> Optional[User]:
+    async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
         """认证用户"""
         result = await db.execute(select(User).where(User.Name == username).limit(1))
         user = result.scalar_one_or_none()
@@ -64,13 +63,13 @@ class AuthService:
         return user
 
     @staticmethod
-    async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+    async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
         """根据ID获取用户"""
         result = await db.execute(select(User).where(User.Id == user_id))
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_user_by_username(db: AsyncSession, username: str) -> Optional[User]:
+    async def get_user_by_username(db: AsyncSession, username: str) -> User | None:
         """根据用户名获取用户"""
         result = await db.execute(select(User).where(User.Name == username).limit(1))
         return result.scalar_one_or_none()

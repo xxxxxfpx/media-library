@@ -1,14 +1,14 @@
 """API 依赖项"""
 
-from typing import Optional
+
 from fastapi import Depends, HTTPException, Query, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.auth_service import AuthService
 from app.services.token_denylist import is_token_revoked
-from database.models import User
 from database.core import get_db_session
+from database.models import User
 
 security = HTTPBearer(auto_error=False)
 
@@ -85,8 +85,8 @@ async def get_current_user(
 
 
 async def get_optional_user_id(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> Optional[int]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> int | None:
     """可选获取 user_id（未认证返回 None）"""
     if not credentials:
         return None
@@ -103,8 +103,8 @@ async def get_optional_user_id(
 
 
 async def get_user_id_from_token(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    token: Optional[str] = Query(None, description="访问令牌（兼容无 Header 的媒体加载场景）"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    token: str | None = Query(None, description="访问令牌（兼容无 Header 的媒体加载场景）"),
     db: AsyncSession = Depends(get_db_session),
 ) -> int:
     """从 Bearer 请求头或 token 查询参数校验令牌，返回 user_id

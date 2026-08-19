@@ -4,11 +4,10 @@
 单进程内存实现，适合当前部署规模（SQLite 单实例）。
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from collections import deque
-from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ class SlidingWindowLimiter:
     def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
-        self._records: Dict[str, deque] = {}
+        self._records: dict[str, deque] = {}
         self._lock = threading.Lock()
 
     def _cleanup(self, key: str) -> deque:

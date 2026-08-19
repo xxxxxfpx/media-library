@@ -8,15 +8,15 @@
       按 type 字段值直接匹配到具体类型类，在 API 输入层拦截无效类型和多余字段。
 """
 
-from typing import Annotated, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class SourceInfo(BaseModel):
     """来源信息 - 用于标识媒体的来源"""
-    source_id: Optional[str] = None
-    source_link: Optional[str] = None
+    source_id: str | None = None
+    source_link: str | None = None
 
     def is_set(self, field: str) -> bool:
         return field in self.model_fields_set
@@ -27,15 +27,15 @@ class ItemAttrsBase(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Optional[str] = Field(None, max_length=500, description="名称")
-    overview: Optional[str] = Field(None, description="简介")
-    tagline: Optional[str] = Field(None, description="标语")
-    premiere_date: Optional[str] = Field(None, description="首映日期 (ISO 8601)")
-    end_date: Optional[str] = Field(None, description="结束日期 (ISO 8601)")
-    official_rating: Optional[str] = Field(None, max_length=255, description="官方评级")
-    community_rating: Optional[float] = Field(None, ge=0.0, le=10.0, description="社区评分 0-10")
-    critic_rating: Optional[float] = Field(None, ge=0.0, le=100.0, description="评论家评分 0-100")
-    status: Optional[str] = Field(None, description="状态 (Continuing/Ended/Cancelled)")
+    name: str | None = Field(None, max_length=500, description="名称")
+    overview: str | None = Field(None, description="简介")
+    tagline: str | None = Field(None, description="标语")
+    premiere_date: str | None = Field(None, description="首映日期 (ISO 8601)")
+    end_date: str | None = Field(None, description="结束日期 (ISO 8601)")
+    official_rating: str | None = Field(None, max_length=255, description="官方评级")
+    community_rating: float | None = Field(None, ge=0.0, le=10.0, description="社区评分 0-10")
+    critic_rating: float | None = Field(None, ge=0.0, le=100.0, description="评论家评分 0-100")
+    status: str | None = Field(None, description="状态 (Continuing/Ended/Cancelled)")
 
     def is_set(self, field: str) -> bool:
         return field in self.model_fields_set
@@ -95,18 +95,7 @@ class TagAttrs(ItemAttrsBase):
 
 # Union 类型：使用 discriminator="type" 加速分发，按 type 字段值直接匹配到对应具体类做全量校验
 ItemAttrs = Annotated[
-    Union[
-        MovieAttrs,
-        SeriesAttrs,
-        SeasonAttrs,
-        EpisodeAttrs,
-        BoxSetAttrs,
-        GenreAttrs,
-        PersonAttrs,
-        StudioAttrs,
-        SourceAttrs,
-        TagAttrs,
-    ],
+    MovieAttrs | SeriesAttrs | SeasonAttrs | EpisodeAttrs | BoxSetAttrs | GenreAttrs | PersonAttrs | StudioAttrs | SourceAttrs | TagAttrs,
     Field(discriminator="type"),
 ]
 
@@ -114,14 +103,14 @@ ItemAttrs = Annotated[
 class FileBaseAttrs(BaseModel):
     """文件基本属性"""
     name: str
-    path: Optional[str] = None
-    url: Optional[str] = None
-    provider: Optional[str] = None
-    provider_file_id: Optional[str] = None
+    path: str | None = None
+    url: str | None = None
+    provider: str | None = None
+    provider_file_id: str | None = None
     type: str  # 文件类型必填
-    size: Optional[int] = None
-    etag: Optional[str] = None
-    ffmpeg: Optional[dict] = None
+    size: int | None = None
+    etag: str | None = None
+    ffmpeg: dict | None = None
 
     def is_set(self, field: str) -> bool:
         return field in self.model_fields_set
@@ -153,8 +142,8 @@ class FileCreate(BaseModel):
 
 class ItemLinkCreate(BaseModel):
     """媒体项关联 - 通过 temp_id 绑定源项和目标项"""
-    people_type: Optional[str] = None
-    people_role: Optional[str] = None
+    people_type: str | None = None
+    people_role: str | None = None
     link: str  # 源项的 temp_id
     linked: str  # 目标项的 temp_id
 
@@ -165,8 +154,8 @@ class ItemLinkCreate(BaseModel):
 class SingleItemLinkCreate(BaseModel):
     """已有媒体项之间的单条关联。"""
     linked_item_id: int = Field(..., gt=0)
-    people_type: Optional[str] = None
-    people_role: Optional[str] = None
+    people_type: str | None = None
+    people_role: str | None = None
 
 
 class FileLinkBase(BaseModel):
@@ -176,8 +165,8 @@ class FileLinkBase(BaseModel):
 
     item: str
     file: str
-    image_index: Optional[int] = 0
-    start_position_ticks: Optional[int] = None
+    image_index: int | None = 0
+    start_position_ticks: int | None = None
 
     def is_set(self, field: str) -> bool:
         return field in self.model_fields_set
@@ -201,12 +190,12 @@ class ChapterFileLink(FileLinkBase):
 
     link_type: Literal["Chapter"]
     chapter_index: int
-    chapter_name: Optional[str] = None
-    marker_type: Optional[str] = None
+    chapter_name: str | None = None
+    marker_type: str | None = None
 
 
 FileLinkCreate = Annotated[
-    Union[MediaSourceFileLink, ImageFileLink, ChapterFileLink],
+    MediaSourceFileLink | ImageFileLink | ChapterFileLink,
     Field(discriminator="link_type"),
 ]
 

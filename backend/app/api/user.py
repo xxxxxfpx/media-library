@@ -2,22 +2,27 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Body, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user, get_user_id
+from app.api.deps import security as app_deps_security
 from app.schemas.auth import LoginRequest, LoginResponse, RefreshTokenRequest
-from app.schemas.user import UserInfo, UpdateUserDataRequest, ChangePasswordRequest
-from app.schemas.setting import UserSettings, UpdateUserSettingsRequest
+from app.schemas.setting import UpdateUserSettingsRequest, UserSettings
+from app.schemas.user import ChangePasswordRequest, UpdateUserDataRequest, UserInfo
 from app.services.auth_service import AuthService
 from app.services.media_service import get_media_list
-from app.services.user_service import update_userdata, get_user_setting, update_user_setting, change_password
 from app.services.rate_limiter import is_login_blocked, record_login_failure, reset_login_failures
-from app.services.token_denylist import revoke_token, _payload_exp_ttl
-from app.api.deps import get_current_user, get_user_id, security as app_deps_security
-from database.models import User
+from app.services.token_denylist import _payload_exp_ttl, revoke_token
+from app.services.user_service import (
+    change_password,
+    get_user_setting,
+    update_user_setting,
+    update_userdata,
+)
 from database.core import get_db_session
+from database.models import User
 
 router = APIRouter(prefix="/api/user", tags=["用户"])
 

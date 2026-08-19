@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 数据库初始化测试
 ================
@@ -8,13 +7,12 @@
 import pytest
 from sqlalchemy import text
 
-from database.core import engine, Base, init_db, AsyncSessionLocal
+from database.core import AsyncSessionLocal, Base, engine
 from tests.utils.db_helper import (
     get_all_tables,
     get_table_columns,
     get_table_indexes,
 )
-
 
 # 预期的表名列表（根据实际模型）
 EXPECTED_TABLES = [

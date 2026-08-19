@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-
 SaveMode = Literal["offline", "upload"]
 
 

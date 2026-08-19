@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 User Model - 用户模型
 ==================================
@@ -14,20 +13,25 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum as SQLEnum, Float, ForeignKey, Index, Integer, String, Text, JSON,
-    UniqueConstraint,
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
 )
 from sqlalchemy.orm import relationship
 
 from .base import Base
-from .enums import ShareLevel
 
 if TYPE_CHECKING:
-    from .media_item import MediaItem
-    from .file import File
+    pass
 
 
 class User(Base):

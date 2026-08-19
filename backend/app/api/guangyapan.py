@@ -1,33 +1,32 @@
 """GuangYaPan drive proxy API."""
 
-from typing import Literal, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-
-from app.api.deps import get_admin_id
-from database.core import get_db_session
-from database.models import DriveFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.guangyapan_service import GuangYaPanClient, GuangYaPanError
+
+from app.api.deps import get_admin_id
 from app.services.guangyapan_config_service import (
     decrypt_value,
     encrypt_value,
     get_config,
     get_or_create_config,
 )
-
+from app.services.guangyapan_service import GuangYaPanClient, GuangYaPanError
+from database.core import get_db_session
+from database.models import DriveFile
 
 router = APIRouter(prefix="/api/drives/guangyapan", tags=["光芽盘"])
 
 
 class DriveRequest(BaseModel):
     # Optional for normal operations; the singleton DB config is used when omitted.
-    access_token: Optional[str] = Field(None, min_length=20)
-    refresh_token: Optional[str] = None
-    client_id: Optional[str] = None
-    device_id: Optional[str] = None
+    access_token: str | None = Field(None, min_length=20)
+    refresh_token: str | None = None
+    client_id: str | None = None
+    device_id: str | None = None
 
 
 class ListRequest(DriveRequest):
@@ -58,7 +57,7 @@ class RenameRequest(FileActionRequest):
 class OfflineCreateRequest(DriveRequest):
     url: str = Field(..., min_length=1)
     parent_id: str = ""
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class OfflineListRequest(DriveRequest):
@@ -82,18 +81,18 @@ class SaveUrlRequest(DriveRequest):
     url: str = Field(..., min_length=1)
     mode: Literal["offline", "upload"]
     parent_id: str = ""
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class GuangYaPanConfigUpdate(BaseModel):
-    access_token: Optional[str] = Field(None, min_length=20)
-    refresh_token: Optional[str] = None
-    client_id: Optional[str] = None
-    device_id: Optional[str] = None
-    default_parent_id: Optional[str] = None
+    access_token: str | None = Field(None, min_length=20)
+    refresh_token: str | None = None
+    client_id: str | None = None
+    device_id: str | None = None
+    default_parent_id: str | None = None
 
 
-def _decrypt_config_value(encrypted: Optional[str]) -> Optional[str]:
+def _decrypt_config_value(encrypted: str | None) -> str | None:
     """解密存储的令牌；密文不可读时返回 400 而非 500。
 
     secret_key 轮换后旧密文无法解密，应提示调用方重新配置 Token，

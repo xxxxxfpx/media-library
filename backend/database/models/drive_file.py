@@ -1,4 +1,3 @@
-# coding: utf-8
 """Provider-backed file records used by external drive integrations."""
 
 from datetime import datetime, timezone

@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 用户服务层 - 用户数据管理
 =========================
@@ -15,9 +14,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import User, UserData
+from app.schemas.setting import UpdateUserSettingsRequest, UserSettings
 from app.schemas.user import UpdateUserDataRequest
-from app.schemas.setting import UserSettings, UpdateUserSettingsRequest
+from database.models import User, UserData
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +76,11 @@ async def get_user_setting(db: AsyncSession, user: User) -> UserSettings:
 
 async def update_user_setting(db: AsyncSession, user_id: int, setting: UpdateUserSettingsRequest) -> UserSettings:
     user = await db.get(User, user_id)
-    
+
     current_settings = user.Setting or {}
     update_dict = setting.to_dict()
     current_settings.update(update_dict)
-    
+
     user.Setting = current_settings
     await db.commit()
     logger.info("更新用户设置 | user_id=%s 字段数=%s", user_id, len(update_dict))

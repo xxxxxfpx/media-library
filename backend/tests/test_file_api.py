@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 文件 API 测试
 =============
@@ -9,7 +8,6 @@ import pytest
 from sqlalchemy import text
 
 from tests.utils.db_helper import (
-    query_file_by_id,
     query_filelinks_by_item,
 )
 

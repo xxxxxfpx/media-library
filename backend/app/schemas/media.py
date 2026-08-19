@@ -1,6 +1,5 @@
 """媒体数据序列化 Schema"""
 
-from typing import Any, Optional
 from pydantic import BaseModel
 
 
@@ -8,36 +7,36 @@ class LinkedItemSummary(BaseModel):
     """关联媒体摘要信息"""
     id: int
     name: str
-    type: Optional[str] = None
-    overview: Optional[str] = None
-    tagline: Optional[str] = None
-    premiere_date: Optional[str] = None
-    official_rating: Optional[str] = None
-    community_rating: Optional[float] = None
-    primary_image: Optional[str] = None
-    source_link: Optional[str] = None
+    type: str | None = None
+    overview: str | None = None
+    tagline: str | None = None
+    premiere_date: str | None = None
+    official_rating: str | None = None
+    community_rating: float | None = None
+    primary_image: str | None = None
+    source_link: str | None = None
 
 
 class LinkItem(BaseModel):
     """媒体关联项（人物/角色）"""
-    people_type: Optional[str] = None
-    people_role: Optional[str] = None
-    source_link: Optional[str] = None
+    people_type: str | None = None
+    people_role: str | None = None
+    source_link: str | None = None
     linked_item: LinkedItemSummary
 
 
 class FileInfo(BaseModel):
     """文件信息"""
     id: int
-    name: Optional[str] = None
-    path: Optional[str] = None
-    type: Optional[str] = None
-    link_type: Optional[str] = None
-    image_type: Optional[str] = None
-    image_index: Optional[int] = None
-    size: Optional[int] = None
-    etag: Optional[str] = None
-    ffmpeg: Optional[str] = None
+    name: str | None = None
+    path: str | None = None
+    type: str | None = None
+    link_type: str | None = None
+    image_type: str | None = None
+    image_index: int | None = None
+    size: int | None = None
+    etag: str | None = None
+    ffmpeg: str | None = None
 
 
 class FileInfoDetail(BaseModel):
@@ -45,20 +44,20 @@ class FileInfoDetail(BaseModel):
     id: int
     name: str
     path: str
-    type: Optional[str] = None
-    link_type: Optional[str] = None
+    type: str | None = None
+    link_type: str | None = None
     item_id: int
-    image_type: Optional[str] = None
-    image_index: Optional[int] = None
-    size: Optional[int] = None
-    etag: Optional[str] = None
-    ffmpeg: Optional[str] = None
+    image_type: str | None = None
+    image_index: int | None = None
+    size: int | None = None
+    etag: str | None = None
+    ffmpeg: str | None = None
 
 
 class AliasItem(BaseModel):
     """别名"""
     name: str
-    source: Optional[str] = None
+    source: str | None = None
 
 
 class UserDataInfo(BaseModel):
@@ -68,35 +67,35 @@ class UserDataInfo(BaseModel):
     playback_rate: float = 1.0
     play_count: int = 0
     is_played: bool = False
-    rating: Optional[float] = None
-    last_played_date: Optional[str] = None
-    favorited_at: Optional[str] = None
+    rating: float | None = None
+    last_played_date: str | None = None
+    favorited_at: str | None = None
 
 
 class MediaItemSummary(BaseModel):
     """媒体项基本信息"""
     id: int
     name: str
-    type: Optional[str] = None
-    overview: Optional[str] = None
-    tagline: Optional[str] = None
-    premiere_date: Optional[str] = None
-    end_date: Optional[str] = None
-    official_rating: Optional[str] = None
-    community_rating: Optional[float] = None
-    critic_rating: Optional[float] = None
-    date_created: Optional[str] = None
-    date_modified: Optional[str] = None
-    source_id: Optional[str] = None
-    source_link: Optional[str] = None
-    source_name: Optional[str] = None
+    type: str | None = None
+    overview: str | None = None
+    tagline: str | None = None
+    premiere_date: str | None = None
+    end_date: str | None = None
+    official_rating: str | None = None
+    community_rating: float | None = None
+    critic_rating: float | None = None
+    date_created: str | None = None
+    date_modified: str | None = None
+    source_id: str | None = None
+    source_link: str | None = None
+    source_name: str | None = None
 
 
 class MediaItemResponse(MediaItemSummary):
     """媒体项完整响应（含关联数据）"""
     links: list[LinkItem] = []
     files: list[FileInfo] = []
-    userdata: Optional[UserDataInfo] = None
+    userdata: UserDataInfo | None = None
     alias: list[AliasItem] = []
     has_children: bool = False
 
@@ -107,7 +106,7 @@ class MediaListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-    next_cursor: Optional[str] = None
+    next_cursor: str | None = None
 
 
 class MediaStatsResponse(BaseModel):
@@ -176,7 +175,7 @@ def serialize_alias(alias_list) -> list[AliasItem]:
     return [AliasItem(name=a.Name, source=a.Source) for a in alias_list]
 
 
-def serialize_userdata(ud) -> Optional[UserDataInfo]:
+def serialize_userdata(ud) -> UserDataInfo | None:
     """序列化用户播放数据"""
     if not ud:
         return None
@@ -200,7 +199,7 @@ def serialize_userdata(ud) -> Optional[UserDataInfo]:
 
 def serialize_item(item, include_extra_fields: bool = False) -> MediaItemSummary:
     """序列化媒体项基本信息
-    
+
     Args:
         item: MediaItem ORM 对象
         include_extra_fields: 是否包含扩展字段（详情接口为 True，列表接口为 False）

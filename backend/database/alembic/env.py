@@ -1,9 +1,7 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, create_engine
-from sqlalchemy import pool
-
 from alembic import context
+from sqlalchemy import create_engine, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,8 +16,8 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-import sys
 import os
+import sys
 
 # 获取当前文件所在目录（backend/database/alembic）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,8 +27,9 @@ backend_dir = os.path.dirname(os.path.dirname(current_dir))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from database.core import Base
 from database import models  # noqa: F401 - Import models to register them with Base
+from database.core import Base
+
 target_metadata = Base.metadata
 from config import config as app_config
 

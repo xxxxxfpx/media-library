@@ -6,14 +6,13 @@ This keeps ``alembic upgrade head`` safe to run from an empty database as
 well as against a schema that was created by ``Base.metadata.create_all``.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "sync_media_source_columns"
-down_revision: Union[str, Sequence[str], None] = "add_drive_files"
+down_revision: str | Sequence[str] | None = "add_drive_files"
 branch_labels = None
 depends_on = None
 

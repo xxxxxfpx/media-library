@@ -11,8 +11,8 @@ so a fresh-DB build matches the ORM models. It is idempotent: columns that are
 already absent are skipped, which keeps it safe on databases built via
 ``Base.metadata.create_all`` (which never had these columns).
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.

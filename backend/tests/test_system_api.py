@@ -37,7 +37,6 @@ class TestSystemInfo:
 
         # 检查必要字段（根据实际实现可能略有不同）
         # 系统信息通常包含: ip, platform, python_version, cpu, memory_*, disk_*
-        keys = list(data.keys())
 
         # 至少应该有一些系统信息
         assert len(data) > 0, "系统信息不应为空"

@@ -1,4 +1,3 @@
-# coding: utf-8
 """单 Item 及 ItemLinks 局部修改接口测试。"""
 
 import pytest

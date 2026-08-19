@@ -1,11 +1,11 @@
-# coding: utf-8
 """
 数据库验证辅助函数
 ==================
 提供数据库结构验证和数据查询的辅助函数
 """
 
-from typing import Optional, Dict, Any, List
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +23,7 @@ async def verify_column_exists(
     session: AsyncSession,
     table_name: str,
     column_name: str
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """验证列是否存在，返回列信息"""
     result = await session.execute(
         text(f"PRAGMA table_info({table_name})")
@@ -54,7 +54,7 @@ async def verify_index_exists(
     return result.fetchone() is not None
 
 
-async def get_table_columns(session: AsyncSession, table_name: str) -> List[Dict[str, Any]]:
+async def get_table_columns(session: AsyncSession, table_name: str) -> list[dict[str, Any]]:
     """获取表的所有列信息"""
     result = await session.execute(text(f"PRAGMA table_info({table_name})"))
     columns = result.fetchall()
@@ -70,7 +70,7 @@ async def get_table_columns(session: AsyncSession, table_name: str) -> List[Dict
     ]
 
 
-async def get_table_indexes(session: AsyncSession, table_name: str) -> List[Dict[str, Any]]:
+async def get_table_indexes(session: AsyncSession, table_name: str) -> list[dict[str, Any]]:
     """获取表的所有索引"""
     result = await session.execute(
         text(f"PRAGMA index_list({table_name})")
@@ -92,7 +92,7 @@ async def get_table_indexes(session: AsyncSession, table_name: str) -> List[Dict
     return result_list
 
 
-async def query_user_by_id(session: AsyncSession, user_id: int) -> Optional[Dict[str, Any]]:
+async def query_user_by_id(session: AsyncSession, user_id: int) -> dict[str, Any] | None:
     """根据 ID 查询用户"""
     result = await session.execute(
         text("SELECT * FROM Users WHERE Id = :id"),
@@ -104,7 +104,7 @@ async def query_user_by_id(session: AsyncSession, user_id: int) -> Optional[Dict
     return None
 
 
-async def query_user_by_name(session: AsyncSession, username: str) -> Optional[Dict[str, Any]]:
+async def query_user_by_name(session: AsyncSession, username: str) -> dict[str, Any] | None:
     """根据用户名查询用户"""
     result = await session.execute(
         text("SELECT * FROM Users WHERE Name = :name"),
@@ -116,7 +116,7 @@ async def query_user_by_name(session: AsyncSession, username: str) -> Optional[D
     return None
 
 
-async def query_media_item_by_id(session: AsyncSession, item_id: int) -> Optional[Dict[str, Any]]:
+async def query_media_item_by_id(session: AsyncSession, item_id: int) -> dict[str, Any] | None:
     """根据 ID 查询媒体项"""
     result = await session.execute(
         text("SELECT * FROM MediaItems WHERE Id = :id"),
@@ -132,7 +132,7 @@ async def query_userdata(
     session: AsyncSession,
     user_id: int,
     item_id: int
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """查询用户数据"""
     result = await session.execute(
         text("SELECT * FROM UserData WHERE UserId = :user_id AND ItemId = :item_id"),
@@ -144,7 +144,7 @@ async def query_userdata(
     return None
 
 
-async def query_file_by_id(session: AsyncSession, file_id: int) -> Optional[Dict[str, Any]]:
+async def query_file_by_id(session: AsyncSession, file_id: int) -> dict[str, Any] | None:
     """根据 ID 查询文件"""
     result = await session.execute(
         text("SELECT * FROM Files WHERE Id = :id"),
@@ -156,7 +156,7 @@ async def query_file_by_id(session: AsyncSession, file_id: int) -> Optional[Dict
     return None
 
 
-async def query_filelinks_by_item(session: AsyncSession, item_id: int) -> List[Dict[str, Any]]:
+async def query_filelinks_by_item(session: AsyncSession, item_id: int) -> list[dict[str, Any]]:
     """查询媒体项的所有文件关联"""
     result = await session.execute(
         text("SELECT * FROM FileLinks WHERE ItemId = :item_id"),
@@ -165,7 +165,7 @@ async def query_filelinks_by_item(session: AsyncSession, item_id: int) -> List[D
     return [dict(row._mapping) for row in result.fetchall()]
 
 
-async def query_itemlinks_by_item(session: AsyncSession, item_id: int) -> List[Dict[str, Any]]:
+async def query_itemlinks_by_item(session: AsyncSession, item_id: int) -> list[dict[str, Any]]:
     """查询媒体项的所有关联"""
     result = await session.execute(
         text("SELECT * FROM ItemLinks WHERE ItemId = :item_id"),
@@ -174,7 +174,7 @@ async def query_itemlinks_by_item(session: AsyncSession, item_id: int) -> List[D
     return [dict(row._mapping) for row in result.fetchall()]
 
 
-async def query_aliases_by_item(session: AsyncSession, item_id: int) -> List[Dict[str, Any]]:
+async def query_aliases_by_item(session: AsyncSession, item_id: int) -> list[dict[str, Any]]:
     """查询媒体项的所有别名"""
     result = await session.execute(
         text("SELECT * FROM Aliases WHERE ItemId = :item_id"),
@@ -183,7 +183,7 @@ async def query_aliases_by_item(session: AsyncSession, item_id: int) -> List[Dic
     return [dict(row._mapping) for row in result.fetchall()]
 
 
-async def get_all_tables(session: AsyncSession) -> List[str]:
+async def get_all_tables(session: AsyncSession) -> list[str]:
     """获取所有表名"""
     result = await session.execute(
         text("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")

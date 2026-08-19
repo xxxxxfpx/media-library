@@ -9,14 +9,13 @@ Idempotent: on a fresh database the column already exists and the legacy
 columns never existed, so every step is skipped.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "consolidate_guangyapan_parent_id"
-down_revision: Union[str, Sequence[str], None] = "merge_filelink_guangyapan_heads"
+down_revision: str | Sequence[str] | None = "merge_filelink_guangyapan_heads"
 branch_labels = None
 depends_on = None
 

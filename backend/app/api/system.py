@@ -19,7 +19,7 @@ async def get_system_info(user_id: int = Depends(get_user_id)):
         hostname = socket.gethostname()
         try:
             ip = socket.gethostbyname(hostname)
-        except:
+        except Exception:
             ip = "127.0.0.1"
 
         # 获取系统信息

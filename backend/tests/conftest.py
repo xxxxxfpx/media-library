@@ -1,15 +1,15 @@
-# coding: utf-8
 """
 pytest 配置文件
 ===============
 提供测试所需的 fixtures 和配置
 """
 
+import asyncio
 import os
 import sys
-import pytest
-import asyncio
 from pathlib import Path
+
+import pytest
 
 # 设置环境变量指向测试配置文件
 os.environ['CONFIG_PATH'] = os.path.join(os.path.dirname(__file__), '..', 'env.yaml')
@@ -17,11 +17,11 @@ os.environ['CONFIG_PATH'] = os.path.join(os.path.dirname(__file__), '..', 'env.y
 # 添加项目根目录到 sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from httpx import AsyncClient, ASGITransport, Timeout
+from httpx import ASGITransport, AsyncClient, Timeout
 from sqlalchemy import text
-from database.core import engine, AsyncSessionLocal, Base, init_db
-from app.main import app
 
+from app.main import app
+from database.core import AsyncSessionLocal, Base, engine
 
 # ==================== Fixtures ====================
 
@@ -75,8 +75,8 @@ async def init_database():
             await conn.run_sync(Base.metadata.create_all)
 
         # 确保 admin 用户存在
-        from database.core import AsyncSessionLocal
         from app.services.auth_service import AuthService
+        from database.core import AsyncSessionLocal
 
         async with AsyncSessionLocal() as db:
             admin = await AuthService.get_user_by_username(db, "admin")
@@ -99,7 +99,6 @@ async def db_session():
 async def app_client(init_database):
     """提供 FastAPI TestClient（带超时控制）"""
     # 直接导入并使用 app，确保 lifespan 事件被执行
-    from app.main import app
 
     transport = ASGITransport(app=app)
     # 10秒超时，防止服务器无响应时阻塞

@@ -3,22 +3,47 @@
 import logging
 import time
 from collections import defaultdict
-from typing import Optional, List, Dict, Any
 
-from sqlalchemy import select, func, or_, text, and_, delete
+from sqlalchemy import and_, delete, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType, FileLinkType, DriveFile
-from app.schemas.media import serialize_links, serialize_files, serialize_alias, serialize_userdata, serialize_item
-from app.schemas.media import LinkItem, FileInfo, AliasItem, UserDataInfo, MediaItemResponse
-from app.schemas.create import ImageFileLink, ChapterFileLink, SingleItemCreate, SingleItemLinkCreate
+from app.schemas.create import (
+    ChapterFileLink,
+    ImageFileLink,
+    MediaBatchCreate,
+    SingleItemCreate,
+    SingleItemLinkCreate,
+)
+from app.schemas.media import (
+    AliasItem,
+    FileInfo,
+    LinkItem,
+    MediaItemResponse,
+    UserDataInfo,
+    serialize_alias,
+    serialize_files,
+    serialize_item,
+    serialize_links,
+    serialize_userdata,
+)
 from config import config as _app_config
+from database.models import (
+    Alias,
+    DriveFile,
+    File,
+    FileLink,
+    FileLinkType,
+    ItemLinks,
+    MediaItem,
+    MediaType,
+    UserData,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
+def parse_types(types_str: str | None) -> list[MediaType] | None:
     if not types_str:
         return None
     result = []
@@ -32,7 +57,7 @@ def parse_types(types_str: Optional[str]) -> Optional[List[MediaType]]:
     return result if result else None
 
 
-async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[LinkItem]]:
+async def fetch_links_batch(db: AsyncSession, item_ids: list[int]) -> dict[int, list[LinkItem]]:
     if not item_ids:
         return {}
     # 优化方案：两步查询，避免 SQLite 优化器选择以 MediaItems 为驱动表导致的性能问题
@@ -58,7 +83,7 @@ async def fetch_links_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
     return {item_id: serialize_links(links_list) for item_id, links_list in grouped.items()}
 
 
-async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[FileInfo]]:
+async def fetch_files_batch(db: AsyncSession, item_ids: list[int]) -> dict[int, list[FileInfo]]:
     if not item_ids:
         return {}
     # 显式列选择：避开 FFmpeg 大 JSON 字段，列表页不需要完整探针数据
@@ -88,7 +113,7 @@ async def fetch_files_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
     return {item_id: serialize_files(files) for item_id, files in grouped.items()}
 
 
-async def fetch_userdata_batch(db: AsyncSession, item_ids: List[int], user_id: Optional[int]) -> Dict[int, Optional[UserDataInfo]]:
+async def fetch_userdata_batch(db: AsyncSession, item_ids: list[int], user_id: int | None) -> dict[int, UserDataInfo | None]:
     if not item_ids or user_id is None:
         return {}
     result = await db.execute(
@@ -98,7 +123,7 @@ async def fetch_userdata_batch(db: AsyncSession, item_ids: List[int], user_id: O
     return {ud.ItemId: serialize_userdata(ud) for ud in result.scalars().all()}
 
 
-async def fetch_alias_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, list[AliasItem]]:
+async def fetch_alias_batch(db: AsyncSession, item_ids: list[int]) -> dict[int, list[AliasItem]]:
     if not item_ids:
         return {}
     result = await db.execute(
@@ -111,7 +136,7 @@ async def fetch_alias_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, 
     return {item_id: serialize_alias(aliases) for item_id, aliases in grouped.items()}
 
 
-async def fetch_has_children_batch(db: AsyncSession, item_ids: List[int]) -> set[int]:
+async def fetch_has_children_batch(db: AsyncSession, item_ids: list[int]) -> set[int]:
     """批量查询哪些 item 有子项（作为 LinkedItemId 出现在 ItemLinks 中）"""
     if not item_ids:
         return set()
@@ -124,7 +149,7 @@ async def fetch_has_children_batch(db: AsyncSession, item_ids: List[int]) -> set
     return {row[0] for row in result.all()}
 
 
-async def fetch_source_names_batch(db: AsyncSession, item_ids: List[int]) -> Dict[int, str]:
+async def fetch_source_names_batch(db: AsyncSession, item_ids: list[int]) -> dict[int, str]:
     """批量查询 items 的 source_name（通过 SourceItemId 关联 Source 类型 MediaItem）"""
     if not item_ids:
         return {}
@@ -165,6 +190,7 @@ def _get_cache(name: str):
     """惰性初始化指定名称的 diskcache 缓存（同名只创建一次）"""
     if name not in _cache_instances:
         import os
+
         import diskcache
         cache_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -257,17 +283,17 @@ async def _search_condition(db: AsyncSession, search: str):
 async def get_media_list(
     db: AsyncSession,
     user_id: int,
-    types: Optional[str] = None,
+    types: str | None = None,
     favorite: bool = False,
     has_playback: bool = False,
     has_rating: bool = False,
     sort_by: str = "date_created",
     limit: int = 50,
     offset: int = 0,
-    item_ids: Optional[str] = None,
-    linked_item_ids: Optional[str] = None,
-    search: Optional[str] = None,
-    cursor: Optional[str] = None,
+    item_ids: str | None = None,
+    linked_item_ids: str | None = None,
+    search: str | None = None,
+    cursor: str | None = None,
 ) -> dict:
     query = select(MediaItem).where(MediaItem.IsDeleted == False)
     total_query = select(func.count()).select_from(MediaItem).where(MediaItem.IsDeleted == False)
@@ -391,7 +417,7 @@ async def get_media_list(
         # 统一加 Id 作为次排序键，保证稳定排序
         query = query.order_by(order_col.desc(), MediaItem.Id.desc())
         if cursor_enabled:
-            from datetime import datetime, timezone
+            from datetime import datetime
             try:
                 c_dt, c_id = cursor.split("|", 1)
                 c_dt = datetime.fromisoformat(c_dt.replace(" ", "T").replace("Z", "+00:00"))
@@ -468,17 +494,17 @@ async def get_media_list(
 async def get_media_list_cached(
     db: AsyncSession,
     user_id: int,
-    types: Optional[str] = None,
+    types: str | None = None,
     favorite: bool = False,
     has_playback: bool = False,
     has_rating: bool = False,
     sort_by: str = "date_created",
     limit: int = 50,
     offset: int = 0,
-    item_ids: Optional[str] = None,
-    linked_item_ids: Optional[str] = None,
-    search: Optional[str] = None,
-    cursor: Optional[str] = None,
+    item_ids: str | None = None,
+    linked_item_ids: str | None = None,
+    search: str | None = None,
+    cursor: str | None = None,
 ) -> dict:
     """带缓存的媒体列表。
 
@@ -516,7 +542,7 @@ async def get_media_list_cached(
     return result
 
 
-async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
+async def get_media_info(db: AsyncSession, id: int, user_id: int) -> MediaItemResponse | None:
     result = await db.execute(
         select(MediaItem)
         .where(MediaItem.Id == id, MediaItem.IsDeleted == False)
@@ -596,7 +622,7 @@ async def get_media_info(db: AsyncSession, id: int, user_id: int) -> Optional[Me
     )
 
 
-async def get_media_info_cached(db: AsyncSession, id: int, user_id: int) -> Optional[MediaItemResponse]:
+async def get_media_info_cached(db: AsyncSession, id: int, user_id: int) -> MediaItemResponse | None:
     """带缓存的媒体详情（供 API 层调用）"""
     cache_key = f"media_info_{id}_{user_id}"
     cached = await _cache_get(cache_key)
@@ -755,10 +781,10 @@ async def create_media_batch(
                       所有 items 必须通过 item_links 互相连通
     """
     _t0 = time.perf_counter()
-    from app.schemas.create import MediaBatchCreate
-    from database.models import MediaType, FileType, PersonType, ImageType, ItemStatus, FileLinkType
-    from datetime import datetime, timezone
     import json
+    from datetime import datetime, timezone
+
+    from database.models import FileLinkType, FileType, ImageType, ItemStatus, MediaType, PersonType
 
     # 日期解析辅助函数
     def parse_datetime(val):
@@ -875,7 +901,6 @@ async def create_media_batch(
         attrs = item_data.attrs
         source_info = item_data.source_info
         source_id = source_info.source_id if source_info and source_info.is_set("source_id") else None
-        source_link = source_info.source_link if source_info and source_info.is_set("source_link") else None
         item_type = attrs.type if attrs.is_set("type") else None
         dedup_key = (source_id, MediaType(item_type)) if (source_id and source_item_id and item_type) else None
 

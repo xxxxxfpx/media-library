@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 ItemLinks Model - 媒体项关联表
 ==============================
@@ -19,13 +18,12 @@ ItemLinks Model - 媒体项关联表
 
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Column, DateTime, Enum as SQLEnum, ForeignKey, Index, Integer, String, Text, UniqueConstraint
-)
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, Text, UniqueConstraint
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from .base import Base
-from .enums import MediaType, PersonType
+from .enums import PersonType
 
 
 class ItemLinks(Base):

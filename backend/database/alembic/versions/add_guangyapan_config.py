@@ -4,14 +4,13 @@ Idempotent against a schema already created by ``Base.metadata.create_all``
 (which may contain this table). Only creates the table when it does not exist.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "add_guangyapan_config"
-down_revision: Union[str, Sequence[str], None] = "sync_media_source_columns"
+down_revision: str | Sequence[str] | None = "sync_media_source_columns"
 branch_labels = None
 depends_on = None
 

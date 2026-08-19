@@ -1,40 +1,41 @@
 """Media API - 媒体相关接口"""
 
-from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import ValidationError
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import MediaItem, ItemLinks, File, FileLink, Alias, UserData, MediaType
-from database.core import get_db_session
-from app.api.deps import get_user_id, get_admin_id
-from app.services.media_service import (
-    get_media_list_cached, get_media_info, get_media_info_cached, get_media_stats,
-    create_media_batch, create_media_item, create_item_link, delete_item_link,
-    delete_media_item, invalidate_response_cache,
-)
-from app.schemas.media import MediaListResponse, MediaItemResponse, MediaStatsResponse
+from app.api.deps import get_admin_id, get_user_id
 from app.schemas.create import MediaBatchCreate, SingleItemCreate, SingleItemLinkCreate
+from app.schemas.media import MediaItemResponse, MediaListResponse, MediaStatsResponse
+from app.services.media_service import (
+    create_item_link,
+    create_media_batch,
+    create_media_item,
+    delete_item_link,
+    delete_media_item,
+    get_media_info_cached,
+    get_media_list_cached,
+    get_media_stats,
+    invalidate_response_cache,
+)
+from database.core import get_db_session
 
 router = APIRouter(prefix="/api/media", tags=["媒体"])
 
 
 @router.get("/list", response_model=MediaListResponse)
 async def get_list(
-    types: Optional[str] = Query(None, description="媒体类型，逗号分隔"),
+    types: str | None = Query(None, description="媒体类型，逗号分隔"),
     favorite: bool = Query(False, description="仅收藏"),
     has_playback: bool = Query(False, description="仅播放过"),
     has_rating: bool = Query(False, description="仅评分过"),
     sort_by: str = Query("date_created", description="排序字段"),
     limit: int = Query(50, description="每页数量"),
     offset: int = Query(0, description="偏移量"),
-    item_ids: Optional[str] = Query(None, description="媒体ID列表，逗号分隔"),
-    linked_item_ids: Optional[str] = Query(None, description="关联媒体ID列表，逗号分隔"),
-    search: Optional[str] = Query(None, description="搜索关键词，匹配名称、简介、标语、别名"),
-    cursor: Optional[str] = Query(None, description="keyset 游标（上一页返回的 next_cursor），用于高效翻页"),
+    item_ids: str | None = Query(None, description="媒体ID列表，逗号分隔"),
+    linked_item_ids: str | None = Query(None, description="关联媒体ID列表，逗号分隔"),
+    search: str | None = Query(None, description="搜索关键词，匹配名称、简介、标语、别名"),
+    cursor: str | None = Query(None, description="keyset 游标（上一页返回的 next_cursor），用于高效翻页"),
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db_session),
 ):

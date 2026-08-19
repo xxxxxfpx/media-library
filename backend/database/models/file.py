@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 File Models - 文件模型
 ============================
@@ -34,14 +33,12 @@ FileLink 表字段说明（融合 ItemSource + LinkImageFile + ChapterImage）�
 
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Column, Integer, BigInteger, String, Text, ForeignKey, Index,
-    Enum as SQLEnum, DateTime, JSON
-)
+from sqlalchemy import JSON, BigInteger, Column, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from .base import Base
-from .enums import FileType, ImageType, ChapterMarkerType, FileLinkType
+from .enums import ChapterMarkerType, FileLinkType, FileType, ImageType
 
 
 class File(Base):

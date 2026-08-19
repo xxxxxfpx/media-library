@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 Base Model - 基础模型类
 ========================
@@ -19,7 +18,6 @@ SQLAlchemy 声明式基类，所有模型类都继承自此类。
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import declarative_base
-
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",

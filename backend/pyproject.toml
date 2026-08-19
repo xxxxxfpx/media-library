@@ -26,6 +26,15 @@ target-version = "py310"
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
+[tool.ruff.lint.per-file-ignores]
+# schemas 包使用 `from .xxx import *` 聚合导出（有意模式）
+"app/schemas/__init__.py" = ["F403"]
+# alembic env.py 需先调整 sys.path 再导入；database/core.py 延迟导入 Base 避免循环引用
+"database/alembic/env.py" = ["E402"]
+"database/core.py" = ["E402"]
+# media_service.py 使用 SQLAlchemy 列比较 `Column == False`（构造 SQL 条件，非 Python 布尔比较）
+"app/services/media_service.py" = ["E712"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

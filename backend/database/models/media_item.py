@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 MediaItem Model - 媒体项核心表
 ===========================================
@@ -28,7 +27,7 @@ Series → Season → Episode 层级通过 ItemLinks 建立关联。
 
 from datetime import datetime, timezone
 from math import isfinite
-from typing import Any, ClassVar, Optional
+from typing import Any, ClassVar
 
 from sqlalchemy import (
     BigInteger,
@@ -36,25 +35,25 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum as SQLEnum,
     Float,
     ForeignKey,
     Index,
     Integer,
-    JSON,
     String,
     Text,
     and_,
+    event,
     false,
     func,
 )
-from sqlalchemy import event
-from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+from sqlalchemy import (
+    Enum as SQLEnum,
+)
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.types import TypeDecorator
 
 from .base import Base
 from .enums import ItemStatus, MediaType
-
 
 _TICKS_PER_SECOND = 10_000_000
 
@@ -250,7 +249,7 @@ class MediaItem(Base):
         """获取显示名称。"""
         return self.Name or "Unknown"
 
-    def get_duration_str(self) -> Optional[str]:
+    def get_duration_str(self) -> str | None:
         """获取运行时长字符串。"""
         runtime_ticks = getattr(self, "RunTimeTicks", None)
         if runtime_ticks is None:

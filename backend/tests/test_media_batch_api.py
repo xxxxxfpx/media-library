@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 媒体批量创建 API 测试
 ====================
@@ -17,17 +16,28 @@
 每个测试后通过 db_session 直接查询数据库验证
 """
 
-import json
 
 import pytest
-from sqlalchemy import text
 from pydantic import ValidationError
+from sqlalchemy import text
 
 from app.schemas.create import (
-    MediaBatchCreate, ItemCreate, FileCreate, ItemLinkCreate,
-    FileBaseAttrs, SourceInfo,
-    MediaSourceFileLink, ImageFileLink, ChapterFileLink,
-    MovieAttrs, SeriesAttrs, SeasonAttrs, EpisodeAttrs, BoxSetAttrs, PersonAttrs, GenreAttrs, TagAttrs,
+    BoxSetAttrs,
+    EpisodeAttrs,
+    FileBaseAttrs,
+    FileCreate,
+    GenreAttrs,
+    ImageFileLink,
+    ItemCreate,
+    ItemLinkCreate,
+    MediaBatchCreate,
+    MediaSourceFileLink,
+    MovieAttrs,
+    PersonAttrs,
+    SeasonAttrs,
+    SeriesAttrs,
+    SourceInfo,
+    TagAttrs,
 )
 
 
@@ -102,7 +112,6 @@ class TestMediaBatchAPI:
         assert "item-1" in result["items"]
 
         # 验证数据库
-        item = await self._get_item_by_name(db_session, None)
         result_db = await db_session.execute(text("SELECT * FROM MediaItems WHERE Name IS NULL AND IsDeleted = 0"))
         row = result_db.fetchone()
         assert row is not None, "应该创建了媒体项"
@@ -262,7 +271,7 @@ class TestMediaBatchAPI:
 
         # 验证 item_links
         links = await self._get_itemlinks(db_session, item1_id)
-        actor_links = [l for l in links if l["LinkedItemId"] == item2_id]
+        actor_links = [link for link in links if link["LinkedItemId"] == item2_id]
         assert len(actor_links) == 1
         assert actor_links[0]["PeopleType"] == "Actor"
         assert actor_links[0]["PeopleRole"] == "主演"
@@ -350,14 +359,14 @@ class TestMediaBatchAPI:
 
         # 验证层级关系
         series_links = await self._get_itemlinks(db_session, series["Id"])
-        assert any(l["LinkedItemId"] == season["Id"] for l in series_links)
+        assert any(link["LinkedItemId"] == season["Id"] for link in series_links)
 
         season_links = await self._get_itemlinks(db_session, season["Id"])
-        assert any(l["LinkedItemId"] == episode["Id"] for l in season_links)
+        assert any(link["LinkedItemId"] == episode["Id"] for link in season_links)
 
         # 验证人物关联
         episode_links = await self._get_itemlinks(db_session, episode["Id"])
-        person_links = [l for l in episode_links if l["LinkedItemId"] == person["Id"]]
+        person_links = [link for link in episode_links if link["LinkedItemId"] == person["Id"]]
         assert len(person_links) == 1
         assert person_links[0]["PeopleType"] == "Actor"
         assert person_links[0]["PeopleRole"] == "领衔主演"
@@ -759,14 +768,14 @@ class TestMediaBatchAPI:
         # 验证类型关联
         g1_id = result["items"]["g1"]
         g1_as_linked = await self._get_itemlinks(db_session, g1_id)
-        g1_as_linked = [l for l in g1_as_linked if l["LinkedItemId"] == g1_id]
+        g1_as_linked = [link for link in g1_as_linked if link["LinkedItemId"] == g1_id]
         assert len(g1_as_linked) == 0, "类型不应该作为被关联方"
 
         # 验证 m1->m2 关联（通过 Actor 类型关联）
         m1_id = result["items"]["m1"]
         m2_id = result["items"]["m2"]
         m1_links = await self._get_itemlinks(db_session, m1_id)
-        m1_to_m2 = [l for l in m1_links if l["LinkedItemId"] == m2_id]
+        m1_to_m2 = [link for link in m1_links if link["LinkedItemId"] == m2_id]
         assert len(m1_to_m2) == 1, "应该有 m1->m2 关联"
 
         # 验证文件关联
@@ -839,13 +848,13 @@ class TestMediaBatchAPI:
 
         # 验证 m1→m2 关联
         m1_links = await self._get_itemlinks(db_session, m1_id)
-        m1_to_m2 = [l for l in m1_links if l["LinkedItemId"] == m2_id]
+        m1_to_m2 = [link for link in m1_links if link["LinkedItemId"] == m2_id]
         assert len(m1_to_m2) == 1
         assert m1_to_m2[0]["PeopleType"] == "Actor"
 
         # 验证 m2→m1 关联
         m2_links = await self._get_itemlinks(db_session, m2_id)
-        m2_to_m1 = [l for l in m2_links if l["LinkedItemId"] == m1_id]
+        m2_to_m1 = [link for link in m2_links if link["LinkedItemId"] == m1_id]
         assert len(m2_to_m1) == 1
         assert m2_to_m1[0]["PeopleType"] == "Director"
 
@@ -990,7 +999,7 @@ class TestMediaBatchAPI:
             ]
         )
 
-        response = await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
+        await app_client.post("/api/media/batch", json=data.model_dump(exclude_unset=True), headers=auth_headers)
         # 由于 person_type 会在序列化时被过滤，可能不报错
         # 这个测试验证的是 service 层能处理这种情况
         # 如果 Pydantic 验证通过了，则 API 会处理

@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 媒体 API 测试
 =============
@@ -7,14 +6,6 @@
 
 import pytest
 from sqlalchemy import text
-
-from tests.utils.db_helper import (
-    query_media_item_by_id,
-    count_table_rows,
-    query_filelinks_by_item,
-    query_itemlinks_by_item,
-    query_aliases_by_item,
-)
 
 
 class TestMediaAPI:

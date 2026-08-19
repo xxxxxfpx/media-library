@@ -1,4 +1,3 @@
-# coding: utf-8
 """
 Database Core - 数据库核心配置
 ================================
@@ -17,7 +16,7 @@ Database Core - 数据库核心配置
 """
 
 import json
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

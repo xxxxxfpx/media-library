@@ -1,13 +1,12 @@
 """add provider-backed drive file records"""
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision: str = "add_drive_files"
-down_revision: Union[str, Sequence[str], None] = "initial_schema"
+down_revision: str | Sequence[str] | None = "initial_schema"
 branch_labels = None
 depends_on = None
 
