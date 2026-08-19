@@ -42,10 +42,7 @@
     <!-- 播放/暂停图标 -->
     <transition name="scale-fade">
       <div v-if="showPlayIcon" class="play-icon-overlay" @click="togglePlay">
-        <el-icon :size="80">
-          <VideoPlay v-if="!isPlaying" />
-          <VideoPause v-else />
-        </el-icon>
+        <AppIcon :name="isPlaying ? 'pause' : 'play'" :size="80" />
       </div>
     </transition>
 
@@ -57,7 +54,7 @@
           <span v-if="currentQuality" class="quality-badge">{{ currentQuality }}</span>
         </div>
         <el-button class="close-btn" circle @click="goBack">
-          <el-icon size="24"><ArrowLeft /></el-icon>
+          <AppIcon name="arrow-left" :size="24" />
         </el-button>
       </div>
     </transition>
@@ -91,22 +88,15 @@
         <div class="controls-row">
           <div class="controls-left">
             <button class="control-btn play-pause-btn" :class="{ 'is-playing': isPlaying }" @click="togglePlay">
-              <el-icon :size="24">
-                <VideoPlay v-if="!isPlaying" />
-                <VideoPause v-else />
-              </el-icon>
+              <AppIcon :name="isPlaying ? 'pause' : 'play'" :size="24" />
             </button>
 
             <!-- 音量控制 -->
             <div class="volume-control">
               <button class="control-btn volume-btn" :class="{ 'is-muted': isMuted || volume === 0 }" @click="toggleMute">
                 <span class="volume-icon-wrapper">
-                  <el-icon :size="20">
-                    <Notification />
-                  </el-icon>
-                  <el-icon v-if="isMuted || volume === 0" :size="12" class="mute-forbidden-icon">
-                    <CircleCloseFilled />
-                  </el-icon>
+                  <AppIcon name="bell" :size="20" />
+                  <AppIcon v-if="isMuted || volume === 0" name="circle-x" :size="12" class="mute-forbidden-icon" />
                 </span>
               </button>
               <div class="volume-slider-wrapper">
@@ -131,7 +121,7 @@
             <!-- 倍速播放 -->
             <div class="speed-dropdown">
               <button class="control-btn speed-btn" :class="{ 'is-active': playbackRate !== 1 }" @click="showSpeedMenu = !showSpeedMenu">
-                <el-icon :size="18" style="margin-right: 4px;"><Clock /></el-icon>
+                <AppIcon name="clock" :size="18" style="margin-right: 4px;" />
                 {{ playbackRate }}x
               </button>
               <transition name="fade">
@@ -151,15 +141,12 @@
 
             <!-- 视频信息 -->
             <button class="control-btn" @click="showInfo = !showInfo">
-              <el-icon :size="20"><InfoFilled /></el-icon>
+              <AppIcon name="info" :size="20" />
             </button>
 
             <!-- 全屏 -->
             <button class="control-btn" @click="toggleFullscreen">
-              <el-icon :size="20">
-                <FullScreen v-if="!isFullscreen" />
-                <Close v-else />
-              </el-icon>
+              <AppIcon :name="isFullscreen ? 'x' : 'maximize'" :size="20" />
             </button>
           </div>
         </div>
@@ -201,13 +188,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { mediaAPI, fileAPI, userAPI } from '@/api'
-import { formatFileSize, parseFFmpegInfo } from '@/utils/format'
+import { mediaAPI, fileAPI } from '@/api'
+import { parseFFmpegInfo } from '@/utils/format'
 import { usePlayerState } from '@/composables/usePlayerState'
-import {
-  VideoPlay, VideoPause, ArrowLeft, FullScreen, Close,
-  Notification, CircleCloseFilled, InfoFilled, Clock
-} from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -215,7 +199,6 @@ const router = useRouter()
 const containerRef = ref(null)
 const videoRef = ref(null)
 
-const videoId = ref(route.query.videoId)
 const fileId = ref(route.query.file_id)
 const itemId = ref(route.query.item_id)
 
@@ -227,14 +210,11 @@ const {
   volume,
   playbackRate,
   isMuted,
-  syncInterval,
   setCurrentTime,
   setVolume,
   setPlaybackRate,
   setMuted,
-  syncPlayback,
   startSyncTimer,
-  stopSyncTimer,
   loadUserSettings,
   applyUserSettings,
   onEnded,
@@ -417,7 +397,7 @@ function handleSeekMove(event) {
   updateSeekPosition(event)
 }
 
-function handleSeekEnd(event) {
+function handleSeekEnd(_event) {
   if (!isSeeking.value) return
   isSeeking.value = false
   

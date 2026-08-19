@@ -1,0 +1,18 @@
+/* 现代白（必备）—— 清爽留白 + 同源靛蓝，类 shadcn/ui 亮色 */
+[data-theme="modern-light"] {
+  --color-bg-page:        var(--zinc-50);
+  --color-bg-surface:     var(--zinc-100);
+  --color-bg-elevated:    var(--zinc-200);
+  --color-bg-inverse:     var(--zinc-900);
+  --color-text-primary:   var(--zinc-900);
+  --color-text-secondary: var(--zinc-600);
+  --color-text-tertiary:  var(--zinc-500);
+  --color-text-disabled:  var(--zinc-400);
+  --color-text-inverse:   var(--zinc-50);
+  --color-accent:         var(--indigo-600);
+  --color-accent-hover:   var(--indigo-500);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}

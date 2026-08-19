@@ -7,23 +7,18 @@
         mode="contain"
       >
         <div class="poster-placeholder" :class="`type-${(item.type || 'unknown').toLowerCase()}`">
-          <el-icon :size="48">
-            <component :is="typeIcon" />
-          </el-icon>
+          <AppIcon :name="typeIcon" :size="48" />
         </div>
       </AdaptiveImage>
 
       <div v-if="!effectiveHideOverlay" class="poster-overlay"></div>
 
       <button v-if="!effectiveDisableFavorite" class="favorite-btn" @click.stop="toggleFavorite">
-        <el-icon :size="18">
-          <StarFilled v-if="isFavorite" />
-          <Star v-else />
-        </el-icon>
+        <AppIcon :name="isFavorite ? 'star' : 'star'" :size="18" :filled="isFavorite" />
       </button>
 
       <div v-if="!effectiveHideRatingBadge && item.community_rating" class="rating-badge">
-        <el-icon><StarFilled /></el-icon>
+        <AppIcon name="star" :size="12" :filled="true" />
         <span>{{ item.community_rating.toFixed(1) }}</span>
       </div>
 
@@ -42,16 +37,13 @@
 </template>
 
 <script setup>
-import { ref, computed, toRaw } from 'vue'
+import { ref, computed } from 'vue'
 import { userAPI } from '@/api'
 import { ElMessage } from 'element-plus'
-import { openMediaDetail } from '@/composables/useMediaNavigation'
 import AdaptiveImage from '@/components/AdaptiveImage.vue'
-import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import { getTypeLabel, getTypeIconName } from '@/constants/mediaTypes'
 import { getPrimaryImageUrl } from '@/utils/url'
-import {
-  Star, StarFilled
-} from '@element-plus/icons-vue'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -70,7 +62,7 @@ const favLoading = ref(false)
 const isFavorite = ref(props.item?.userdata?.is_favorite ?? false)
 const primaryImageUrl = computed(() => getPrimaryImageUrl(props.item))
 
-const typeIcon = computed(() => getTypeIcon(props.item.type))
+const typeIcon = computed(() => getTypeIconName(props.item.type))
 
 const effectiveDisableClick = computed(() => effectiveSetting.value.disableClick ?? props.disableClick)
 const effectiveDisableFavorite = computed(() => effectiveSetting.value.disableFavorite ?? props.disableFavorite)
@@ -154,46 +146,45 @@ async function toggleFavorite() {
     color: var(--imm-text-primary);
   }
   &.type-audio {
-    background: linear-gradient(135deg, var(--imm-success) 0%, #388E3C 100%);
+    background: linear-gradient(135deg, var(--imm-success) 0%, color-mix(in oklch, var(--imm-success) 75%, black) 100%);
     color: var(--imm-text-primary);
   }
   &.type-photo {
-    background: linear-gradient(135deg, var(--imm-warning) 0%, #F57C00 100%);
+    background: linear-gradient(135deg, var(--imm-warning) 0%, color-mix(in oklch, var(--imm-warning) 75%, black) 100%);
     color: var(--imm-text-primary);
   }
   &.type-book {
-    background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+    background: linear-gradient(135deg, var(--purple-400) 0%, var(--purple-800) 100%);
     color: var(--imm-text-primary);
   }
 }
 
 .poster-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 40%, transparent 70%);
-  opacity: 0.8; transition: opacity 0.3s ease; z-index: 2;
+  background: linear-gradient(to top, color-mix(in oklch, black 90%, transparent) 0%, color-mix(in oklch, black 40%, transparent) 40%, transparent 70%);
+  opacity: 0.8; transition: opacity var(--duration-base) var(--ease-standard); z-index: 2;
 }
 
 .favorite-btn {
   position: absolute; top: 10px; right: 10px;
   width: 36px; height: 36px; border-radius: 50%; border: none;
-  background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+  background: color-mix(in oklch, black 60%, transparent); backdrop-filter: blur(8px);
   color: var(--imm-text-secondary); cursor: pointer; z-index: 10;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; transform: translateY(-10px);
-  transition: all 0.3s ease;
+  transition: all var(--duration-base) var(--ease-standard);
 
   &:hover {
-    background: rgba(0,0,0,0.8); color: var(--imm-warning); transform: scale(1.1);
+    background: color-mix(in oklch, black 80%, transparent); color: var(--imm-warning); transform: scale(1.1);
   }
-  &:active .el-icon { transform: scale(0.9); }
+  &:active .app-icon { transform: scale(0.9); }
 }
 
 .rating-badge {
   position: absolute; bottom: 10px; left: 10px;
   display: flex; align-items: center; gap: 4px;
-  padding: 4px 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  padding: 4px 8px; background: color-mix(in oklch, black 70%, transparent); backdrop-filter: blur(8px);
   border-radius: 6px; color: var(--imm-warning); font-size: 0.8125rem; font-weight: 600; z-index: 5;
-  .el-icon { font-size: 0.75rem; }
 }
 
 .type-badge {

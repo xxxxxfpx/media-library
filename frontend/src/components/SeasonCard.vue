@@ -2,7 +2,7 @@
   <div class="season-card" @click="handleClick">
     <div class="season-poster">
       <AdaptiveImage :src="primaryImageUrl" :alt="item.name">
-        <div class="season-placeholder"><el-icon :size="32"><Film /></el-icon></div>
+        <div class="season-placeholder"><AppIcon name="film" :size="32" /></div>
       </AdaptiveImage>
     </div>
     <div class="season-info">
@@ -15,7 +15,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Film } from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import AdaptiveImage from '@/components/AdaptiveImage.vue'
 import { getPrimaryImageUrl } from '@/utils/url'
 

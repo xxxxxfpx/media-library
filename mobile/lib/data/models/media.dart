@@ -136,12 +136,14 @@ class MediaListResponse {
   final int total;
   final int limit;
   final int offset;
+  final String? nextCursor;
 
   MediaListResponse({
     required this.items,
     required this.total,
     required this.limit,
     required this.offset,
+    this.nextCursor,
   });
 
   factory MediaListResponse.fromJson(Map<String, dynamic> json) {
@@ -152,6 +154,7 @@ class MediaListResponse {
       total: (json['total'] as num?)?.toInt() ?? 0,
       limit: (json['limit'] as num?)?.toInt() ?? 50,
       offset: (json['offset'] as num?)?.toInt() ?? 0,
+      nextCursor: json['next_cursor'] as String?,
     );
   }
 }

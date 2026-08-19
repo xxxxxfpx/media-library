@@ -14,10 +14,14 @@ class MediaApi {
     MediaListRequest request, {
     int limit = 60,
     int offset = 0,
+    String? cursor,
   }) async {
     final params = request.toQueryParams()
       ..['limit'] = limit
       ..['offset'] = offset;
+    if (cursor != null && cursor.isNotEmpty) {
+      params['cursor'] = cursor;
+    }
     final response =
         await _client.get('/api/media/list', queryParameters: params);
     return MediaListResponse.fromJson(response.data);

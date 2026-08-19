@@ -73,6 +73,10 @@ class SettingsNotifier extends StateNotifier<UserSetting?> {
   // 主题设置 getter/setter
   // ──────────────────────────────
 
+  String get themePreset => state?.themePreset ?? 'currentPurple';
+  set themePreset(String value) =>
+      _setProperty((state ?? UserSetting()).copyWith(themePreset: value));
+
   String get themeMode => state?.themeMode ?? 'system';
   set themeMode(String value) =>
       _setProperty((state ?? UserSetting()).copyWith(themeMode: value));
@@ -209,6 +213,10 @@ extension SettingsExtension on WidgetRef {
 
   String getThemeMode() {
     return watch(settingsProvider)?.themeMode ?? 'system';
+  }
+
+  String getThemePreset() {
+    return watch(settingsProvider)?.themePreset ?? 'currentPurple';
   }
 
   String? getPrimaryColor() {

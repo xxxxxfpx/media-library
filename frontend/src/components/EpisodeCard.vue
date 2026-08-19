@@ -2,7 +2,7 @@
   <div class="episode-item" @click="handleClick">
     <div class="episode-thumb">
       <AdaptiveImage :src="primaryImageUrl" :alt="item.name">
-        <div class="episode-placeholder"><el-icon :size="24"><VideoCamera /></el-icon></div>
+        <div class="episode-placeholder"><AppIcon name="video" :size="24" /></div>
       </AdaptiveImage>
     </div>
     <div class="episode-info">
@@ -18,7 +18,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { VideoCamera } from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import AdaptiveImage from '@/components/AdaptiveImage.vue'
 import { getPrimaryImageUrl } from '@/utils/url'
 
@@ -39,7 +39,7 @@ function handleClick() {
   border-radius: 10px; cursor: pointer; transition: all 0.3s ease;
 
   &:hover {
-    background: var(--imm-hover-strong); border-color: rgba(255,255,255,0.1);
+    background: var(--imm-hover-strong); border-color: var(--color-border-subtle);
     transform: translateX(4px);
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,12 +26,102 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
   String _username = '';
   bool _isSyncing = false;
   String? _lastSyncTime;
+  String _currentBaseUrl = AppConstants.defaultBaseUrl;
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
     _loadLastSyncTime();
+    _loadBaseUrl();
+  }
+
+  Future<void> _loadBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final url = prefs.getString(AppConstants.storageKeyBaseUrl) ??
+        AppConstants.defaultBaseUrl;
+    if (mounted) setState(() => _currentBaseUrl = url);
+  }
+
+  Future<void> _showEditBaseUrlDialog() async {
+    final controller = TextEditingController(text: _currentBaseUrl);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: const Text('后端 API 端点'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '仅 debug 模式可修改，用于测试不同后端。\n生产默认：${AppConstants.defaultBaseUrl}',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Base URL',
+                  hintText: 'https://media.mz727.top',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove(AppConstants.storageKeyBaseUrl);
+                if (ctx.mounted) Navigator.pop(ctx, AppConstants.defaultBaseUrl);
+              },
+              child: const Text('重置默认'),
+            ),
+            FilledButton(
+              onPressed: () {
+                var url = controller.text.trim();
+                if (url.isEmpty) return;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                  url = 'https://$url';
+                }
+                url = url.replaceAll(RegExp(r'/+$'), '');
+                if (url.isEmpty) return;
+                Navigator.pop(ctx, url);
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+    if (result != null && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(AppConstants.storageKeyBaseUrl, result);
+      setState(() => _currentBaseUrl = result);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已切换至 $result，下次请求生效'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      AppLogger.info(
+        'debug_base_url_changed',
+        category: 'settings',
+        fields: {'base_url': result},
+      );
+    }
   }
 
   Future<void> _loadLastSyncTime() async {
@@ -348,6 +439,27 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
                   onTap: _isSyncing ? null : _handleSyncSettings,
                 ),
               ),
+              if (kDebugMode) ...[
+                const Divider(height: 1, indent: 56),
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    leading: Icon(Icons.bug_report_outlined, color: cs.primary),
+                    title: Text(
+                      '后端 API 端点 (Debug)',
+                      style: TextStyle(fontSize: 16, color: cs.onSurface),
+                    ),
+                    subtitle: Text(
+                      _currentBaseUrl,
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.edit_outlined, size: 18),
+                    onTap: _showEditBaseUrlDialog,
+                  ),
+                ),
+              ],
             ],
           ),
         ),

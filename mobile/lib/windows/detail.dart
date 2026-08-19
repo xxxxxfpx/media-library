@@ -10,6 +10,7 @@ import '../data/api/media_api.dart';
 import '../data/models/media.dart';
 import '../component/media_card.dart';
 import '../component/media_tag.dart';
+import '../design_system/app_color_tokens.dart';
 import '../phone/video_play.dart';
 
 class DetailPageWindows extends StatefulWidget {
@@ -85,12 +86,12 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D0D0D),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onSurface))
           : _media == null
-          ? const Center(
-              child: Text('加载失败', style: TextStyle(color: Colors.white54)),
+          ? Center(
+              child: Text('加载失败', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             )
           : SafeArea(
               top: false,
@@ -99,15 +100,15 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                   children: [
                     _buildMediaInfoSection(),
                     if (_videoFiles.isNotEmpty) ...[
-                      const Divider(color: Colors.white12, height: 1),
+                      Divider(color: Theme.of(context).colorScheme.outlineVariant, height: 1),
                       _buildPlaySection(),
                     ],
-                    const Divider(color: Colors.white12, height: 1),
+                    Divider(color: Theme.of(context).colorScheme.outlineVariant, height: 1),
                     SizedBox(height: 48, child: _buildUserMediaData()),
-                    const Divider(color: Colors.white12, height: 1),
+                    Divider(color: Theme.of(context).colorScheme.outlineVariant, height: 1),
                     _buildLinksSection(),
                     if (_media!.files.isNotEmpty) ...[
-                      const Divider(color: Colors.white12, height: 1),
+                      Divider(color: Theme.of(context).colorScheme.outlineVariant, height: 1),
                       _buildFilesSection(),
                     ],
                   ],
@@ -158,10 +159,10 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
             Flexible(
               child: Text(
                 m.name ?? '未知标题',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -178,12 +179,12 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white54, width: 1),
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurfaceVariant, width: 1),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.language,
                     size: 16,
-                    color: Colors.white70,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -196,18 +197,18 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: _isFavorite
-                      ? Colors.red.withValues(alpha: 0.8)
+                      ? Theme.of(context).extension<AppSemanticColors>()!.favorite.withValues(alpha: 0.8)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _isFavorite ? Colors.red : Colors.white54,
+                    color: _isFavorite ? Theme.of(context).extension<AppSemanticColors>()!.favorite : Theme.of(context).colorScheme.onSurfaceVariant,
                     width: 1,
                   ),
                 ),
                 child: Icon(
                   _isFavorite ? Icons.favorite : Icons.favorite_border,
                   size: 16,
-                  color: _isFavorite ? Colors.white : Colors.white54,
+                  color: _isFavorite ? Theme.of(context).colorScheme.onSurface : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -227,14 +228,14 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white12,
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       a.name ?? '',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white70,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -246,10 +247,10 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           const SizedBox(height: 4),
           Text(
             m.tagline!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontStyle: FontStyle.italic,
-              color: Colors.white54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -260,33 +261,33 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           alignment: WrapAlignment.start,
           children: [
             if (m.officialRating != null)
-              _buildTag(m.officialRating!, Colors.orange),
+              _buildTag(m.officialRating!, Theme.of(context).extension<AppSemanticColors>()!.warning),
             if (m.productionYear != null)
-              _buildTag('${m.productionYear}', Colors.blue),
+              _buildTag('${m.productionYear}', Theme.of(context).extension<AppSemanticColors>()!.info),
             if (m.runTimeTicks != null)
               _buildTag(
                 '${(m.runTimeTicks! / 600000000).round()} 分钟',
-                Colors.green,
+                Theme.of(context).extension<AppSemanticColors>()!.success,
               ),
-            if (m.type != null) _buildTag(m.type!, Colors.purple),
+            if (m.type != null) _buildTag(m.type!, Theme.of(context).colorScheme.primary),
           ],
         ),
         if (m.overview != null && m.overview!.isNotEmpty) ...[
           const SizedBox(height: 16),
-          const Text(
+          Text(
             '简介',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.white70,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             m.overview!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: Colors.white54,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
             maxLines: 5,
@@ -337,25 +338,25 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           Row(
             children: [
               if (userdata.favoritedAt != null)
-                _buildInfoChip(Icons.favorite, '已收藏', Colors.red),
+                _buildInfoChip(Icons.favorite, '已收藏', Theme.of(context).extension<AppSemanticColors>()!.favorite),
               if (userdata.favoritedAt != null) const SizedBox(width: 12),
               if (userdata.rating != null)
                 _buildInfoChip(
                   Icons.star,
                   userdata.rating!.toStringAsFixed(1),
-                  Colors.amber,
+                  Theme.of(context).extension<AppSemanticColors>()!.rating,
                 ),
               if (userdata.rating != null) const SizedBox(width: 12),
               _buildInfoChip(
                 Icons.play_arrow,
                 '播放 ${userdata.playCount ?? 0} 次',
-                Colors.green,
+                Theme.of(context).extension<AppSemanticColors>()!.success,
               ),
               const SizedBox(width: 12),
               _buildInfoChip(
                 Icons.history,
                 userdata.lastPlayedDisplay ?? '未播放',
-                Colors.blue,
+                Theme.of(context).extension<AppSemanticColors>()!.info,
               ),
             ],
           ),
@@ -365,16 +366,16 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
               children: [
                 Text(
                   _formatTicks(userdata.playbackPositionTicks),
-                  style: const TextStyle(fontSize: 12, color: Colors.purple),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
                 ),
                 if (runtimeSeconds > 0) ...[
-                  const Text(
+                  Text(
                     ' / ',
-                    style: TextStyle(fontSize: 12, color: Colors.white30),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
                   ),
                   Text(
                     _formatTicks(_media!.runTimeTicks),
-                    style: const TextStyle(fontSize: 12, color: Colors.purple),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -382,8 +383,8 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: progress,
-                        backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation(Colors.purple),
+                        backgroundColor: Theme.of(context).colorScheme.outlineVariant,
+                        valueColor: AlwaysStoppedAnimation(Theme.of(context).colorScheme.primary),
                         minHeight: 6,
                       ),
                     ),
@@ -391,7 +392,7 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                   const SizedBox(width: 8),
                   Text(
                     '${(progress * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(fontSize: 12, color: Colors.purple),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.primary),
                   ),
                 ],
               ],
@@ -445,12 +446,12 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '关联内容',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -479,10 +480,10 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           padding: const EdgeInsets.only(bottom: 8),
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.purple,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ),
@@ -573,12 +574,12 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '播放',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -589,16 +590,16 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white12,
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
                         value: _selectedVideoIndex,
                         isExpanded: true,
-                        dropdownColor: const Color(0xFF2A2A2A),
-                        style: const TextStyle(
-                          color: Colors.white,
+                        dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 13,
                         ),
                         items: List.generate(_videoFiles.length, (i) {
@@ -623,7 +624,7 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                 Expanded(
                   child: Text(
                     _videoLabel(_videoFiles.first),
-                    style: const TextStyle(fontSize: 13, color: Colors.white70),
+                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -642,11 +643,11 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.play_arrow, size: 20),
-                label: const Text('播放'),
+                icon: Icon(Icons.play_arrow, size: 20),
+                label: Text('播放'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  foregroundColor: Colors.white,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -666,12 +667,12 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '文件',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 12),
@@ -700,19 +701,19 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white12,
+        color: Theme.of(context).colorScheme.outlineVariant,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             file.name ?? '未知文件',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               height: 1.3,
             ),
             maxLines: 2,
@@ -722,17 +723,17 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
           if (file.type != null)
             Text(
               file.type!,
-              style: const TextStyle(fontSize: 11, color: Colors.white54),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           if (sizeStr.isNotEmpty)
             Text(
               sizeStr,
-              style: const TextStyle(fontSize: 11, color: Colors.white54),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           if (codec.isNotEmpty)
             Text(
               codec,
-              style: const TextStyle(fontSize: 11, color: Colors.purple),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.primary),
             ),
           const Spacer(),
           Row(
@@ -767,11 +768,11 @@ class _DetailPageWindowsState extends State<DetailPageWindows> {
       height: 32,
       child: IconButton(
         padding: EdgeInsets.zero,
-        icon: Icon(icon, size: 16, color: Colors.white54),
+        icon: Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
         tooltip: tooltip,
         onPressed: onPressed,
         style: IconButton.styleFrom(
-          backgroundColor: Colors.white10,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),

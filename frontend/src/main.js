@@ -3,18 +3,16 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
-import './style.scss'
+
+// 设计令牌（顺序即层叠顺序：语义派生 → 主题 → EP 桥接；tokens/index.css 末尾已含 element-bridge）
+import './styles/tokens/index.css'
+import './styles/tailwind.css'
 import './styles/immersive.scss'
+import './style.scss'
 
 const app = createApp(App)
-
-// 注册所有图标
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-  app.component(key, component)
-}
 
 app.use(createPinia())
 app.use(router)

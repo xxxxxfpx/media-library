@@ -1,9 +1,7 @@
 <template>
   <div class="file-row">
     <div class="file-icon" :class="fileTypeClass">
-      <el-icon :size="20">
-        <component :is="fileIcon" />
-      </el-icon>
+      <AppIcon :name="fileIcon" :size="20" />
     </div>
     <div class="file-info">
       <span class="file-name">{{ file.name || file.path?.split('/').pop() }}</span>
@@ -16,38 +14,36 @@
 
 <script setup>
 import { computed } from 'vue'
-import {
-  Picture, VideoCamera, Headset, Document, MessageBox, Folder, DataLine, Notebook
-} from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { formatFileSize } from '@/utils/format'
 
 const props = defineProps({
   file: { type: Object, required: true }
 })
 
-// 根据文件类型返回对应的图标
+// 根据文件类型返回对应的图标名（lucide），由 AppIcon 渲染
 const fileIcon = computed(() => {
   const type = props.file?.type
 
   switch (type) {
     case 'Image':
     case 'EmbeddedImage':
-      return Picture
+      return 'image'
     case 'Video':
-      return VideoCamera
+      return 'video'
     case 'Audio':
-      return Headset
+      return 'headphones'
     case 'Subtitle':
     case 'Lyrics':
-      return MessageBox
+      return 'message-square'
     case 'Nfo':
-      return Notebook
+      return 'notebook'
     case 'Data':
-      return DataLine
+      return 'chart-line'
     case 'Attachment':
-      return Folder
+      return 'folder'
     default:
-      return Document
+      return 'file-text'
   }
 })
 
@@ -76,20 +72,20 @@ const fileTypeClass = computed(() => {
 
 .file-icon.type-image,
 .file-icon.type-embeddedimage {
-  color: #4CAF50;
+  color: var(--color-success);
 }
 
 .file-icon.type-video {
-  color: #2196F3;
+  color: var(--color-accent);
 }
 
 .file-icon.type-audio {
-  color: #FF9800;
+  color: var(--color-warning);
 }
 
 .file-icon.type-subtitle,
 .file-icon.type-lyrics {
-  color: #00BCD4;
+  color: var(--color-info);
 }
 
 .file-info {

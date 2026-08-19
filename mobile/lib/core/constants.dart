@@ -2,7 +2,8 @@
 // ignore_for_file: constant_identifier_names
 
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
+import '../design_system/app_icons.dart';
+import '../design_system/app_media_colors.dart';
 
 /// 应用配置的全局类
 class AppConstants {
@@ -32,8 +33,8 @@ class AppConstants {
   /// 本地存储键：标记已观看阈值
   static const String storageKeyWatchedThreshold = 'watched_threshold';
 
-  /// 默认后端 API 地址
-  static const String defaultBaseUrl = 'http://192.168.1.5:8000';
+  /// 默认后端 API 地址（生产）
+  static const String defaultBaseUrl = 'https://media.mz727.top';
 }
 
 /// 媒体类型枚举，定义所有支持的媒体类型
@@ -75,15 +76,17 @@ class FileTypeInfo {
   const FileTypeInfo(this.icon, this.color);
 }
 
-/// 文件类型信息映射，包含图标和颜色
+/// 文件类型信息映射，包含图标和颜色（颜色定义归属于设计系统，此处为语义固定色）
 const Map<FileType, FileTypeInfo> fileTypeInfo = {
-  FileType.image: FileTypeInfo(LucideIcons.image, Color(0xFF4CAF50)),
-  FileType.video: FileTypeInfo(LucideIcons.video, Color(0xFF2196F3)),
-  FileType.audio: FileTypeInfo(LucideIcons.music, Color(0xFFFF9800)),
-  FileType.subtitle: FileTypeInfo(LucideIcons.captions, Color(0xFF00BCD4)),
-  FileType.nfo: FileTypeInfo(LucideIcons.file_text, Color(0xFF9E9E9E)),
-  FileType.data: FileTypeInfo(LucideIcons.file, Color(0xFF607D8B)),
-  FileType.attachment: FileTypeInfo(LucideIcons.paperclip, Color(0xFF795548)),
+  FileType.image: FileTypeInfo(AppIcons.fileImage, AppMediaColors.fileImage),
+  FileType.video: FileTypeInfo(AppIcons.fileVideo, AppMediaColors.fileVideo),
+  FileType.audio: FileTypeInfo(AppIcons.fileAudio, AppMediaColors.fileAudio),
+  FileType.subtitle:
+      FileTypeInfo(AppIcons.fileSubtitle, AppMediaColors.fileSubtitle),
+  FileType.nfo: FileTypeInfo(AppIcons.fileNfo, AppMediaColors.fileNfo),
+  FileType.data: FileTypeInfo(AppIcons.fileData, AppMediaColors.fileData),
+  FileType.attachment:
+      FileTypeInfo(AppIcons.fileAttachment, AppMediaColors.fileAttachment),
 };
 
 /// 媒体数据类型枚举，用于统计数据卡片
@@ -114,26 +117,26 @@ class StatCardConfig {
 /// 统计数据卡片配置列表，定义首页显示的统计卡片
 const List<StatCardConfig> statCards = [
   StatCardConfig(
-    icon: LucideIcons.video,
-    color: Color(0xFF2196F3),
+    icon: AppIcons.fileVideo,
+    color: AppMediaColors.statVideo,
     label: '视频',
     dataKey: MediaDataType.videoCount,
   ),
   StatCardConfig(
-    icon: LucideIcons.music,
-    color: Color(0xFF4CAF50),
+    icon: AppIcons.fileAudio,
+    color: AppMediaColors.statAudio,
     label: '音乐',
     dataKey: MediaDataType.audioCount,
   ),
   StatCardConfig(
-    icon: LucideIcons.image,
-    color: Color(0xFFFF9800),
+    icon: AppIcons.fileImage,
+    color: AppMediaColors.statImage,
     label: '图片',
     dataKey: MediaDataType.imageCount,
   ),
   StatCardConfig(
-    icon: LucideIcons.book_open,
-    color: Color(0xFF9C27B0),
+    icon: AppIcons.book,
+    color: AppMediaColors.statBook,
     label: '电子书',
     dataKey: MediaDataType.ebookCount,
   ),

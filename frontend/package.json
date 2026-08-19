@@ -7,8 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs",
-    "lint:fix": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs && stylelint \"src/**/*.{vue,scss,css}\"",
+    "lint:eslint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs",
+    "lint:style": "stylelint \"src/**/*.{vue,scss,css}\"",
+    "lint:fix": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix && stylelint \"src/**/*.{vue,scss,css}\" --fix",
     "format": "prettier --write \"src/**/*.{js,vue,scss}\"",
     "test": "vitest run"
   },
@@ -21,12 +23,22 @@
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.123",
+    "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-vue": "^5.0.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-local-rules": "^3.0.2",
     "eslint-plugin-vue": "^9.33.0",
+    "postcss-html": "^2.0.0",
+    "postcss-scss": "^4.0.9",
     "prettier": "^3.9.6",
     "sass": "^1.69.0",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard-scss": "^17.0.0",
+    "tailwindcss": "^4.3.3",
+    "unplugin-icons": "^23.0.1",
+    "unplugin-vue-components": "^32.1.0",
     "vite": "^5.0.0",
     "vitest": "^3.2.4"
   }

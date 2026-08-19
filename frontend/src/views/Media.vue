@@ -1,7 +1,7 @@
 <template>
   <div class="media-detail">
     <div v-if="loading" class="loading-state">
-      <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
+      <AppIcon name="loader-circle" :size="48" class="loading-icon" />
       <p>加载中...</p>
     </div>
 
@@ -11,7 +11,7 @@
         <div class="hero-gradient"></div>
         <div class="hero-content">
           <button class="back-btn" @click="goBack">
-            <el-icon><ArrowLeft /></el-icon>
+            <AppIcon name="arrow-left" :size="16" />
             <span>返回</span>
           </button>
 
@@ -28,7 +28,7 @@
                 <span v-if="item.production_year" class="badge year-badge">{{ item.production_year }}</span>
                 <span v-if="item.official_rating" class="badge rating-badge-official">{{ item.official_rating }}</span>
                 <span v-if="item.community_rating" class="badge rating-badge">
-                  <el-icon><StarFilled /></el-icon> {{ item.community_rating.toFixed(1) }}
+                  <AppIcon name="star" :size="14" :filled="true" /> {{ item.community_rating.toFixed(1) }}
                 </span>
                 <span v-if="runTimeText" class="badge runtime-badge">{{ runTimeText }}</span>
               </div>
@@ -42,10 +42,7 @@
                   :title="isFavorite ? '取消收藏' : '加入收藏'"
                   @click="toggleFavorite"
                 >
-                  <el-icon :size="18">
-                    <StarFilled v-if="isFavorite" />
-                    <Star v-else />
-                  </el-icon>
+                  <AppIcon :name="'star'" :size="18" :filled="isFavorite" />
                 </button>
               </div>
 
@@ -115,7 +112,7 @@
                   :disabled="!selectedVideo"
                   @click="playVideo(selectedVideo)"
                 >
-                  <el-icon size="18"><VideoPlay /></el-icon>
+                  <AppIcon name="play" :size="18" />
                   <span>播放</span>
                 </button>
               </div>
@@ -263,17 +260,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { mediaAPI, fileAPI, userAPI } from '@/api'
+import { mediaAPI, userAPI } from '@/api'
 import MediaGrid from '@/components/MediaGrid.vue'
 import MediaCard from '@/components/MediaCard.vue'
 import LinkCard from '@/components/LinkCard.vue'
 import FileRow from '@/components/FileRow.vue'
-import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
-import { formatDate, formatFileSize, parseFFmpegInfo } from '@/utils/format'
-import { getFileDataUrl } from '@/utils/url'
+import { getTypeLabel } from '@/constants/mediaTypes'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import { formatDate, parseFFmpegInfo } from '@/utils/format'
 
 const heroConfig = {
   disableClick: true,
@@ -283,10 +280,6 @@ const heroConfig = {
   hideOverlay: false,
   hideCardInfo: true
 }
-import {
-  ArrowLeft, ArrowRight, Loading, StarFilled, Star,
-  VideoPlay
-} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -308,8 +301,6 @@ const itemTypeClass = computed(() => (item.value?.type || '').toLowerCase())
 
 const typeLabel = computed(() => getTypeLabel(item.value?.type))
 
-const typeIcon = computed(() => getTypeIcon(item.value?.type))
-
 const heroBgStyle = computed(() => {
   if (backdropUrl.value) {
     return { backgroundImage: `url(${backdropUrl.value})` }
@@ -317,8 +308,6 @@ const heroBgStyle = computed(() => {
   return {}
 })
 
-const genres = computed(() => getLinksByType('Genre'))
-const studios = computed(() => getLinksByType('Studio'))
 const castList = computed(() => getPeopleByType('Actor'))
 
 // 视频文件列表
@@ -341,8 +330,6 @@ const selectedVideoInfo = computed(() => {
     codec: parsed.codec || null,
   }
 })
-
-const backdropImages = computed(() => getFilesByImageType('Backdrop'))
 
 const sourceLinks = computed(() => {
   if (!item.value?.links) return []
@@ -403,13 +390,6 @@ function getPeopleByType(personType) {
     }))
 }
 
-function getFilesByImageType(imageType) {
-  if (!item.value?.files) return []
-  return item.value.files
-    .filter(f => f.image_type === imageType)
-    .sort((a, b) => (a.image_index || 0) - (b.image_index || 0))
-}
-
 function playVideo(video) {
   if (!video) {
     ElMessage.warning('视频文件不存在')
@@ -428,11 +408,6 @@ function playVideo(video) {
 
 function navigateTo(id) {
   if (id) router.push(`/media/${id}`)
-}
-
-async function loadImageUrls() {
-  const backdropList = getFilesByImageType('Backdrop')
-  backdropUrl.value = backdropList.length ? fileAPI.getDataUrl(backdropList[0].id) : null
 }
 
 async function fetchItem() {
@@ -552,8 +527,8 @@ watch(() => route.params.id, (newId, oldId) => {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(0,0,0,0.1) 0%,
-    rgba(0,0,0,0.4) 50%,
+    color-mix(in oklch, black 10%, transparent) 0%,
+    color-mix(in oklch, black 40%, transparent) 50%,
     var(--imm-bg-primary) 100%
   );
 }
@@ -571,19 +546,19 @@ watch(() => route.params.id, (newId, oldId) => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  color: rgba(255,255,255,0.7);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 0.875rem;
-  transition: all 0.3s ease;
+  transition: all var(--duration-base) var(--ease-standard);
   margin-bottom: 32px;
 
   &:hover {
     background: var(--imm-accent);
     border-color: var(--imm-accent);
-    color: #fff;
+    color: var(--color-text-inverse);
   }
 }
 
@@ -623,22 +598,20 @@ watch(() => route.params.id, (newId, oldId) => {
     border: 1px solid var(--imm-accent);
   }
 
-  &.year-badge { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
-  &.rating-badge-official { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7); }
+  &.year-badge { background: var(--color-hover); color: var(--color-text-secondary); }
+  &.rating-badge-official { background: var(--color-hover); color: var(--color-text-secondary); }
 
   &.rating-badge {
-    background: rgba(255, 193, 7, 0.15);
-    color: #FFC107;
+    background: color-mix(in oklch, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
     display: flex;
     align-items: center;
     gap: 4px;
-
-    .el-icon { font-size: 0.875rem; }
   }
 
   &.runtime-badge {
-    background: rgba(33, 150, 243, 0.15);
-    color: #64B5F6;
+    background: color-mix(in oklch, var(--color-info) 15%, transparent);
+    color: var(--color-info);
   }
 }
 
@@ -683,17 +656,17 @@ watch(() => route.params.id, (newId, oldId) => {
   }
 
   &.active {
-    color: #FFC107;
-    background: rgba(255, 193, 7, 0.1);
-    border-color: rgba(255, 193, 7, 0.3);
+    color: var(--color-warning);
+    background: color-mix(in oklch, var(--color-warning) 10%, transparent);
+    border-color: color-mix(in oklch, var(--color-warning) 30%, transparent);
 
     &:hover:not(:disabled) {
-      background: rgba(255, 193, 7, 0.15);
-      border-color: #FFC107;
+      background: color-mix(in oklch, var(--color-warning) 15%, transparent);
+      border-color: var(--color-warning);
     }
   }
 
-  &:active .el-icon {
+  &:active .app-icon {
     transform: scale(0.9);
   }
 }
@@ -742,7 +715,7 @@ watch(() => route.params.id, (newId, oldId) => {
 
   &::-webkit-scrollbar { height: 4px; }
   &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  &::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 4px; }
 }
 
 .cast-chip {

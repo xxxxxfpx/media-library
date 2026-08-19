@@ -21,6 +21,6 @@ class SystemConfig {
 
   void _applyYaml(YamlMap map) {
     final api = map['api'] as YamlMap?;
-    _baseUrl = (api?['base_url'] as String?) ?? 'http://192.168.1.5:8000';
+    _baseUrl = (api?['base_url'] as String?) ?? 'https://media.mz727.top';
   }
 }

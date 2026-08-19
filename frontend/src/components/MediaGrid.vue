@@ -16,7 +16,7 @@
           clearable
         >
           <template #prefix>
-            <el-icon><Search /></el-icon>
+            <AppIcon name="search" :size="16" />
           </template>
         </el-input>
 
@@ -26,14 +26,14 @@
             circle
             @click="viewMode = 'grid'"
           >
-            <el-icon><Grid /></el-icon>
+            <AppIcon name="layout-grid" :size="16" />
           </el-button>
           <el-button
             :class="{ active: viewMode === 'list' }"
             circle
             @click="viewMode = 'list'"
           >
-            <el-icon><List /></el-icon>
+            <AppIcon name="list" :size="16" />
           </el-button>
         </div>
       </div>
@@ -64,7 +64,7 @@
       <div v-if="!loading && (!items || !items.length)" class="grid-empty">
         <el-empty description="暂无内容">
           <template #image>
-            <el-icon :size="64" class="empty-icon"><VideoCamera /></el-icon>
+            <AppIcon name="video" :size="64" class="empty-icon" />
           </template>
         </el-empty>
       </div>
@@ -81,7 +81,7 @@
         <div class="list-poster">
           <img v-if="item.poster_url" :src="item.poster_url" :alt="item.name" />
           <div v-else class="poster-placeholder">
-            <el-icon><component :is="getTypeIcon(item.type)" /></el-icon>
+            <AppIcon :name="getTypeIconName(item.type)" :size="20" />
           </div>
         </div>
         <div class="list-info">
@@ -90,7 +90,7 @@
             <span v-if="item.production_year">{{ item.production_year }}</span>
             <span v-if="item.type">{{ getTypeLabel(item.type) }}</span>
             <span v-if="item.community_rating" class="rating">
-              <el-icon><StarFilled /></el-icon> {{ item.community_rating.toFixed(1) }}
+              <AppIcon name="star" :size="14" :filled="true" /> {{ item.community_rating.toFixed(1) }}
             </span>
           </p>
           <p v-if="item.overview" class="list-overview">{{ item.overview }}</p>
@@ -127,6 +127,7 @@ import { ref, watch } from 'vue'
 import { mediaAPI } from '@/api'
 import { openMediaDetail } from '@/composables/useMediaNavigation'
 import MediaCard from '@/components/MediaCard.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const listConfig = {
   disableClick: false,
@@ -136,10 +137,7 @@ const listConfig = {
   hideOverlay: false,
   hideCardInfo: false
 }
-import {
-  VideoCamera, Search, Grid, List, StarFilled,
-} from '@element-plus/icons-vue'
-import { TYPE_OPTIONS, getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
+import { TYPE_OPTIONS, getTypeLabel, getTypeIconName } from '@/constants/mediaTypes'
 
 const props = defineProps({
   params: { type: Object, default: () => ({}) },
@@ -402,7 +400,7 @@ watch(
   &.active {
     background: var(--imm-accent);
     border-color: var(--imm-accent);
-    color: #fff;
+    color: var(--color-text-inverse);
   }
 }
 

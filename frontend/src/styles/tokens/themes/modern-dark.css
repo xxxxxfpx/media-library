@@ -1,0 +1,18 @@
+/* 现代黑（必备，默认主题）—— 中性近黑 + 靛蓝强调，类 shadcn/ui 暗色 */
+[data-theme="modern-dark"] {
+  --color-bg-page:        var(--zinc-1025);
+  --color-bg-surface:     var(--zinc-975);
+  --color-bg-elevated:    var(--zinc-950);
+  --color-bg-inverse:     var(--zinc-50);
+  --color-text-primary:   var(--zinc-50);
+  --color-text-secondary: var(--zinc-300);
+  --color-text-tertiary:  var(--zinc-400);
+  --color-text-disabled:  var(--zinc-500);
+  --color-text-inverse:   var(--zinc-1025);
+  --color-accent:         var(--indigo-500);
+  --color-accent-hover:   var(--indigo-400);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}

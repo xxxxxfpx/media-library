@@ -1,109 +1,15 @@
 /**
- * 沉浸式深色模式样式系统
- * 使用 Element Plus CSS 变量覆盖 + 自定义变量
+ * 沉浸式样式系统（现代化改造版）
+ * ============================================================
+ * 原文件在 :root / html[data-theme="light"] 中硬编码定义了一整套
+ * --imm-* / --el-* 色值，会覆盖 tokens 语义令牌并锁定旧 Material 色板。
+ *
+ * 改造后：
+ * - 色值一律由 src/styles/tokens/（primitives → semantic → themes → element-bridge）
+ *   提供，--imm-* 仅为兼容别名（见 semantic.css），随主题自动翻转；
+ * - 本文件只保留 Element Plus 组件外观覆盖与工具类，全部引用令牌变量。
+ * ============================================================
  */
-
-// ===== 颜色变量 =====
-:root {
-  --imm-bg-primary: #000000;
-  --imm-bg-secondary: #0a0a0a;
-  --imm-bg-tertiary: #121212;
-  --imm-bg-elevated: #1a1a1a;
-  --imm-text-primary: #ffffff;
-  --imm-text-secondary: rgba(255, 255, 255, 0.87);
-  --imm-text-tertiary: rgba(255, 255, 255, 0.60);
-  --imm-text-disabled: rgba(255, 255, 255, 0.38);
-  --imm-accent: #2196F3;
-  --imm-accent-light: #64B5F6;
-  --imm-accent-dark: #1976D2;
-  --imm-accent-bg: rgba(33, 150, 243, 0.15);
-  --imm-success: #4CAF50;
-  --imm-warning: #FF9800;
-  --imm-error: #F44336;
-  --imm-info: #2196F3;
-  --imm-divider: rgba(255, 255, 255, 0.08);
-  --imm-border: rgba(255, 255, 255, 0.12);
-  --imm-overlay: rgba(0, 0, 0, 0.7);
-  --imm-backdrop: blur(20px) saturate(180%);
-  --imm-glass-bg: rgba(10, 10, 10, 0.8);
-  --imm-hover: rgba(255, 255, 255, 0.05);
-  --imm-hover-strong: rgba(255, 255, 255, 0.10);
-
-  // Element Plus CSS 变量覆盖
-  --el-color-primary: #2196F3;
-  --el-color-primary-light-3: #64B5F6;
-  --el-color-primary-light-5: #90CAF9;
-  --el-color-primary-light-7: #BBDEFB;
-  --el-color-primary-light-9: #E3F2FD;
-  --el-color-primary-dark-2: #1976D2;
-  --el-bg-color: #0a0a0a;
-  --el-bg-color-overlay: #1a1a1a;
-  --el-bg-color-page: #000000;
-  --el-text-color-primary: #ffffff;
-  --el-text-color-regular: rgba(255, 255, 255, 0.87);
-  --el-text-color-secondary: rgba(255, 255, 255, 0.60);
-  --el-text-color-placeholder: rgba(255, 255, 255, 0.38);
-  --el-border-color: rgba(255, 255, 255, 0.12);
-  --el-border-color-light: rgba(255, 255, 255, 0.08);
-  --el-border-color-lighter: rgba(255, 255, 255, 0.06);
-  --el-fill-color: rgba(255, 255, 255, 0.05);
-  --el-fill-color-light: rgba(255, 255, 255, 0.03);
-  --el-fill-color-lighter: rgba(255, 255, 255, 0.02);
-  --el-fill-color-blank: #1a1a1a;
-  --el-mask-color: rgba(0, 0, 0, 0.7);
-  --el-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
-  --el-box-shadow-light: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --el-border-radius-base: 8px;
-  --el-border-radius-small: 6px;
-}
-
-html[data-theme="light"] {
-  --imm-bg-primary: #f0f2f5;
-  --imm-bg-secondary: #ffffff;
-  --imm-bg-tertiary: #ffffff;
-  --imm-bg-elevated: #e8eaed;
-  --imm-text-primary: #1a1a2e;
-  --imm-text-secondary: rgba(0, 0, 0, 0.80);
-  --imm-text-tertiary: rgba(0, 0, 0, 0.50);
-  --imm-text-disabled: rgba(0, 0, 0, 0.30);
-  --imm-accent: #1976D2;
-  --imm-accent-light: #2196F3;
-  --imm-accent-dark: #1565C0;
-  --imm-accent-bg: rgba(25, 118, 210, 0.10);
-  --imm-success: #388E3C;
-  --imm-warning: #F57C00;
-  --imm-error: #D32F2F;
-  --imm-info: #1976D2;
-  --imm-divider: rgba(0, 0, 0, 0.08);
-  --imm-border: rgba(0, 0, 0, 0.12);
-  --imm-overlay: rgba(0, 0, 0, 0.3);
-  --imm-backdrop: blur(20px) saturate(180%);
-  --imm-glass-bg: rgba(255, 255, 255, 0.85);
-  --imm-hover: rgba(0, 0, 0, 0.04);
-  --imm-hover-strong: rgba(0, 0, 0, 0.08);
-
-  --el-color-primary: #1976D2;
-  --el-color-primary-light-3: #2196F3;
-  --el-color-primary-light-5: #42A5F5;
-  --el-color-primary-light-7: #90CAF9;
-  --el-color-primary-light-9: #E3F2FD;
-  --el-color-primary-dark-2: #1565C0;
-  --el-bg-color: #ffffff;
-  --el-bg-color-overlay: #e8eaed;
-  --el-bg-color-page: #f0f2f5;
-  --el-text-color-primary: #1a1a2e;
-  --el-text-color-regular: rgba(0, 0, 0, 0.80);
-  --el-text-color-secondary: rgba(0, 0, 0, 0.50);
-  --el-text-color-placeholder: rgba(0, 0, 0, 0.30);
-  --el-border-color: rgba(0, 0, 0, 0.12);
-  --el-border-color-light: rgba(0, 0, 0, 0.08);
-  --el-border-color-lighter: rgba(0, 0, 0, 0.06);
-  --el-fill-color: rgba(0, 0, 0, 0.04);
-  --el-fill-color-light: rgba(0, 0, 0, 0.02);
-  --el-fill-color-lighter: rgba(0, 0, 0, 0.01);
-  --el-fill-color-blank: #ffffff;
-  --el-mask-color: rgba(0, 0, 0, 0.3);
-}
 
 // ===== 全局重置 =====
 html, body {
@@ -207,7 +113,7 @@ html, body {
       background: var(--imm-accent-light);
       border-color: var(--imm-accent-light);
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+      box-shadow: 0 4px 12px var(--color-accent-glow);
     }
   }
 

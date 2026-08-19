@@ -1,5 +1,9 @@
 /**
- * 路由配置
+ * 路由配置 —— 现代化：meta 增加 title/layout/icon 驱动模块化布局与侧边栏
+ * - meta.title: 页面标题（布局头部读取）
+ * - meta.layout: 布局 key（默认 main，见 layouts/registry.js）
+ * - meta.icon: 侧边栏菜单图标（lucide 名，MainLayout 菜单读取）
+ * - meta.menu: 是否显示在侧边栏
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
@@ -11,61 +15,61 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: () => import('@/views/Login.vue'),
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: false, title: '登录', layout: 'blank' }
   },
   {
     path: '/',
     name: 'Home',
     component: () => import('@/views/Home.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '首页', icon: 'home', menu: true }
   },
   {
     path: '/library',
     name: 'Library',
     component: () => import('@/views/Library.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '媒体库', icon: 'clapperboard', menu: true }
   },
   {
     path: '/favorites',
     name: 'Favorites',
     component: () => import('@/views/Favorites.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '收藏', icon: 'star', menu: true }
   },
   {
     path: '/history',
     name: 'History',
     component: () => import('@/views/History.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '最近观看', icon: 'history', menu: true }
   },
   {
     path: '/media/:id',
     name: 'Media',
     component: () => import('@/views/Media.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '媒体详情' }
   },
   {
     path: '/player',
     name: 'Player',
     component: () => import('@/views/VideoPlayer.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '播放器' }
   },
   {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true, title: '设置', icon: 'settings', menu: true }
   },
   {
     path: '/system',
     name: 'System',
     component: () => import('@/views/System.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    meta: { requiresAuth: true, requiresAdmin: true, title: '系统监控', icon: 'monitor', menu: true }
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound.vue'),
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: false, title: '404', layout: 'blank' }
   }
 ]
 
@@ -104,6 +108,11 @@ router.beforeEach(async (to, from, next) => {
       next({ name: 'Login', query: { redirect: to.fullPath } })
       return
     }
+  }
+
+  // 同步文档标题
+  if (to.meta.title) {
+    document.title = `${to.meta.title} - 媒体库管理系统`
   }
 
   next()

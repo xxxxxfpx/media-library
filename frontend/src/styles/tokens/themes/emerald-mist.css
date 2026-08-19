@@ -1,0 +1,18 @@
+/* 翡翠雾 —— 浅底 + 翡翠强调，清新 */
+[data-theme="emerald-mist"] {
+  --color-bg-page:        var(--green-50);
+  --color-bg-surface:     var(--zinc-50);
+  --color-bg-elevated:    var(--green-100);
+  --color-bg-inverse:     var(--green-900);
+  --color-text-primary:   var(--green-900);
+  --color-text-secondary: var(--green-700);
+  --color-text-tertiary:  var(--green-600);
+  --color-text-disabled:  var(--zinc-400);
+  --color-text-inverse:   var(--green-50);
+  --color-accent:         var(--emerald-600);
+  --color-accent-hover:   var(--emerald-500);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}

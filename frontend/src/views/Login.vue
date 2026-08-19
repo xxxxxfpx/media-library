@@ -9,7 +9,7 @@
     <div class="login-wrapper">
       <div class="brand-section">
         <div class="logo">
-          <el-icon :size="64"><VideoCamera /></el-icon>
+          <AppIcon name="clapperboard" :size="64" />
         </div>
         <h1 class="brand-title">Media Library</h1>
         <p class="brand-subtitle">沉浸式媒体管理体验</p>
@@ -28,7 +28,7 @@
               class="imm-input"
             >
               <template #prefix>
-                <el-icon><User /></el-icon>
+                <AppIcon name="user" :size="16" />
               </template>
             </el-input>
           </el-form-item>
@@ -44,7 +44,7 @@
               @keyup.enter="handleLogin"
             >
               <template #prefix>
-                <el-icon><Lock /></el-icon>
+                <AppIcon name="lock" :size="16" />
               </template>
             </el-input>
           </el-form-item>
@@ -84,7 +84,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/store'
 import { ElMessage } from 'element-plus'
-import { User, Lock, VideoCamera } from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
 const store = useAppStore()
@@ -134,7 +134,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: var(--color-bg-page);
   position: relative;
   overflow: hidden;
   padding: 20px;
@@ -150,16 +150,16 @@ async function handleLogin() {
     position: absolute;
     inset: 0;
     background: 
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(33, 150, 243, 0.3), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(33, 150, 243, 0.15), transparent);
+      radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklch, var(--color-accent) 30%, transparent), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 100%, color-mix(in oklch, var(--color-accent) 15%, transparent), transparent);
   }
   
   .bg-pattern {
     position: absolute;
     inset: 0;
     background-image: 
-      radial-gradient(circle at 25% 25%, rgba(33, 150, 243, 0.1) 0%, transparent 50%),
-      radial-gradient(circle at 75% 75%, rgba(33, 150, 243, 0.05) 0%, transparent 50%);
+      radial-gradient(circle at 25% 25%, color-mix(in oklch, var(--color-accent) 10%, transparent) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, color-mix(in oklch, var(--color-accent) 5%, transparent) 0%, transparent 50%);
     opacity: 0.5;
   }
 }
@@ -187,15 +187,15 @@ async function handleLogin() {
     width: 120px;
     height: 120px;
     margin: 0 auto 24px;
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
     border-radius: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--color-text-inverse);
     box-shadow: 
-      0 20px 40px rgba(33, 150, 243, 0.4),
-      0 0 80px rgba(33, 150, 243, 0.2);
+      0 20px 40px var(--color-accent-glow),
+      0 0 80px color-mix(in oklch, var(--color-accent) 20%, transparent);
     animation: float 6s ease-in-out infinite;
   }
   
@@ -203,7 +203,7 @@ async function handleLogin() {
     font-size: 3rem;
     font-weight: 700;
     margin: 0 0 12px;
-    background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.7) 100%);
+    background: linear-gradient(135deg, var(--color-text-inverse) 0%, color-mix(in oklch, var(--color-text-inverse) 70%, transparent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -212,7 +212,7 @@ async function handleLogin() {
   
   .brand-subtitle {
     font-size: 1.125rem;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-tertiary);
     margin: 0;
     font-weight: 400;
   }
@@ -227,14 +227,14 @@ async function handleLogin() {
 .login-card {
   width: 100%;
   max-width: 400px;
-  background: rgba(26, 26, 26, 0.8);
-  backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 20px;
   padding: 40px;
   box-shadow: 
-    0 24px 48px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    var(--shadow-lg),
+    inset 0 1px 0 color-mix(in oklch, var(--color-text-inverse) 5%, transparent);
   
   @media (max-width: 768px) {
     padding: 32px 24px;
@@ -244,14 +244,14 @@ async function handleLogin() {
 .login-title {
   font-size: 1.75rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-inverse);
   margin: 0 0 8px;
   text-align: center;
 }
 
 .login-subtitle {
   font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-tertiary);
   margin: 0 0 32px;
   text-align: center;
 }
@@ -262,42 +262,42 @@ async function handleLogin() {
   }
   
   :deep(.el-input__wrapper) {
-    background: rgba(0, 0, 0, 0.5) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-elevated) !important;
+    border: 1px solid var(--color-border-subtle);
     border-radius: 12px;
     padding: 4px 16px;
     box-shadow: none;
     
     &:hover, &:focus, &.is-focus {
-      border-color: #2196F3;
-      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-soft);
     }
   }
   
   :deep(.el-input__inner) {
-    color: #fff;
+    color: var(--color-text-inverse);
     height: 44px;
     
     &::placeholder {
-      color: rgba(255, 255, 255, 0.4);
+      color: var(--color-text-disabled);
     }
   }
   
   :deep(.el-input__prefix) {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-tertiary);
     margin-right: 12px;
   }
   
   :deep(.el-input__suffix) {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-tertiary);
   }
 }
 
 .login-error {
   margin-bottom: 20px;
   border-radius: 8px;
-  background: rgba(244, 67, 54, 0.1) !important;
-  border: 1px solid rgba(244, 67, 54, 0.3);
+  background: color-mix(in oklch, var(--color-danger) 10%, transparent) !important;
+  border: 1px solid color-mix(in oklch, var(--color-danger) 30%, transparent);
 }
 
 .login-btn {
@@ -306,14 +306,14 @@ async function handleLogin() {
   font-size: 1rem;
   font-weight: 600;
   border-radius: 12px;
-  background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
   border: none;
-  box-shadow: 0 8px 20px rgba(33, 150, 243, 0.4);
-  transition: all 0.3s ease;
+  box-shadow: 0 8px 20px var(--color-accent-glow);
+  transition: all var(--duration-base) var(--ease-standard);
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 28px rgba(33, 150, 243, 0.5);
+    box-shadow: 0 12px 28px var(--color-accent-glow);
   }
   
   &:active {
@@ -326,13 +326,13 @@ async function handleLogin() {
   text-align: center;
   
   p {
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--color-text-disabled);
     font-size: 0.8125rem;
     margin: 0;
   }
   
   .highlight {
-    color: #2196F3;
+    color: var(--color-accent);
     font-weight: 500;
   }
 }

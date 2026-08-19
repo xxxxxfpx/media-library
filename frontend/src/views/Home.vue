@@ -9,9 +9,7 @@
         :style="{ '--stat-color': stat.color }"
       >
         <div class="stat-icon-wrapper">
-          <el-icon :size="18">
-            <component :is="stat.icon" />
-          </el-icon>
+          <AppIcon :name="stat.icon" :size="18" />
         </div>
         <div class="stat-info">
           <div class="stat-value">{{ formatNumber(stat.value) }}</div>
@@ -25,7 +23,7 @@
     <div class="section">
       <div class="section-header">
         <div class="section-title">
-          <el-icon><Clock /></el-icon>
+          <AppIcon name="clock" :size="18" />
           <span>最近添加</span>
         </div>
         <el-button
@@ -34,7 +32,7 @@
           class="view-all-btn"
           @click="$router.push('/library')"
         >
-          查看全部 <el-icon><ArrowRight /></el-icon>
+          查看全部 <AppIcon name="arrow-right" :size="14" />
         </el-button>
       </div>
 
@@ -57,15 +55,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { mediaAPI } from '@/api'
 import MediaGrid from '@/components/MediaGrid.vue'
-import {
-  Clock, ArrowRight
-} from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
+// 统计卡颜色一律引用语义令牌（--color-stat-*，定义于 tokens/semantic.css），禁止硬编码
 const stats = ref([
-  { key: 'video', label: '视频', value: 0, icon: 'VideoCamera', color: '#2196F3' },
-  { key: 'audio', label: '音乐', value: 0, icon: 'Headset', color: '#4CAF50' },
-  { key: 'image', label: '图片', value: 0, icon: 'Picture', color: '#FF9800' },
-  { key: 'book', label: '电子书', value: 0, icon: 'Document', color: '#9C27B0' },
+  { key: 'video', label: '视频', value: 0, icon: 'video', color: 'var(--color-stat-video)' },
+  { key: 'audio', label: '音乐', value: 0, icon: 'headphones', color: 'var(--color-stat-audio)' },
+  { key: 'image', label: '图片', value: 0, icon: 'image', color: 'var(--color-stat-image)' },
+  { key: 'book', label: '电子书', value: 0, icon: 'book-open', color: 'var(--color-stat-book)' },
 ])
 
 const visibleStats = computed(() => stats.value.filter(s => s.value > 0))
@@ -78,10 +75,10 @@ async function fetchData() {
   try {
     const statsData = await mediaAPI.getStats()
     stats.value = [
-      { key: 'video', label: '视频', value: statsData.video_count || 0, icon: 'VideoCamera', color: '#2196F3' },
-      { key: 'audio', label: '音乐', value: statsData.audio_count || 0, icon: 'Headset', color: '#4CAF50' },
-      { key: 'image', label: '图片', value: statsData.image_count || 0, icon: 'Picture', color: '#FF9800' },
-      { key: 'book', label: '电子书', value: statsData.book_count || 0, icon: 'Document', color: '#9C27B0' },
+      { key: 'video', label: '视频', value: statsData.video_count || 0, icon: 'video', color: 'var(--color-stat-video)' },
+      { key: 'audio', label: '音乐', value: statsData.audio_count || 0, icon: 'headphones', color: 'var(--color-stat-audio)' },
+      { key: 'image', label: '图片', value: statsData.image_count || 0, icon: 'image', color: 'var(--color-stat-image)' },
+      { key: 'book', label: '电子书', value: statsData.book_count || 0, icon: 'book-open', color: 'var(--color-stat-book)' },
     ]
   } catch (error) {
     console.error('获取数据失败:', error)
@@ -146,7 +143,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--stat-color, #2196F3);
+    color: var(--stat-color);
     flex-shrink: 0;
   }
 
@@ -177,7 +174,7 @@ onMounted(() => {
     right: -20%;
     width: 150px;
     height: 150px;
-    background: var(--stat-color, #2196F3);
+    background: var(--stat-color);
     filter: blur(60px);
     opacity: 0;
     transition: opacity 0.3s ease;

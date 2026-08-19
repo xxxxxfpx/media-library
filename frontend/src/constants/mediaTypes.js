@@ -1,10 +1,9 @@
 /**
  * 媒体类型常量 - 统一维护类型标签和图标映射
+ *
+ * 图标统一为 lucide 图标名（字符串），由 AppIcon 渲染；
+ * 新增类型只需在 TYPE_ICONS 登记图标名，并在 icons/registry.js 注册对应图标。
  */
-
-import {
-  Film, VideoCamera, User, FolderOpened, Collection
-} from '@element-plus/icons-vue'
 
 export const TYPE_LABELS = {
   'Movie': '电影',
@@ -20,22 +19,16 @@ export const TYPE_LABELS = {
 }
 
 export const TYPE_ICONS = {
-  'Movie': 'Film',
-  'Series': 'Film',
-  'Season': 'Film',
-  'Episode': 'Film',
-  'Person': 'User',
-  'Source': 'FolderOpened',
-  'Studio': 'VideoCamera',
-  'Genre': 'Collection',
-  'Tag': 'Collection',
-  'BoxSet': 'Collection',
-}
-
-// 图标名称 → 组件引用映射（唯一维护处，供各组件共用）
-export const ICON_COMPONENT_MAP = {
-  'Film': Film, 'VideoCamera': VideoCamera, 'User': User,
-  'FolderOpened': FolderOpened, 'Collection': Collection,
+  'Movie': 'film',
+  'Series': 'film',
+  'Season': 'film',
+  'Episode': 'film',
+  'Person': 'user',
+  'Source': 'folder-open',
+  'Studio': 'clapperboard',
+  'Genre': 'library',
+  'Tag': 'library',
+  'BoxSet': 'library',
 }
 
 export const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([value, label]) => ({
@@ -48,10 +41,10 @@ export function getTypeLabel(type) {
 }
 
 export function getTypeIconName(type) {
-  return TYPE_ICONS[type] || 'VideoCamera'
+  return TYPE_ICONS[type] || 'clapperboard'
 }
 
+// 兼容旧调用方：返回 lucide 图标名（字符串），配合 <AppIcon :name="..."> 使用
 export function getTypeIcon(type) {
-  const iconName = TYPE_ICONS[type] || 'VideoCamera'
-  return ICON_COMPONENT_MAP[iconName] || Film
+  return getTypeIconName(type)
 }

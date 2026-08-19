@@ -49,6 +49,7 @@ class UserInfo {
 
 class UserSetting {
   // 主题设置
+  final String? themePreset;
   final String? themeMode;
   final String? primaryColor;
   
@@ -71,6 +72,7 @@ class UserSetting {
   final int? autoSyncInterval;
 
   UserSetting({
+    this.themePreset,
     this.themeMode,
     this.primaryColor,
     this.defaultPlaybackRate,
@@ -87,6 +89,7 @@ class UserSetting {
 
   factory UserSetting.fromJson(Map<String, dynamic> json) {
     return UserSetting(
+      themePreset: json['theme_preset'] as String?,
       themeMode: json['theme_mode'] as String?,
       primaryColor: json['primary_color'] as String?,
       defaultPlaybackRate: (json['default_playback_rate'] as num?)?.toDouble(),
@@ -103,6 +106,7 @@ class UserSetting {
   }
 
   Map<String, dynamic> toJson() => {
+        if (themePreset != null) 'theme_preset': themePreset,
         if (themeMode != null) 'theme_mode': themeMode,
         if (primaryColor != null) 'primary_color': primaryColor,
         if (defaultPlaybackRate != null) 'default_playback_rate': defaultPlaybackRate,
@@ -118,6 +122,7 @@ class UserSetting {
       };
 
   UserSetting copyWith({
+    String? themePreset,
     String? themeMode,
     String? primaryColor,
     double? defaultPlaybackRate,
@@ -132,6 +137,7 @@ class UserSetting {
     int? autoSyncInterval,
   }) {
     return UserSetting(
+      themePreset: themePreset ?? this.themePreset,
       themeMode: themeMode ?? this.themeMode,
       primaryColor: primaryColor ?? this.primaryColor,
       defaultPlaybackRate: defaultPlaybackRate ?? this.defaultPlaybackRate,

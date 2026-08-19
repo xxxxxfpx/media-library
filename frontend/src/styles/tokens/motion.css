@@ -1,0 +1,18 @@
+/**
+ * 动效令牌（Motion）—— 所有动效时长/缓动只引用本层，与颜色同等级纪律。
+ * 时长超 400ms 的动效需专门评审。
+ */
+
+:root {
+  --duration-fast: 150ms;   /* hover、按压、焦点 */
+  --duration-base: 250ms;   /* 面板、抽屉、菜单 */
+  --duration-slow: 400ms;    /* 路由转场、大区域 */
+
+  --ease-standard:  cubic-bezier(0.2, 0, 0, 1);    /* 常规进出 */
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);   /* 进入强调 */
+  --ease-exit:      cubic-bezier(0.4, 0, 1, 1);    /* 退出 */
+
+  /* 路由转场（View Transitions / <Transition>） */
+  --route-enter: 220ms;
+  --route-exit:  180ms;
+}

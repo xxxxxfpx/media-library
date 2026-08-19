@@ -3,7 +3,7 @@
  * 统一处理播放器状态变更和 UserData 同步
  */
 
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import { userAPI } from '@/api'
 
 export function usePlayerState(itemId, videoRef) {
@@ -129,7 +129,7 @@ export function usePlayerState(itemId, videoRef) {
   /**
    * 应用用户设置到播放器
    */
-  function applyUserSettings(settings) {
+  function applyUserSettings(_settings) {
     if (!videoRef.value) return
 
     const shouldAutoplay = localStorage.getItem('video_autoplay') === 'true'

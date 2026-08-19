@@ -5,6 +5,7 @@ import '../core/constants.dart';
 import '../core/app_logger.dart';
 import '../data/api/api_client.dart';
 import '../data/api/user_api.dart';
+import '../design_system/app_color_tokens.dart';
 
 import '../providers/settings_provider.dart';
 import '../services/sync_service.dart';
@@ -25,7 +26,9 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
 
   // 云端设置（读取后从 Provider 获取默认值，修改后自动同步云端）
   bool _isLoading = true;
+  String? _themePreset;
   String? _themeMode;
+  // ignore: unused_field
   String? _primaryColor;
   int? _autoSyncInterval;
   int? _mediaRetryInterval;
@@ -62,6 +65,7 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
       final settings = await userApi.getSetting();
       if (!mounted) return;
       setState(() {
+        _themePreset = settings.themePreset ?? 'currentPurple';
         _themeMode = settings.themeMode;
         _primaryColor = settings.primaryColor;
         _autoSyncInterval = settings.autoSyncInterval ?? 60;
@@ -215,27 +219,8 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
     );
   }
 
-  static const List<Color> _presetColors = [
-    Colors.red,
-    Colors.pink,
-    Colors.purple,
-    Colors.deepPurple,
-    Colors.indigo,
-    Colors.blue,
-    Colors.lightBlue,
-    Colors.cyan,
-    Colors.teal,
-    Colors.green,
-    Colors.lightGreen,
-    Colors.lime,
-    Colors.yellow,
-    Colors.amber,
-    Colors.orange,
-    Colors.deepOrange,
-    Colors.brown,
-    Colors.blueGrey,
-  ];
-
+  // 旧版主题色已迁移至主题预设系统，仅保留兼容读取
+  // ignore: unused_element
   static String _colorToHex(Color color) {
     return '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
   }
@@ -246,6 +231,63 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
       title: '主题设置',
       icon: Icons.palette,
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.style_outlined, color: cs.primary),
+                  const SizedBox(width: 12),
+                  Text(
+                    '主题预设',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: AppThemePresets.all.map((preset) {
+                  final isSelected = (_themePreset ?? 'currentPurple') == preset.id.id;
+                  final scheme = Theme.of(context).brightness == Brightness.dark
+                      ? preset.darkScheme
+                      : preset.lightScheme;
+                  return ChoiceChip(
+                    label: Text(preset.id.label),
+                    selected: isSelected,
+                    avatar: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: scheme.outlineVariant),
+                      ),
+                    ),
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() => _themePreset = preset.id.id);
+                      ref.read(settingsProvider.notifier).themePreset = preset.id.id;
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '现代黑 / 现代白 / 韵味紫为必选主题，支持浅色与深色模式',
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -294,66 +336,12 @@ class _MediaPlaySettingsPageState extends ConsumerState<MediaPlaySettingsPage> {
             children: [
               Padding(
                 padding: const EdgeInsets.only(right: 16),
-                child: Icon(Icons.colorize, color: cs.primary),
+                child: Icon(Icons.info_outline, color: cs.primary),
               ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '主题色',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _presetColors.map((color) {
-                        final hex = _colorToHex(color);
-                        final isSelected = _primaryColor?.toUpperCase() == hex;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() => _primaryColor = hex);
-                            ref.read(settingsProvider.notifier).primaryColor =
-                                hex;
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: isSelected
-                                  ? Border.all(color: cs.onSurface, width: 3)
-                                  : null,
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withValues(alpha: 0.5),
-                                        blurRadius: 8,
-                                        spreadRadius: 1,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: isSelected
-                                ? Icon(
-                                    Icons.check,
-                                    color: color.computeLuminance() > 0.5
-                                        ? Colors.black
-                                        : Colors.white,
-                                    size: 18,
-                                  )
-                                : null,
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                child: Text(
+                  '主题色已由主题预设统一管理，旧版 primary_color 仅作兼容保留',
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                 ),
               ),
             ],

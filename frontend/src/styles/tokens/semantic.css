@@ -1,0 +1,71 @@
+/**
+ * 语义令牌（Semantic）—— 按用途命名，主题通过重定义取值换肤。
+ *
+ * 本文件 :root 仅定义「与主题无关」的派生令牌（公式/别名/圆角/阴影），
+ * 真正的色值由 themes/*.css 提供。业务代码只引用本层及以上令牌。
+ *
+ * 保留 --imm-* 别名以兼容存量组件（immersive.scss / MainLayout 等），
+ * 它们只是 --color-* 的别名，最终会随主题翻转。
+ */
+
+:root {
+  /* ===== 派生令牌（基于主题的 --color-* 计算，本身不含色值） ===== */
+  --color-accent-soft:  color-mix(in oklch, var(--color-accent) 15%, transparent);
+  --color-accent-glow:  color-mix(in oklch, var(--color-accent) 40%, transparent);
+  --color-border-default: color-mix(in oklch, var(--color-text-primary) 14%, transparent);
+  --color-border-subtle:  color-mix(in oklch, var(--color-text-primary) 8%, transparent);
+  --color-border-strong:  color-mix(in oklch, var(--color-text-primary) 22%, transparent);
+  --color-hover:        color-mix(in oklch, var(--color-text-primary) 5%, transparent);
+  --color-hover-strong: color-mix(in oklch, var(--color-text-primary) 10%, transparent);
+  --color-selected:     color-mix(in oklch, var(--color-accent) 14%, transparent);
+  --color-overlay:      color-mix(in oklch, black 60%, transparent);
+  --color-backdrop:     blur(20px) saturate(180%);
+  --glass-bg:           color-mix(in oklch, var(--color-bg-page) 80%, transparent);
+  --glass-blur:         blur(20px) saturate(180%);
+
+  /* 统计卡固定语义色（不随主题翻转） */
+  --color-stat-video:  var(--indigo-500);
+  --color-stat-audio:  var(--sky-500);
+  --color-stat-image:  var(--emerald-500);
+  --color-stat-book:   var(--amber-500);
+
+  /* ===== 圆角 / 阴影（主题无关） ===== */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --shadow-sm:  0 1px 2px color-mix(in oklch, black 30%, transparent);
+  --shadow-md:  0 4px 16px color-mix(in oklch, black 40%, transparent);
+  --shadow-lg:  0 16px 48px color-mix(in oklch, black 50%, transparent);
+  --shadow-glow-accent: 0 4px 16px var(--color-accent-glow);
+
+  /* ===== 布局尺寸令牌 ===== */
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
+  --header-height: 64px;
+
+  /* ===== 向后兼容别名（过渡期，后续随组件改造删除） ===== */
+  --imm-bg-primary:      var(--color-bg-page);
+  --imm-bg-secondary:    var(--color-bg-surface);
+  --imm-bg-tertiary:     var(--color-bg-elevated);
+  --imm-bg-elevated:     var(--color-bg-elevated);
+  --imm-text-primary:    var(--color-text-primary);
+  --imm-text-secondary:  var(--color-text-secondary);
+  --imm-text-tertiary:   var(--color-text-tertiary);
+  --imm-text-disabled:   var(--color-text-disabled);
+  --imm-accent:          var(--color-accent);
+  --imm-accent-light:    var(--color-accent-hover);
+  --imm-accent-dark:     var(--color-accent-hover);
+  --imm-accent-bg:       var(--color-selected);
+  --imm-success:         var(--color-success);
+  --imm-warning:         var(--color-warning);
+  --imm-error:           var(--color-danger);
+  --imm-info:            var(--color-info);
+  --imm-divider:         var(--color-border-subtle);
+  --imm-border:          var(--color-border-default);
+  --imm-overlay:         var(--color-overlay);
+  --imm-backdrop:        var(--color-backdrop);
+  --imm-glass-bg:        var(--glass-bg);
+  --imm-hover:           var(--color-hover);
+  --imm-hover-strong:    var(--color-hover-strong);
+}

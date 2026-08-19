@@ -1,0 +1,11 @@
+/* 设计令牌统一入口：引入顺序即层叠顺序（主题文件须在语义派生之后） */
+@import './primitives.css';
+@import './semantic.css';
+@import './motion.css';
+@import './themes/modern-dark.css';
+@import './themes/modern-light.css';
+@import './themes/indigo-night.css';
+@import './themes/emerald-mist.css';
+@import './themes/amber-sand.css';
+@import './themes/rose-dusk.css';
+@import './element-bridge.css';

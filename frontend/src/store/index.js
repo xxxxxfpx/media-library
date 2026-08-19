@@ -4,7 +4,7 @@
 
 import { defineStore } from 'pinia'
 import { useAuthStore } from './auth'
-import { useThemeStore } from './theme'
+import { useThemeStore, THEMES } from './theme'
 import { useLayoutStore } from './layout'
 
 export const useAppStore = defineStore('app', () => {
@@ -25,6 +25,7 @@ export const useAppStore = defineStore('app', () => {
 
     // 主题
     theme: theme.theme,
+    themes: THEMES,
     userSetting: theme.userSetting,
     setTheme: theme.setTheme,
     toggleTheme: theme.toggleTheme,

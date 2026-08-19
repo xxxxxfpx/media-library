@@ -14,7 +14,7 @@
     @closed="handleClosed"
   >
     <div v-if="loading" class="drawer-loading">
-      <el-icon class="loading-icon" :size="32"><Loading /></el-icon>
+      <AppIcon name="loader-circle" :size="32" class="loading-icon" />
       <p>加载中...</p>
     </div>
 
@@ -27,13 +27,13 @@
 
         <div class="hero-content">
           <button class="close-btn" @click="close">
-            <el-icon><Close /></el-icon>
+            <AppIcon name="x" :size="18" />
           </button>
 
           <div class="poster-wrapper">
             <img v-if="currentImageUrl" :src="currentImageUrl" :alt="item.name" class="poster-img" />
             <div v-else class="poster-placeholder">
-              <el-icon :size="48"><component :is="typeIcon" /></el-icon>
+              <AppIcon :name="typeIcon" :size="48" />
             </div>
           </div>
 
@@ -42,7 +42,7 @@
               <span class="badge type-badge">{{ typeLabel }}</span>
               <span v-if="item.production_year" class="badge year-badge">{{ item.production_year }}</span>
               <span v-if="item.community_rating" class="badge rating-badge">
-                <el-icon><StarFilled /></el-icon> {{ item.community_rating.toFixed(1) }}
+                <AppIcon name="star" :size="14" :filled="true" /> {{ item.community_rating.toFixed(1) }}
               </span>
             </div>
 
@@ -102,7 +102,7 @@
         <div v-if="item?.has_children" ref="childrenSectionRef" class="detail-section">
           <h3 class="section-title">包含的媒体</h3>
           <div v-if="childrenLoading" class="drawer-loading" style="padding: 20px 0;">
-            <el-icon class="loading-icon" :size="24"><Loading /></el-icon>
+            <AppIcon name="loader-circle" :size="24" class="loading-icon" />
             <p style="margin-top: 8px;">加载子媒体...</p>
           </div>
           <div v-else-if="childrenItems.length" class="link-grid">
@@ -123,7 +123,7 @@
       <!-- 底部操作栏 -->
       <div class="drawer-footer">
         <el-button type="primary" class="action-btn" @click="goToDetailPage">
-          <el-icon><Document /></el-icon>
+          <AppIcon name="file-text" :size="16" />
           <span>查看完整详情</span>
         </el-button>
       </div>
@@ -138,12 +138,10 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { mediaAPI, fileAPI } from '@/api'
 import { useMediaNavigation, closeMediaDetail } from '@/composables/useMediaNavigation'
-import { getTypeLabel, getTypeIcon } from '@/constants/mediaTypes'
+import { getTypeLabel, getTypeIconName } from '@/constants/mediaTypes'
 import { formatDate, formatFileSize } from '@/utils/format'
-import { getFileDataUrl, getPrimaryImageUrl } from '@/utils/url'
-import {
-  Loading, Close, StarFilled
-} from '@element-plus/icons-vue'
+import { getPrimaryImageUrl } from '@/utils/url'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
 const { state } = useMediaNavigation()
@@ -170,7 +168,7 @@ const itemTypeClass = computed(() => (item.value?.type || '').toLowerCase())
 
 const typeLabel = computed(() => getTypeLabel(item.value?.type))
 
-const typeIcon = computed(() => getTypeIcon(item.value?.type))
+const typeIcon = computed(() => getTypeIconName(item.value?.type))
 
 const heroBgStyle = computed(() => {
   const backdrop = item.value?.files?.find(f => f.image_type === 'Backdrop')
@@ -234,11 +232,6 @@ const boxSetLinks = computed(() => {
       name: l.linked_item?.name,
     }))
 })
-
-function openMedia(id) {
-  closeMediaDetail()
-  router.push(`/media/${id}`)
-}
 
 function handleClosed() {
   // 抽屉关闭后的清理
@@ -362,16 +355,17 @@ watch(() => item.value?.has_children, async (hasChildren) => {
   height: 36px;
   border-radius: 50%;
   border: none;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
+  background: var(--color-overlay);
+  color: var(--color-text-inverse);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  transition: all var(--duration-fast) var(--ease-standard);
 
   &:hover {
     background: var(--imm-accent);
+    color: var(--color-text-inverse);
   }
 }
 
@@ -381,7 +375,7 @@ watch(() => item.value?.has_children, async (hasChildren) => {
   border-radius: 12px;
   overflow: hidden;
   background: var(--imm-bg-tertiary);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-lg);
   margin-bottom: 16px;
 }
 
@@ -421,13 +415,13 @@ watch(() => item.value?.has_children, async (hasChildren) => {
     }
 
     &.year-badge {
-      background: rgba(255,255,255,0.08);
-      color: rgba(255,255,255,0.7);
+      background: var(--color-hover);
+      color: var(--color-text-secondary);
     }
 
     &.rating-badge {
-      background: rgba(255, 193, 7, 0.15);
-      color: #FFC107;
+      background: color-mix(in oklch, var(--color-warning) 15%, transparent);
+      color: var(--color-warning);
       display: flex;
       align-items: center;
       gap: 4px;

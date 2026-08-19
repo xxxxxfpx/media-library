@@ -1,0 +1,38 @@
+/* Tailwind CSS v4 入口 —— 原子化工具类映射到语义令牌。
+   由于 --color-* 随 data-theme 翻转，bg-ui-surface / text-ui-fg 等工具类
+   天然多主题，无需为每个主题写 dark: 变体分支。 */
+@import "tailwindcss";
+
+/* 让 dark: 工具类作用于「暗色主题」而非系统偏好（与我们的主题系统对齐）。
+   Tailwind v4 内置容器查询（@container / @sm: 等），无需额外插件。 */
+@custom-variant dark (&:is([data-theme="modern-dark"], [data-theme="indigo-night"], [data-theme="rose-dusk"] *));
+
+@theme inline {
+  /* 颜色：引用语义令牌，运行时随主题解析 */
+  --color-ui-page:         var(--color-bg-page);
+  --color-ui-surface:      var(--color-bg-surface);
+  --color-ui-elevated:     var(--color-bg-elevated);
+  --color-ui-fg:           var(--color-text-primary);
+  --color-ui-muted:        var(--color-text-secondary);
+  --color-ui-subtle:       var(--color-text-tertiary);
+  --color-ui-disabled:     var(--color-text-disabled);
+  --color-ui-brand:        var(--color-accent);
+  --color-ui-brand-soft:   var(--color-accent-soft);
+  --color-ui-success:      var(--color-success);
+  --color-ui-warning:      var(--color-warning);
+  --color-ui-danger:       var(--color-danger);
+  --color-ui-info:         var(--color-info);
+  --color-ui-border:       var(--color-border-default);
+  --color-ui-border-subtle: var(--color-border-subtle);
+  --color-ui-overlay:      var(--color-overlay);
+
+  /* 圆角 / 阴影：引用语义令牌 */
+  --radius-card: var(--radius-lg);
+  --radius-tile: var(--radius-md);
+  --radius-chip: var(--radius-sm);
+  --radius-pill: 999px;
+  --shadow-soft: var(--shadow-md);
+  --shadow-card: var(--shadow-lg);
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}

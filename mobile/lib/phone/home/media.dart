@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../design_system/app_icons.dart';
 import '../../component/horizontal_media_section.dart';
 import '../../core/constants.dart';
 import '../../core/app_logger.dart';
@@ -238,7 +238,7 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
           children: [
             const Padding(
               padding: EdgeInsets.only(left: 4),
-              child: Icon(LucideIcons.search, size: 20),
+              child: Icon(AppIcons.search, size: 20),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -272,9 +272,9 @@ class _HomeTabMediaState extends State<HomeTabMedia> {
                   _searchController.clear();
                   setState(() {});
                 },
-                child: const Padding(
-                  padding: EdgeInsets.only(right: 4),
-                  child: Icon(LucideIcons.x, size: 16),
+                  child: Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(AppIcons.close, size: 16),
                 ),
               ),
           ],

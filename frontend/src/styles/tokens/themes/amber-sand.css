@@ -1,0 +1,18 @@
+/* 琥珀砂 —— 暖浅底 + 琥珀强调 */
+[data-theme="amber-sand"] {
+  --color-bg-page:        var(--amber-50);
+  --color-bg-surface:     var(--zinc-50);
+  --color-bg-elevated:    var(--amber-100);
+  --color-bg-inverse:     var(--amber-900);
+  --color-text-primary:   var(--amber-900);
+  --color-text-secondary: var(--amber-700);
+  --color-text-tertiary:  var(--amber-600);
+  --color-text-disabled:  var(--zinc-400);
+  --color-text-inverse:   var(--amber-50);
+  --color-accent:         var(--amber-500);
+  --color-accent-hover:   var(--amber-400);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}

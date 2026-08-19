@@ -12,8 +12,9 @@ class UserSettings(BaseModel):
     """用户设置模型"""
     
     # 主题设置
+    theme_preset: Optional[str] = Field(None, description="主题预设：modernBlack/modernWhite/currentPurple/ocean/forest")
     theme_mode: Optional[str] = Field(None, description="主题模式：light/dark/system")
-    primary_color: Optional[str] = Field(None, description="主题色")
+    primary_color: Optional[str] = Field(None, description="主题色（兼容旧版本，已废弃请使用 theme_preset）")
     
     # 播放设置
     default_playback_rate: Optional[float] = Field(None, description="默认播放速率")

@@ -6,7 +6,7 @@
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon :size="32" color="#409EFF"><Monitor /></el-icon>
+            <AppIcon name="monitor" :size="32" style="color: var(--color-info)" />
             <div class="stat-info">
               <div class="stat-value">{{ systemInfo.ip || '--' }}</div>
               <div class="stat-label">IP 地址</div>
@@ -17,7 +17,7 @@
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon :size="32" color="#67C23A"><Cpu /></el-icon>
+            <AppIcon name="cpu" :size="32" style="color: var(--color-success)" />
             <div class="stat-info">
               <div class="stat-value">{{ systemInfo.cpu?.toFixed(1) || '0' }}%</div>
               <div class="stat-label">CPU 使用率</div>
@@ -29,7 +29,7 @@
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon :size="32" color="#E6A23C"><Coin /></el-icon>
+            <AppIcon name="coins" :size="32" style="color: var(--color-warning)" />
             <div class="stat-info">
               <div class="stat-value">{{ systemInfo.memory_percent?.toFixed(1) || '0' }}%</div>
               <div class="stat-label">内存使用</div>
@@ -41,7 +41,7 @@
       <el-col :span="6">
         <el-card shadow="hover">
           <div class="stat-card">
-            <el-icon :size="32" color="#F56C6C"><Folder /></el-icon>
+            <AppIcon name="folder" :size="32" style="color: var(--color-danger)" />
             <div class="stat-info">
               <div class="stat-value">{{ systemInfo.disk_percent?.toFixed(1) || '0' }}%</div>
               <div class="stat-label">磁盘使用</div>
@@ -89,7 +89,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { systemAPI } from '@/api'
-import { Monitor, Cpu, Coin, Folder } from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const systemInfo = ref({})
 let timer = null
@@ -105,9 +105,9 @@ async function fetchSystemInfo() {
 }
 
 function getProgressColor(value) {
-  if (value > 90) return '#F56C6C'
-  if (value > 70) return '#E6A23C'
-  return '#67C23A'
+  if (value > 90) return 'var(--color-danger)'
+  if (value > 70) return 'var(--color-warning)'
+  return 'var(--color-success)'
 }
 
 function startPolling() {
@@ -170,7 +170,7 @@ onUnmounted(() => {
 
 .stat-label {
   font-size: 12px;
-  color: #999;
+  color: var(--imm-text-tertiary);
 }
 
 .detail-list {
@@ -201,7 +201,7 @@ onUnmounted(() => {
   font-size: 14px;
   color: var(--imm-text-primary);
   font-weight: 500;
-  word-break: break-word;
+  overflow-wrap: break-word;
   line-height: 1.5;
 }
 </style>

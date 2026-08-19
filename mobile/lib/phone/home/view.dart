@@ -110,7 +110,10 @@ class _HomePagePhoneState extends ConsumerState<HomePagePhone> {
                     child: Container(
                       height: _bottomBarHeight,
                       width: barWidth,
-                      color: Colors.black.withValues(alpha: 0.25),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .scrim
+                          .withValues(alpha: 0.25),
                     ),
                   ),
                 ),

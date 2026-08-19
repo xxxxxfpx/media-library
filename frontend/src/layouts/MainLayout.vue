@@ -4,7 +4,7 @@
     <el-aside :width="sidebarWidth" class="sidebar">
       <div class="sidebar-inner">
         <div class="brand">
-          <el-icon :size="28"><VideoCamera /></el-icon>
+          <AppIcon name="clapperboard" :size="28" class="brand-icon" />
           <span v-show="!store.sidebarCollapsed" class="brand-text">Media Library</span>
         </div>
 
@@ -15,30 +15,16 @@
           :collapse="store.sidebarCollapsed"
           :collapse-transition="false"
         >
-          <el-menu-item index="/">
-            <el-icon><HomeFilled /></el-icon>
-            <template #title>首页</template>
+          <el-menu-item v-for="item in menuItems" :key="item.to" :index="item.to">
+            <AppIcon :name="item.icon" :size="18" />
+            <template #title>{{ item.title }}</template>
           </el-menu-item>
-          <el-menu-item index="/library">
-            <el-icon><VideoCamera /></el-icon>
-            <template #title>媒体库</template>
-          </el-menu-item>
-          <el-menu-item index="/favorites">
-            <el-icon><Star /></el-icon>
-            <template #title>收藏</template>
-          </el-menu-item>
-          <el-menu-item index="/history">
-            <el-icon><Clock /></el-icon>
-            <template #title>最近观看</template>
-          </el-menu-item>
+
           <div class="nav-divider"></div>
-          <el-menu-item index="/settings">
-            <el-icon><Setting /></el-icon>
-            <template #title>设置</template>
-          </el-menu-item>
-          <el-menu-item v-if="store.isAdmin" index="/system">
-            <el-icon><Monitor /></el-icon>
-            <template #title>系统监控</template>
+
+          <el-menu-item v-for="item in visibleAdminItems" :key="item.to" :index="item.to">
+            <AppIcon :name="item.icon" :size="18" />
+            <template #title>{{ item.title }}</template>
           </el-menu-item>
         </el-menu>
 
@@ -57,10 +43,7 @@
 
       <!-- 收缩按钮 -->
       <button class="collapse-btn" @click="store.toggleSidebar">
-        <el-icon :size="16">
-          <Fold v-if="!store.sidebarCollapsed" />
-          <Expand v-else />
-        </el-icon>
+        <AppIcon :name="store.sidebarCollapsed ? 'panel-left-open' : 'panel-left-close'" :size="16" />
       </button>
     </el-aside>
 
@@ -72,30 +55,22 @@
           <h2 class="page-title">{{ pageTitle }}</h2>
         </div>
         <div class="header-right">
-          <el-button
-            circle
-            class="theme-btn"
-            @click="store.toggleTheme"
-          >
-            <el-icon :size="18">
-              <component :is="store.theme === 'dark' ? Sunny : Moon" />
-            </el-icon>
-          </el-button>
+          <ThemeSwitcher />
 
           <el-dropdown trigger="click" @command="handleCommand">
             <div class="user-menu-trigger">
               <el-avatar :size="32" class="user-avatar-small">
                 {{ store.userInfo?.username?.charAt(0)?.toUpperCase() || 'U' }}
               </el-avatar>
-              <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+              <AppIcon name="chevron-down" :size="14" class="dropdown-icon" />
             </div>
             <template #dropdown>
               <el-dropdown-menu class="user-dropdown">
                 <el-dropdown-item command="settings">
-                  <el-icon><Setting /></el-icon> 个人设置
+                  <AppIcon name="settings" :size="16" /> 个人设置
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
-                  <el-icon><SwitchButton /></el-icon> 退出登录
+                  <AppIcon name="log-out" :size="16" /> 退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -105,7 +80,11 @@
 
       <!-- 动态内容 -->
       <el-main class="main-content">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="route" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </div>
   </div>
@@ -116,30 +95,34 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store'
 import { authAPI } from '@/api'
-import {
-  VideoCamera, HomeFilled, Star, Clock, Setting, Monitor, Tools,
-  Sunny, Moon, ArrowDown, SwitchButton, Fold, Expand
-} from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 
-const sidebarWidth = computed(() => store.sidebarCollapsed ? '72px' : '240px')
+const sidebarWidth = computed(() => (store.sidebarCollapsed ? '72px' : '240px'))
 
-const pageTitle = computed(() => {
-  const titles = {
-    '/': '首页',
-    '/library': '媒体库',
-    '/favorites': '收藏',
-    '/history': '最近观看',
-    '/settings': '设置',
-    '/system': '系统监控'
-  }
-  if (titles[route.path]) return titles[route.path]
-  if (route.path.startsWith('/media/')) return '媒体详情'
-  return '首页'
-})
+// 侧边栏菜单：由路由 meta 驱动（新增页面只需在 router/index.js 注册 meta.icon + meta.menu）
+const menuItems = [
+  { to: '/', icon: 'home', title: '首页' },
+  { to: '/library', icon: 'clapperboard', title: '媒体库' },
+  { to: '/favorites', icon: 'star', title: '收藏' },
+  { to: '/history', icon: 'history', title: '最近观看' },
+]
+
+const adminItems = [
+  { to: '/settings', icon: 'settings', title: '设置' },
+  { to: '/system', icon: 'monitor', title: '系统监控', adminOnly: true },
+]
+
+// 仅管理员可见的菜单（adminOnly 项）
+const visibleAdminItems = computed(() =>
+  adminItems.filter((item) => !item.adminOnly || store.isAdmin)
+)
+
+const pageTitle = computed(() => route.meta.title || '首页')
 
 function handleCommand(command) {
   if (command === 'logout') {
@@ -190,6 +173,10 @@ function handleCommand(command) {
   color: var(--imm-text-primary);
   white-space: nowrap;
 
+  .brand-icon {
+    color: var(--imm-accent);
+  }
+
   .brand-text {
     font-size: 1.125rem;
     font-weight: 600;
@@ -214,9 +201,8 @@ function handleCommand(command) {
     font-size: 0.9375rem;
     white-space: nowrap;
 
-    .el-icon {
+    .app-icon {
       margin-right: 12px;
-      font-size: 1.125rem;
     }
 
     &:hover {
@@ -233,7 +219,7 @@ function handleCommand(command) {
 
   // 收缩模式下图标居中
   &:not(:deep(.el-menu--collapse)) {
-    .el-menu-item .el-icon {
+    .el-menu-item .app-icon {
       margin-right: 12px;
     }
   }
@@ -258,7 +244,7 @@ function handleCommand(command) {
 
     .user-avatar {
       background: linear-gradient(135deg, var(--imm-accent) 0%, var(--imm-accent-dark) 100%);
-      color: #fff;
+      color: var(--color-text-inverse);
       font-weight: 600;
       flex-shrink: 0;
     }
@@ -305,9 +291,9 @@ function handleCommand(command) {
 
   &:hover {
     background: var(--imm-accent);
-    color: #fff;
+    color: var(--color-text-inverse);
     border-color: var(--imm-accent);
-    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+    box-shadow: 0 4px 12px var(--color-accent-glow);
   }
 }
 
@@ -347,19 +333,6 @@ function handleCommand(command) {
   display: flex;
   align-items: center;
   gap: 12px;
-
-  .theme-btn {
-    width: 36px;
-    height: 36px;
-    background: var(--imm-hover) !important;
-    border: 1px solid var(--imm-border) !important;
-    color: var(--imm-text-secondary) !important;
-
-    &:hover {
-      background: var(--imm-hover-strong) !important;
-      color: var(--imm-text-primary) !important;
-    }
-  }
 }
 
 .user-menu-trigger {
@@ -377,13 +350,12 @@ function handleCommand(command) {
 
   .user-avatar-small {
     background: linear-gradient(135deg, var(--imm-accent) 0%, var(--imm-accent-dark) 100%);
-    color: #fff;
+    color: var(--color-text-inverse);
     font-weight: 600;
   }
 
   .dropdown-icon {
     color: var(--imm-text-disabled);
-    font-size: 0.75rem;
   }
 }
 
@@ -409,9 +381,8 @@ function handleCommand(command) {
     padding: 10px 16px;
     font-size: 0.875rem;
 
-    .el-icon {
+    .app-icon {
       margin-right: 10px;
-      font-size: 1rem;
     }
 
     &:hover {

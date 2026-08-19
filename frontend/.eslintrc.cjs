@@ -24,4 +24,4 @@ module.exports = {
     // 允许 console（项目内含调试输出）
     'no-console': 'off',
   },
-}
+};

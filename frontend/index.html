@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>媒体库管理系统</title>
+    <!-- 首屏防闪烁：在 CSS 加载前确定 data-theme（与 store/theme.js 逻辑保持一致） -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('ui.theme') || localStorage.getItem('theme');
+          if (t === 'dark') t = 'modern-dark';
+          else if (t === 'light') t = 'modern-light';
+          if (!t || !['modern-dark','modern-light','indigo-night','emerald-mist','amber-sand','rose-dusk'].includes(t)) {
+            var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            t = prefersDark ? 'modern-dark' : 'modern-light';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'modern-dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -13,6 +13,7 @@ import '../core/constants.dart';
 import '../core/app_logger.dart';
 import '../core/token_cache.dart';
 import '../component/media_card.dart';
+import '../design_system/app_theme.dart';
 import 'video_play.dart';
 import 'grid_view.dart';
 
@@ -231,7 +232,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                 IconButton(
                   icon: Icon(
                     _isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: _isFavorite ? Colors.red : cs.onSurfaceVariant,
+                    color: _isFavorite
+                        ? context.semantic.favorite
+                        : cs.onSurfaceVariant,
                   ),
                   onPressed: _toggleFavorite,
                 ),
@@ -529,16 +532,19 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
           alignment: WrapAlignment.start,
           children: [
             if (m.communityRating != null)
-              _buildTag(m.communityRating!.toStringAsFixed(1), Colors.amber),
-            _buildTag('#${_media!.id}', Colors.grey),
+              _buildTag(
+                m.communityRating!.toStringAsFixed(1),
+                context.semantic.rating,
+              ),
+            _buildTag('#${_media!.id}', cs.outline),
             if (m.officialRating != null)
-              _buildTag(m.officialRating!, Colors.orange),
+              _buildTag(m.officialRating!, context.semantic.warning),
             if (m.productionYear != null)
-              _buildTag('${m.productionYear}', Colors.blue),
+              _buildTag('${m.productionYear}', context.semantic.info),
             if (m.runTimeTicks != null)
               _buildTag(
                 '${(m.runTimeTicks! / 600000000).round()} 分钟',
-                Colors.green,
+                context.semantic.success,
               ),
             _buildTag(_media!.mediaType.labelZH, cs.primary),
           ],
@@ -648,19 +654,23 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
         Row(
           children: [
             if (userdata.favoritedAt != null)
-              _buildInfoChip(Icons.favorite, '已收藏', Colors.red),
+              _buildInfoChip(
+                Icons.favorite,
+                '已收藏',
+                context.semantic.favorite,
+              ),
             if (userdata.favoritedAt != null) const SizedBox(width: 12),
             if (userdata.rating != null)
               _buildInfoChip(
                 Icons.star,
                 userdata.rating!.toStringAsFixed(1),
-                Colors.amber,
+                context.semantic.rating,
               ),
             if (userdata.rating != null) const SizedBox(width: 12),
             _buildInfoChip(
               Icons.play_arrow,
               '播放 ${userdata.playCount ?? 0} 次',
-              Colors.green,
+              context.semantic.success,
             ),
             const SizedBox(width: 12),
             _buildInfoChip(
@@ -729,7 +739,8 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
             Icon(
               hasRating ? Icons.star : Icons.star_border,
               size: 18,
-              color: hasRating ? Colors.amber : cs.onSurfaceVariant,
+              color:
+                  hasRating ? context.semantic.rating : cs.onSurfaceVariant,
             ),
             const SizedBox(width: 6),
             Text(
@@ -750,7 +761,7 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: hasRating
-                      ? Colors.amber
+                      ? context.semantic.rating
                       : cs.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
               ),
@@ -838,7 +849,7 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                           width: activeTrackLength.clamp(0.0, ratingZoneLength),
                           height: trackHeight,
                           decoration: BoxDecoration(
-                            color: Colors.amber,
+                            color: context.semantic.rating,
                             borderRadius: BorderRadius.circular(
                               trackHeight / 2,
                             ),
@@ -885,11 +896,13 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                         height: thumbRadius * 2,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: hasRating ? Colors.amber : cs.onSurfaceVariant,
+                          color: hasRating
+                              ? context.semantic.rating
+                              : cs.onSurfaceVariant,
                           border: Border.all(color: cs.surface, width: 2),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
+                              color: cs.scrim.withValues(alpha: 0.2),
                               blurRadius: 4,
                               offset: const Offset(0, 2),
                             ),
@@ -898,7 +911,9 @@ class _DetailPagePhoneState extends State<DetailPagePhone> {
                         child: Icon(
                           hasRating ? Icons.star : Icons.block,
                           size: 12,
-                          color: hasRating ? Colors.white : cs.surface,
+                          color: hasRating
+                              ? context.semantic.playerOverlayText
+                              : cs.surface,
                         ),
                       ),
                     ),

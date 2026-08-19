@@ -1,10 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import '../data/models/media.dart';
 import '../core/constants.dart';
 import '../core/token_cache.dart';
+import '../design_system/app_icons.dart';
+import '../design_system/app_theme.dart';
 import '../phone/detail.dart';
 
 class CardConfig {
@@ -34,20 +35,20 @@ class CardConfig {
 
 class MediaCard extends StatelessWidget {
   static final Map<MediaType, IconData> _mediaTypeIcons = {
-    MediaType.Movie: LucideIcons.film,
-    MediaType.Series: LucideIcons.tv,
-    MediaType.Season: LucideIcons.calendar,
-    MediaType.Episode: LucideIcons.list,
-    MediaType.Audio: LucideIcons.music,
-    MediaType.Photo: LucideIcons.image,
-    MediaType.Book: LucideIcons.book,
-    MediaType.Person: LucideIcons.user,
-    MediaType.Source: LucideIcons.globe,
-    MediaType.Studio: LucideIcons.building,
-    MediaType.Genre: LucideIcons.tags,
-    MediaType.Tag: LucideIcons.tag,
-    MediaType.BoxSet: LucideIcons.box,
-    MediaType.unknown: Icons.help_outline,
+    MediaType.Movie: AppIcons.movie,
+    MediaType.Series: AppIcons.series,
+    MediaType.Season: AppIcons.season,
+    MediaType.Episode: AppIcons.episode,
+    MediaType.Audio: AppIcons.audio,
+    MediaType.Photo: AppIcons.photo,
+    MediaType.Book: AppIcons.book,
+    MediaType.Person: AppIcons.person,
+    MediaType.Source: AppIcons.source,
+    MediaType.Studio: AppIcons.studio,
+    MediaType.Genre: AppIcons.genre,
+    MediaType.Tag: AppIcons.tag,
+    MediaType.BoxSet: AppIcons.boxSet,
+    MediaType.unknown: AppIcons.unknown,
   };
   final MediaItem media;
   final CardConfig config;
@@ -83,7 +84,7 @@ class MediaCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(child: _buildImageStack(cs)),
-                    Positioned.fill(child: _buildInfoOverlay(cs)),
+                    Positioned.fill(child: _buildInfoOverlay(context, cs)),
                   ],
                 ),
               ),
@@ -159,7 +160,9 @@ class MediaCard extends StatelessWidget {
             ),
           ),
           Positioned.fill(
-            child: Container(color: Colors.black.withValues(alpha: 0.2)),
+            child: Container(
+              color: cs.scrim.withValues(alpha: 0.2),
+            ),
           ),
           Center(
             child: Image(
@@ -173,7 +176,8 @@ class MediaCard extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoOverlay(ColorScheme cs) {
+  Widget _buildInfoOverlay(BuildContext context, ColorScheme cs) {
+    final semantic = context.semantic;
     return Stack(
       children: [
         // 显示媒体类型标签
@@ -212,7 +216,7 @@ class MediaCard extends StatelessWidget {
               child: Text(
                 (media.communityRating ?? 0).toStringAsFixed(1),
                 style: TextStyle(
-                  color: Colors.amber,
+                  color: semantic.rating,
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),

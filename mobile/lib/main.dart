@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/constants.dart';
-import 'phone/home/view.dart';
+import 'design_system/app_color_tokens.dart';
+import 'design_system/app_theme.dart';
+import 'phone/home/home_shell.dart';
 import 'phone/login/view.dart';
 import 'services/sync_service.dart';
 import 'providers/settings_provider.dart';
@@ -55,34 +57,15 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-
-    ThemeMode themeMode;
-    switch (settings?.themeMode ?? 'system') {
-      case 'light':
-        themeMode = ThemeMode.light;
-      case 'dark':
-        themeMode = ThemeMode.dark;
-      default:
-        themeMode = ThemeMode.system;
-    }
-
-    final seedColor = _parseColor(settings?.primaryColor);
+    final presetId = _resolvePreset(settings);
+    final themeMode = AppTheme.toThemeMode(settings?.themeMode);
 
     return MaterialApp(
       title: '媒体库',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seedColor),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seedColor,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(presetId),
+      darkTheme: AppTheme.dark(presetId),
       home: const AuthGate(),
       builder: (context, child) {
         final textTheme = Theme.of(context).textTheme;
@@ -96,15 +79,21 @@ class MyApp extends ConsumerWidget {
     );
   }
 
-  static Color _parseColor(String? hex) {
-    if (hex == null || hex.isEmpty) return Colors.purple;
-    hex = hex.replaceFirst('#', '');
-    if (hex.length != 6 && hex.length != 8) return Colors.purple;
-    if (!RegExp(r'^[0-9a-fA-F]+$').hasMatch(hex)) return Colors.purple;
-    final value = int.tryParse(hex, radix: 16);
-    if (value == null) return Colors.purple;
-    if (hex.length == 6) return Color(0xFF000000 | value);
-    return Color(value);
+  static ThemePresetId _resolvePreset(dynamic settings) {
+    final presetId = settings?.themePreset as String?;
+    if (presetId != null && presetId.isNotEmpty) {
+      return ThemePresetId.fromId(presetId);
+    }
+    // 兼容旧版本：primary_color -> 推断预设
+    final legacyHex = settings?.primaryColor as String?;
+    if (legacyHex != null && legacyHex.isNotEmpty) {
+      final hex = legacyHex.replaceFirst('#', '').toUpperCase();
+      // 旧紫色系仍映射到韵味紫
+      if (hex.contains('9C27B0') || hex.contains('9C27') || hex == 'FF9C27B0') {
+        return ThemePresetId.currentPurple;
+      }
+    }
+    return ThemePresetId.currentPurple;
   }
 }
 
@@ -141,7 +130,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_isLoggedIn!) {
-      return const HomePagePhone();
+      return const HomeShell();
     }
     return const LoginScreen();
   }

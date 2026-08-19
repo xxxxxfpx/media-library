@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../core/auth_service.dart';
 import '../../core/app_logger.dart';
-import '../home/view.dart';
+import '../home/home_shell.dart';
 
 Widget buildGlowIcon(BuildContext context) {
   final primary = Theme.of(context).colorScheme.primary;
@@ -114,7 +114,7 @@ Widget buildLoginForm({
               if (context.mounted) {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (_) => const HomePagePhone()),
+                  MaterialPageRoute(builder: (_) => const HomeShell()),
                 );
               }
             }

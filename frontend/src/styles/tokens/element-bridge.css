@@ -1,0 +1,54 @@
+/**
+ * Element Plus 桥接（Element Bridge）—— 将 EP 的 --el-* 变量映射到语义令牌。
+ *
+ * 由于 --color-* 随主题翻转，这里只需全局映射一次，EP 组件即自动换肤。
+ * 强调色派生档（light-3/5/7/9、dark-2）用 color-mix 实时计算，无需逐主题维护。
+ */
+
+:root {
+  --el-color-primary:          var(--color-accent);
+  --el-color-primary-light-3:  color-mix(in oklch, var(--color-accent) 80%, white);
+  --el-color-primary-light-5:  color-mix(in oklch, var(--color-accent) 60%, white);
+  --el-color-primary-light-7:  color-mix(in oklch, var(--color-accent) 35%, white);
+  --el-color-primary-light-9:  color-mix(in oklch, var(--color-accent) 15%, white);
+  --el-color-primary-dark-2:   color-mix(in oklch, var(--color-accent) 85%, black);
+
+  --el-color-success:          var(--color-success);
+  --el-color-warning:          var(--color-warning);
+  --el-color-danger:           var(--color-danger);
+  --el-color-error:            var(--color-danger);
+  --el-color-info:             var(--color-info);
+
+  --el-bg-color:               var(--color-bg-surface);
+  --el-bg-color-overlay:       var(--color-bg-elevated);
+  --el-bg-color-page:          var(--color-bg-page);
+  --el-bg-color-transparent:   transparent;
+
+  --el-text-color-primary:     var(--color-text-primary);
+  --el-text-color-regular:     var(--color-text-secondary);
+  --el-text-color-secondary:   var(--color-text-tertiary);
+  --el-text-color-placeholder: var(--color-text-disabled);
+  --el-text-color-disabled:    var(--color-text-disabled);
+
+  --el-border-color:           var(--color-border-default);
+  --el-border-color-light:     var(--color-border-subtle);
+  --el-border-color-lighter:   var(--color-border-subtle);
+  --el-border-color-dark:      var(--color-border-strong);
+  --el-border-color-hover:     var(--color-border-strong);
+
+  --el-fill-color:             var(--color-hover);
+  --el-fill-color-light:       var(--color-hover);
+  --el-fill-color-lighter:     var(--color-hover);
+  --el-fill-color-blank:       var(--color-bg-surface);
+  --el-fill-color-dark:        var(--color-hover-strong);
+  --el-fill-color-darker:      var(--color-hover-strong);
+
+  --el-mask-color:             var(--color-overlay);
+
+  --el-box-shadow:             var(--shadow-lg);
+  --el-box-shadow-light:       var(--shadow-md);
+
+  --el-border-radius-base:     var(--radius-md);
+  --el-border-radius-small:    var(--radius-sm);
+  --el-border-radius-round:    999px;
+}

@@ -1,7 +1,7 @@
 <template>
   <div class="link-card" @click="handleClick">
     <div class="link-icon">
-      <el-icon><Film /></el-icon>
+      <AppIcon name="film" :size="20" />
     </div>
     <div class="link-name">{{ item.name }}</div>
     <div v-if="subType" class="link-type">{{ subType }}</div>
@@ -10,7 +10,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { Film } from '@element-plus/icons-vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const props = defineProps({
   item: { type: Object, required: true },

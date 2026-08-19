@@ -1,0 +1,18 @@
+/* 玫瑰暮 —— 深紫底 + 玫粉强调 */
+[data-theme="rose-dusk"] {
+  --color-bg-page:        var(--purple-950);
+  --color-bg-surface:     var(--purple-900);
+  --color-bg-elevated:    var(--purple-800);
+  --color-bg-inverse:     var(--purple-50);
+  --color-text-primary:   var(--purple-50);
+  --color-text-secondary: var(--purple-200);
+  --color-text-tertiary:  var(--purple-300);
+  --color-text-disabled:  var(--purple-400);
+  --color-text-inverse:   var(--purple-950);
+  --color-accent:         var(--rose-500);
+  --color-accent-hover:   var(--rose-400);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}

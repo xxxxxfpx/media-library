@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../design_system/app_icons.dart';
 import '../data/api/api_client.dart';
 import '../data/api/media_api.dart';
 import '../data/models/media.dart';
@@ -47,11 +47,11 @@ class _MediaGridPageState extends State<MediaGridPage> {
   static const int _pageSize = 60;
 
   static const _sortOptions = <(String, String, IconData)>[
-    ('date_created', '添加时间', LucideIcons.calendar),
-    ('name', '名称', LucideIcons.arrow_up_a_z),
-    ('production_year', '年份', LucideIcons.calendar_days),
-    ('community_rating', '评分', LucideIcons.star),
-    ('premiere_date', '发布日期', LucideIcons.calendar_check),
+    ('date_created', '添加时间', AppIcons.season),
+    ('name', '名称', Icons.sort_by_alpha),
+    ('production_year', '年份', Icons.calendar_today_outlined),
+    ('community_rating', '评分', AppIcons.star),
+    ('premiere_date', '发布日期', Icons.event_outlined),
   ];
 
   static const _allTypes = [
@@ -238,7 +238,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
                       _buildSortDropdown(),
                       const SizedBox(width: 6),
                       _buildIconButton(
-                        LucideIcons.list_filter,
+                        AppIcons.filter,
                         () => setState(
                           () => _showTypeSelector = !_showTypeSelector,
                         ),
@@ -289,7 +289,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            LucideIcons.inbox,
+                                            AppIcons.empty,
                                             size: 48,
                                             color: Theme.of(
                                               context,
@@ -446,7 +446,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
       ),
       child: Row(
         children: [
-          Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+          Icon(AppIcons.search, size: 18, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
             child: TextField(
@@ -471,7 +471,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
               });
               _resetAndLoad();
             },
-            child: Icon(LucideIcons.x, size: 18, color: cs.onSurfaceVariant),
+            child: Icon(AppIcons.close, size: 18, color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -503,7 +503,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
-            Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+            Icon(AppIcons.search, size: 18, color: cs.onSurfaceVariant),
             const SizedBox(width: 8),
             Text(
               '搜索媒体名称...',
@@ -589,7 +589,7 @@ class _MediaGridPageState extends State<MediaGridPage> {
               ),
               const SizedBox(width: 2),
               Icon(
-                LucideIcons.chevron_down,
+                AppIcons.chevronRight,
                 size: 16,
                 color: cs.onSurfaceVariant,
               ),

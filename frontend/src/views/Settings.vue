@@ -32,10 +32,30 @@
       </template>
       <div class="setting-item">
         <div class="setting-label">
-          <span>深色模式</span>
-          <span class="setting-desc">开启后使用深色主题</span>
+          <span>主题配色</span>
+          <span class="setting-desc">共 6 套主题，现代黑 / 现代白为默认两套；选中即生效并自动保存</span>
         </div>
-        <el-switch v-model="isDark" />
+      </div>
+      <div class="theme-grid">
+        <div
+          v-for="t in store.themes"
+          :key="t.id"
+          class="theme-card"
+          :class="{ active: t.id === store.theme }"
+          role="button"
+          :aria-label="`选择主题 ${t.name}`"
+          @click="store.setTheme(t.id)"
+        >
+          <div class="swatches">
+            <span class="sw" :style="{ background: t.swatch.page }" />
+            <span class="sw" :style="{ background: t.swatch.surface }" />
+            <span class="sw" :style="{ background: t.swatch.accent }" />
+          </div>
+          <div class="meta">
+            <span class="name">{{ t.name }}</span>
+            <AppIcon v-if="t.id === store.theme" name="check" :size="14" class="tick" />
+          </div>
+        </div>
       </div>
     </el-card>
 
@@ -161,17 +181,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/store'
 import { guangYaPanAPI, userAPI } from '@/api'
 import { ElMessage } from 'element-plus'
+import AppIcon from '@/components/ui/AppIcon.vue'
 
 const store = useAppStore()
-
-const isDark = computed({
-  get: () => store.theme === 'dark',
-  set: (val) => store.setTheme(val ? 'dark' : 'light')
-})
 
 const showPasswordDialog = ref(false)
 const passwordLoading = ref(false)
@@ -325,7 +341,7 @@ async function submitPasswordChange() {
   font-size: 14px;
   color: var(--imm-text-primary);
   font-weight: 500;
-  word-break: break-word;
+  overflow-wrap: break-word;
   line-height: 1.5;
 }
 
@@ -373,6 +389,71 @@ async function submitPasswordChange() {
     font-size: 12px;
     color: var(--imm-text-tertiary);
     margin-top: 4px;
+  }
+}
+
+/* ===== 主题选择器（6 套色板，与 ThemeSwitcher 一致） ===== */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+
+  &:hover {
+    border-color: var(--color-accent);
+    transform: translateY(-2px);
+  }
+
+  &.active {
+    border-color: var(--color-accent);
+    background: var(--color-selected);
+  }
+
+  .swatches {
+    display: flex;
+    gap: 4px;
+  }
+
+  .sw {
+    flex: 1;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .name {
+    font-size: 0.8125rem;
+    color: var(--color-text-primary);
+    font-weight: 500;
+  }
+
+  .tick {
+    color: var(--color-accent);
+  }
+}
+
+@media (max-width: 480px) {
+  .theme-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

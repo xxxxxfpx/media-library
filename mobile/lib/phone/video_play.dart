@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_lucide/flutter_lucide.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -15,6 +14,7 @@ import '../core/app_logger.dart';
 import '../data/api/api_client.dart';
 import '../data/api/user_api.dart';
 import '../data/models/media.dart';
+import '../design_system/app_theme.dart';
 import '../providers/settings_provider.dart';
 
 class DouyinSeekBar extends StatefulWidget {
@@ -744,13 +744,13 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: context.semantic.playerOverlay,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _speedLabelText ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.semantic.playerOverlayText,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -774,13 +774,13 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: context.semantic.playerOverlay,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
                     "${_formatDuration(_seekPosition, alignTo: _duration)}/${_formatDuration(_duration)}",
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: context.semantic.playerOverlayText,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -805,18 +805,22 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black54,
+                    color: context.semantic.playerOverlay,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.refresh, color: Colors.white, size: 18),
+                      Icon(
+                        Icons.refresh,
+                        color: context.semantic.playerOverlayText,
+                        size: 18,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         '从头播放',
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context.semantic.playerOverlayText,
                           fontSize: 13,
                         ),
                       ),
@@ -830,12 +834,12 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
         if (_showBrightnessIndicator != null)
           _buildEdgeIndicator(
             icon: _showBrightnessIndicator! <= 0.2
-                ? LucideIcons.moon
+                ? Icons.brightness_2_outlined
                 : _showBrightnessIndicator! <= 0.5
-                ? LucideIcons.sun_dim
+                ? Icons.brightness_3_outlined
                 : _showBrightnessIndicator! <= 0.8
-                ? LucideIcons.sun_medium
-                : LucideIcons.sun,
+                ? Icons.brightness_5_outlined
+                : Icons.brightness_7_outlined,
             value: _showBrightnessIndicator!,
             alignment: Alignment.centerRight,
           ),
@@ -843,12 +847,12 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
         if (_showVolumeIndicator != null)
           _buildEdgeIndicator(
             icon: _showVolumeIndicator! == 0
-                ? LucideIcons.volume_x
+                ? Icons.volume_off_outlined
                 : _showVolumeIndicator! <= 0.33
-                ? LucideIcons.volume
+                ? Icons.volume_mute_outlined
                 : _showVolumeIndicator! <= 0.66
-                ? LucideIcons.volume_1
-                : LucideIcons.volume_2,
+                ? Icons.volume_down_outlined
+                : Icons.volume_up_outlined,
             value: _showVolumeIndicator!,
             alignment: Alignment.centerLeft,
           ),
@@ -860,10 +864,13 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
               child: Center(
                 child: Icon(
                   Icons.play_arrow,
-                  color: Colors.white,
+                  color: context.semantic.playerOverlayText,
                   size: 72,
-                  shadows: const [
-                    Shadow(blurRadius: 12, color: Colors.black54),
+                  shadows: [
+                    Shadow(
+                      blurRadius: 12,
+                      color: context.semantic.playerOverlay,
+                    ),
                   ],
                 ),
               ),
@@ -1277,12 +1284,12 @@ class _VideoPlayPageState extends ConsumerState<VideoPlayPage>
                 IconButton(
                   icon: Icon(
                     _volume == 0
-                        ? LucideIcons.volume_x
+                        ? Icons.volume_off_outlined
                         : _volume <= 0.33
-                        ? LucideIcons.volume
+                        ? Icons.volume_mute_outlined
                         : _volume <= 0.66
-                        ? LucideIcons.volume_1
-                        : LucideIcons.volume_2,
+                        ? Icons.volume_down_outlined
+                        : Icons.volume_up_outlined,
                     color: cs.onSurface,
                     size: 20,
                   ),

@@ -1,0 +1,18 @@
+/* 靛夜蓝 —— 深蓝底 + 天青强调，影院感 */
+[data-theme="indigo-night"] {
+  --color-bg-page:        var(--slate-900);
+  --color-bg-surface:     var(--slate-800);
+  --color-bg-elevated:    var(--slate-700);
+  --color-bg-inverse:     var(--slate-50);
+  --color-text-primary:   var(--slate-100);
+  --color-text-secondary: var(--slate-300);
+  --color-text-tertiary:  var(--slate-400);
+  --color-text-disabled:  var(--slate-500);
+  --color-text-inverse:   var(--slate-900);
+  --color-accent:         var(--sky-500);
+  --color-accent-hover:   var(--sky-400);
+  --color-success:        var(--green-500);
+  --color-warning:        var(--yellow-500);
+  --color-danger:         var(--red-500);
+  --color-info:           var(--blue-500);
+}
