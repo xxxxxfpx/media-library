@@ -167,6 +167,19 @@ jobs:
 
             # 启动服务
             cd "$DEPLOY_DIR/build/deploy"
+
+            # 持久化 secret_key：首次随机生成并保存在 build 目录之外，
+            # 避免每次部署重建导致 secret_key 轮换、已有登录态失效
+            SECRET_FILE="$DEPLOY_DIR/.media_secret_key"
+            if [ ! -f "$SECRET_FILE" ]; then
+              openssl rand -hex 32 > "$SECRET_FILE"
+              chmod 600 "$SECRET_FILE"
+            fi
+            APP_SECRET_KEY="$(cat "$SECRET_FILE")"
+            # 写入 compose 运行时环境变量：入口脚本据此生成 secrets/config.yaml；
+            # CORS 指向对外域名 media.mz727.top
+            printf 'APP_SECRET_KEY=%s\nCORS_ORIGINS=https://media.mz727.top\n' "$APP_SECRET_KEY" > .env
+
             docker compose down --remove-orphans
             docker compose up -d
 
