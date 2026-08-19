@@ -1,83 +1,52 @@
-# AGENTS.md
+# Repository Instructions
 
-## 启动命令
+## Scope
 
-- **后端**: `cd backend && python run.py`（运行在 `http://localhost:8000`，入口 `app.main:app`）
-- **后端测试**: `cd backend && .\.venv\Scripts\python.exe -m pytest`
-- **单个后端测试**: `cd backend && .\.venv\Scripts\python.exe -m pytest tests/test_x.py::TestX::test_y -v`
-- **前端**: `cd frontend && npm install && npm run dev`（运行在 `http://localhost:5173`，代理 `/api` 到后端）
-- **前端 lint**: `cd frontend && npm run lint`（自动修复用 `npm run lint:fix`）
-- **前端测试**: `cd frontend && npm run test`（Vitest）
-- **前端构建**: `cd frontend && npm run build`
-- **移动端**: `cd mobile && flutter analyze && flutter test`
+- `backend/` 是 FastAPI + SQLAlchemy async 后端；`frontend/` 是 Vue 3 + Vite；`mobile/` 是 Flutter 客户端。
+- 后端路由在 `backend/app/api/`，业务逻辑在 `backend/app/services/`，数据库模型在 `backend/database/models/`，迁移在 `backend/database/alembic/`。
+- `CLAUDE.md` 包含更完整的架构与数据流说明；修改架构时同步检查它和本文件。
 
-Windows 注意：必须显式用 `backend\.venv\Scripts\python.exe`，裸 `python` 可能不在 venv 中。
+## Run And Verify
 
-## 提交规范
+- Windows 后端必须使用虚拟环境解释器，不要依赖裸 `python`：`cd backend; .\.venv\Scripts\python.exe run.py`。
+- 后端默认监听 `http://localhost:8000`；`run.py` 会启动 Uvicorn reload，但**后端已经启动后，任何代码修改仍必须手动重启后端再验证**。
+- 前端：`cd frontend; npm install; npm run dev`，默认监听 `http://localhost:5173`，`/api` 代理到 `localhost:8000`。
+- 前端依赖缺失或出现 Rollup Windows 原生可选依赖错误时，先在 `frontend/` 执行 `npm install`，不要删除 lockfile。
+- 后端全量测试：`cd backend; .\.venv\Scripts\python.exe -m pytest`。
+- 后端单测：`cd backend; .\.venv\Scripts\python.exe -m pytest tests/test_x.py::TestX::test_y -v`。
+- 前端检查：`cd frontend; npm run lint`、`npm run test`、`npm run build`。
+- 移动端检查：`cd mobile; flutter analyze; flutter test`；需要运行时先 `flutter pub get`。
+- 改动数据库 schema 后，先在 `backend/` 执行 `cd backend; .\.venv\Scripts\alembic.exe -c database\alembic.ini upgrade head`，再重启后端并运行相关测试。
 
-提交信息遵循 `{提交类型}({提交关键词}):{提交摘要[中文]}`，随后每行一条中文修改条目点。示例：
+## Configuration And Secrets
 
-```
-fix(auth): 修复刷新令牌校验
-- 刷新 token 时校验用户 IsActive
-- 未激活用户禁止续期
-```
+- 配置优先级：`CONFIG_PATH` -> development 模式的 `backend/env.yaml` -> `backend/config/local.yaml` -> `backend/config/default.yaml`。
+- `secrets/config.yaml` 是 gitignored 敏感覆盖，模板是 `secrets/config.example.yaml`；不要把 secret、管理员密码、云盘凭据或远程数据库凭据写入代码、日志或提交。
+- 后端启动要求非空 `app.secret_key`；缺少密钥会在 lifespan 中直接拒绝启动。
+- 测试通过 `backend/tests/conftest.py` 设置 `CONFIG_PATH=backend/env.yaml`，不要用生产配置替代测试配置。
+- 生产 CORS 通过逗号分隔的 `CORS_ORIGINS` 设置；本地默认只允许前后端 localhost 来源。
+- 默认账户通常是 `admin` / `admin123`，应用启动时会在不存在时创建；以本地 secrets 配置为最终准值。
 
-## 默认账户
+## Database And API Gotchas
 
-`admin` / `admin123`（应用启动时若不存在则自动创建）。
+- 默认数据库是 `backend/data/database/media.db`；SQLite 连接启用 WAL、`busy_timeout=5000` 和外键约束，生产可切 PostgreSQL。
+- 使用 Alembic 管理 schema，不要只修改 ORM 模型或直接手改数据库；迁移配置位于 `backend/database/alembic.ini`。
+- `/api/file/data`、`/api/media/stats`、`/api/system/info` 需要登录；媒体二进制 URL 还支持 `token` query 参数，因为 `<img>`、`<video>` 和 Flutter 网络图片不能带 Authorization header。
+- `/api/media/list` 支持 `cursor` keyset 分页；不传 cursor 才使用 offset 兼容路径。生产 stats 缓存 60 秒，debug 模式不缓存。
+- 文件可能由第三方云盘托管：`Files.Provider` + `ProviderFileId` 是稳定身份，临时播放 URL 不应作为永久标识；`DriveFiles` 保存云盘映射。
+- 云盘/远程数据库脚本必须从环境变量读取凭据；运行远程脚本前确认数据源可用，禁止运行 `backend/scripts/legacy/` 下脚本。
 
-## 配置与密钥
+## Workflow
 
-- 配置加载优先级：`CONFIG_PATH` 环境变量 → `ENV=development` 时的 `backend/env.yaml` → `backend/config/local.yaml` → `backend/config/default.yaml`。
-- 敏感配置在 `secrets/config.yaml`（gitignored，含真实 `secret_key`、admin 密码、`cloud_auth`、`remote_database`），会合并到所选配置之上；模板为 `secrets/config.example.yaml`，可用 `SECRETS_PATH` 覆盖路径。
-- **启动守卫**：`app.main` lifespan 在 `app.secret_key` 为空时直接 `raise RuntimeError`——未配置密钥则拒绝启动。
-- 测试能启动是因为 `tests/conftest.py` 设 `CONFIG_PATH=backend/env.yaml`，且 secrets 合并提供了非空 `secret_key`。
-- 生产 CORS 用 `CORS_ORIGINS` 环境变量（逗号分隔）指定，默认仅 localhost:5173/8000。
+- 先读相关路由、service、schema、model 和迁移，再改代码；保持 API 路由薄，复用 service 层和 `get_db_session`。
+- 改动后至少运行受影响的单测；涉及后端启动或 schema 的改动同时重启后端并检查 `http://localhost:8000` 的实际响应。
+- `ruff` 不随 venv 保证存在；本地需要时先安装，再执行 `ruff check app database tests`。
+- `frontend/.env`、`backend/env.yaml` 和 `secrets/config.yaml` 均为本地覆盖，不要提交。
+- 提交信息遵循 `{type}({keyword}):{中文摘要}`，随后每行一条中文修改说明；除非用户要求，不要自行提交或修改 git 历史。
 
-## 鉴权注意
+## High-Value References
 
-- `/api/file/data`、`/api/media/stats`、`/api/system/info` 均需登录。
-- `/api/file/data` 额外接受 `token` query 参数：浏览器 `<img>`/`<video>` 与 Flutter `Image.network` 无法带 Authorization 头，前端/移动端构建媒体 URL 时以 `&token=<access_token>` 附加。移动端通过 `mobile/lib/core/token_cache.dart` 全局缓存取 token。
-
-## 架构
-
-- `backend/app/` — FastAPI 应用，路由在 `app/api/`，服务逻辑在 `app/services/`；路由薄、逻辑在 service，依赖用 `app/api/deps.py` 的 `get_db_session`
-- `backend/database/` — SQLAlchemy async 模型与引擎；Alembic 迁移在 `database/alembic/`（`alembic.ini` 同目录）
-- `backend/config/` — 配置（`default.yaml` 默认、`local.yaml` 本地覆盖、`setting.yaml` UI 卡牌配置）
-- `secrets/` — 敏感凭据（仅 `config.example.yaml` 提交）
-- `backend/scripts/` — 数据校验/迁移脚本（checks / migrations / tools / legacy）
-- `frontend/` — Vue 3 + Vite 前端，API 代理到 `localhost:8000`
-- `mobile/` — Flutter 移动端
-- 详细的接口/数据流说明见 `CLAUDE.md`（架构部分更全，两者需同步维护）
-
-## 数据库
-
-- 默认 SQLite（`backend/data/database/media.db`），通过 `database/core.py` 的 async engine 访问
-- **SQLite 已启用 WAL + `busy_timeout=5000` + `foreign_keys=ON`**（`core.py` 连接事件监听设置）；连接池按库型分流（SQLite 5+5，PG 32）
-- 生产可切换 PostgreSQL（`config/local.yaml` 中 `database.type: postgresql`）
-- `requirements.txt` 含 `psycopg2-binary`（供 Alembic 同步引擎迁移 PG 用）与 `alembic`
-- **视频化精简**：`MediaType`/`FileType` 枚举已删音乐/照片/书籍/频道等类型，`MediaItems.AlbumId` 列已移除（迁移 `video_only_schema`）
-- **列表分页**：`/api/media/list` 支持 `cursor` 参数（keyset 分页，`next_cursor` 返回）；不传时走 `offset` 兼容。keyset 仅对 `date_created`/`order` 排序生效
-- **stats 缓存**：`get_media_stats` 在 debug=false（生产）时缓存 60s，debug 模式不缓存保证测试一致性
-
-## 测试状态（重要）
-
-- **基线为 85 passed / 0 failed**（2026-08-16 修复全部 37 个失败测试后）。此前基线为 37 failed / 48 passed（既存测试债）。
-- CI 后端 job（`pytest -q`）应保持绿灯；改动后若出现失败需排查回归。
-
-## 数据验证/修复脚本
-
-`backend/scripts/` 下按职责分类：`checks/`（校验）、`migrations/`（迁移）、`tools/`（工具）、`legacy/`（存档，勿运行）。涉及远程数据库的脚本凭据通过环境变量 `REMOTE_DB_HOST/PORT/NAME/USER/PASSWORD` 读取（未设置则失败），不得硬编码凭据。涉及远程数据源的脚本先确认源可用。
-
-## 其他注意事项
-
-- **ruff 不在 venv**：本地 `ruff check` 需先 `pip install ruff`；CI 单独安装 ruff（`ruff check app database tests`）。
-- pytest 配置在 `backend/pytest.ini`（`asyncio_mode = auto`）。
-- `frontend/.env` 与 `backend/env.yaml` 均为本地覆盖，不入库。
-
-## 重要文件
-
-- `MIGRATION_PLAN.md` — 全量迁移计划文档
-- `CLAUDE.md` — 架构/数据流详解（与 AGENTS.md 保持同步）
-- `docs/` — 项目文档（架构/开发/部署/运维）
+- `README.md`：快速开始与功能边界。
+- `CLAUDE.md`：接口、目录和数据流细节。
+- `MIGRATION_PLAN.md`：全量迁移计划。
+- `docs/`：架构、开发、部署和运维文档。
