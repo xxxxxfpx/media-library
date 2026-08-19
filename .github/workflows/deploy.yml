@@ -121,6 +121,10 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # ── 启用 docker-container buildx（支持 gha 缓存导出） ──
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       # ── 构建并推镜像（单镜像：FastAPI + SPA 静态资源） ──
       - name: Build and push image
         uses: docker/build-push-action@v5
