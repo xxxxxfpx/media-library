@@ -22,8 +22,10 @@ services:
     volumes:
       # 本地配置覆盖（含凭据）
       - ../backend/config:/app/config:ro
-      # 密钥文件（若已配置则优先使用；缺失时由入口脚本生成到 /app/secrets）
-      - ../secrets:/app/secrets:rw
+      # 密钥文件（若已配置则优先使用；缺失时由入口脚本生成）。
+      # 必须指向 build 目录之外的持久路径：容器以 root 写入该目录，
+      # 若放在 build 内会导致部署用户(dev)无法 rm -rf 重建 build
+      - ${SECRETS_DIR:-../secrets}:/app/secrets:rw
       # 运行时数据持久化
       - media_data:/app/data
     ports:

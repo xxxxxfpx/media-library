@@ -176,9 +176,13 @@ jobs:
               chmod 600 "$SECRET_FILE"
             fi
             APP_SECRET_KEY="$(cat "$SECRET_FILE")"
+            # secrets 持久目录放在 build 之外：容器以 root 写入，
+            # 放 build 内会导致 rm -rf 重建时权限拒绝
+            mkdir -p "$DEPLOY_DIR/secrets"
             # 写入 compose 运行时环境变量：入口脚本据此生成 secrets/config.yaml；
             # CORS 指向对外域名 media.mz727.top
-            printf 'APP_SECRET_KEY=%s\nCORS_ORIGINS=https://media.mz727.top\n' "$APP_SECRET_KEY" > .env
+            printf 'APP_SECRET_KEY=%s\nCORS_ORIGINS=https://media.mz727.top\nSECRETS_DIR=%s\n' \
+              "$APP_SECRET_KEY" "$DEPLOY_DIR/secrets" > .env
 
             docker compose down --remove-orphans
             docker compose up -d
