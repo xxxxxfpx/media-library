@@ -71,7 +71,7 @@ jobs:
       - name: Validate migrations
         working-directory: backend
         run: |
-          DB_PATH=$(mktemp /tmp/alembic-ci-XXXX.db)
+          export DB_PATH=$(mktemp /tmp/alembic-ci-XXXX.db)
           # 生成临时配置覆盖 sqlite_path，避免污染仓库默认测试库
           python - <<PY
           import os, yaml
