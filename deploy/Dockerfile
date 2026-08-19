@@ -1,6 +1,10 @@
 # 后端生产镜像
 FROM python:3.12-slim AS backend
 
+# CI/CD 注入版本号，供运行时日志/health 展示使用
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION:-unknown}
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
