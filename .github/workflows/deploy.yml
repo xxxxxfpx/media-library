@@ -201,6 +201,9 @@ jobs:
             # 拉取最新镜像
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
+            # 停止并移除旧的 media-library 容器，避免端口占用与孤儿容器残留
+            docker rm -f media-library 2>/dev/null || true
+
             # 重建容器（容器入口脚本会自动处理 APP_SECRET_KEY / APP_ADMIN_PASSWORD 兜底）
             docker compose up -d --remove-orphans
 
