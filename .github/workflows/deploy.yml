@@ -204,6 +204,13 @@ jobs:
             # 停止并移除旧的 media-library 容器，避免端口占用与孤儿容器残留
             docker rm -f media-library 2>/dev/null || true
 
+            # 服务器上可能存在旧容器（如旧 compose 项目名）仍占用 1999 端口，一并清理
+            OLD=$(docker ps -aq --filter "publish=127.0.0.1:1999")
+            if [ -n "$OLD" ]; then
+              echo "移除占用 1999 端口的旧容器: $OLD"
+              docker rm -f $OLD
+            fi
+
             # 重建容器（容器入口脚本会自动处理 APP_SECRET_KEY / APP_ADMIN_PASSWORD 兜底）
             docker compose up -d --remove-orphans
 
