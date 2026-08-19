@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: crpi-7r0bt0szn4xnpd8.cn-hangzhou.personal.cr.aliyuncs.com
+  REGISTRY: crpi-7r0bt0szn4xpndx8.cn-hangzhou.personal.cr.aliyuncs.com
   IMAGE_NAME: xiemingzhe/media
 
 jobs:

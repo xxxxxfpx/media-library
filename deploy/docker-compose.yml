@@ -4,7 +4,7 @@
 
 services:
   media:
-    image: ${IMAGE:-crpi-7r0bt0szn4xnpd8.cn-hangzhou.personal.cr.aliyuncs.com/xiemingzhe/media:latest}
+    image: ${IMAGE:-crpi-7r0bt0szn4xpndx8.cn-hangzhou.personal.cr.aliyuncs.com/xiemingzhe/media:latest}
     container_name: media-library
     restart: unless-stopped
     pull_policy: always
