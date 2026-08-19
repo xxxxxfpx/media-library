@@ -7,8 +7,35 @@ on:
     branches: [main, master]
 
 jobs:
+  # 差分检测：按目录归类改动，实现“改动哪个端就只构建哪个端”
+  changes:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      core: ${{ steps.filter.outputs.core }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'requirements*.txt'
+            frontend:
+              - 'frontend/**'
+            mobile:
+              - 'mobile/**'
+            core:
+              - '.github/**'
+
   backend:
     name: Backend (FastAPI)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.core == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +64,8 @@ jobs:
 
   frontend:
     name: Frontend (Vue 3)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.core == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,6 +93,8 @@ jobs:
 
   mobile:
     name: Mobile (Flutter)
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true' || needs.changes.outputs.core == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -84,3 +115,22 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-app-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error

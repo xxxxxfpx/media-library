@@ -7,7 +7,8 @@ from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.file import router as file_router
 from app.api.guangyapan import router as guangyapan_router
@@ -96,6 +97,47 @@ app.include_router(media_router)
 app.include_router(file_router)
 app.include_router(guangyapan_router)
 app.include_router(system_router, prefix="/api")
+
+
+# ── SPA 静态文件托管（单镜像模式下由 FastAPI 直接托管前端 dist） ──
+# 仅当镜像内包含前端构建产物时才启用（开发模式无 static 目录，不影响）
+_STATIC_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "static")
+)
+
+if os.path.isdir(_STATIC_DIR):
+    # Vite 产出的带哈希资源放在 /assets 下，单独挂载以便缓存优化
+    _assets_dir = os.path.join(_STATIC_DIR, "assets")
+    if os.path.isdir(_assets_dir):
+        app.mount(
+            "/assets",
+            StaticFiles(directory=_assets_dir),
+            name="spa-assets",
+        )
+
+    @app.get("/", include_in_schema=False)
+    async def spa_index():
+        """首页：服务 index.html"""
+        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+
+    @app.api_route(
+        "/{full_path:path}",
+        methods=["GET", "HEAD"],
+        include_in_schema=False,
+    )
+    async def spa_fallback(full_path: str):
+        """SPA 路由回退 + 根级静态资源服务。
+
+        - 若文件在静态目录中存在（如 favicon.svg、robots.txt），直接返回文件；
+        - 否则视为 SPA 前端路由（如 /media/123、/settings），返回 index.html。
+
+        API 路由与 /assets 挂载已在上方匹配，此处不会被误命中。
+        """
+        candidate = os.path.abspath(os.path.join(_STATIC_DIR, full_path))
+        # 安全：防止路径穿越
+        if candidate.startswith(_STATIC_DIR) and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
 
 
 @app.get("/health")

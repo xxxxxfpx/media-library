@@ -14,8 +14,12 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  REGISTRY: crpi-7r0bt0szn4xnpd8.cn-hangzhou.personal.cr.aliyuncs.com
+  IMAGE_NAME: xiemingzhe/media
+
 jobs:
-  # ── 测试与构建校验：PR 和 push 都会执行 ──
+  # ── 测试校验：PR 和 push 都会执行 ──
   test:
     runs-on: ubuntu-latest
     steps:
@@ -40,8 +44,7 @@ jobs:
         run: python -m compileall -q app database tests config.py run.py
 
       - name: Run backend tests
-        # 项目当前 pytest 基线有历史债务（约 37 failed / 48 passed），
-        # 修复测试后应移除 continue-on-error，使其阻塞部署。
+        # 项目当前 pytest 基线有历史债务，continue-on-error 待后续清理后移除
         working-directory: backend
         continue-on-error: true
         run: PYTHONPATH=. pytest tests/ -q -W default
@@ -49,15 +52,12 @@ jobs:
       - name: Backend quality checks
         working-directory: backend
         continue-on-error: true
-        run: |
-          echo "── ruff ──"
-          ruff check app database tests --statistics
+        run: ruff check app database tests --statistics
 
-      # ── 前端构建校验 ──
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "20"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -67,15 +67,12 @@ jobs:
           npm ci
           npm run build
 
-      # ── Alembic 迁移验证（单轨） ──
       - name: Validate migrations
         working-directory: backend
         run: |
           export DB_PATH=$(mktemp /tmp/alembic-ci-XXXX.db)
-          # 生成临时配置覆盖 sqlite_path，避免污染仓库默认测试库
           python - <<PY
           import os, yaml
-          # 基于仓库内已提交的默认配置生成临时 CI 配置（env.yaml 为 gitignored 本地覆盖，CI 上不存在）
           with open('config/default.yaml') as f:
               cfg = yaml.safe_load(f)
           cfg['database']['sqlite_path'] = os.environ['DB_PATH']
@@ -95,8 +92,8 @@ jobs:
           PY
           rm -f .ci_alembic_env.yaml
 
-  # ── 生产部署：仅 push 到 main 或 workflow_dispatch 触发 ──
-  deploy-on-server:
+  # ── 构建并推镜像 + 服务器部署：仅 main 分支 push 或手动触发 ──
+  build-and-deploy:
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
@@ -106,94 +103,73 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute frontend version
-        id: version
+      # ── 计算版本标签 ──
+      - name: Compute image tags
+        id: meta
         run: |
-          V="v$(node -p "require('./frontend/package.json').version")-$(git rev-parse --short HEAD)"
-          echo "tag=$V" >> "$GITHUB_OUTPUT"
-          echo "APP_VERSION=$V"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION="v$(node -p "require('./frontend/package.json').version")-${SHORT_SHA}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "tags=${REGISTRY}/${IMAGE_NAME}:${VERSION},${REGISTRY}/${IMAGE_NAME}:latest" >> "$GITHUB_OUTPUT"
 
-      # 镜像在目标服务器上构建：只把源码打包传过去，节省 runner 资源并复用服务器缓存。
-      - name: Package source
-        run: |
-          tar --exclude=.git \
-              --exclude=frontend/node_modules \
-              --exclude=frontend/dist \
-              --exclude='*/__pycache__' \
-              --exclude='*.pyc' \
-              -czf media-library-src.tar.gz \
-              backend frontend deploy
-          ls -lh media-library-src.tar.gz
-
-      - name: Transfer source to server
-        uses: appleboy/scp-action@v0.1.7
+      # ── 登录阿里云镜像仓库 ──
+      - name: Log in to ACR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.HOST || 'mz727.top' }}
-          username: ${{ secrets.USERNAME || 'dev' }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "media-library-src.tar.gz"
-          target: "/tmp"
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and deploy on server
+      # ── 构建并推镜像（单镜像：FastAPI + SPA 静态资源） ──
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./deploy/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── SSH 服务器：拉新镜像 + compose up ──
+      - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.HOST || 'mz727.top' }}
-          username: ${{ secrets.USERNAME || 'dev' }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          command_timeout: 30m
+          command_timeout: 5m
           script: |
             set -euo pipefail
-            export DOCKER_BUILDKIT=1
 
-            DEPLOY_DIR="/home/${{ secrets.USERNAME || 'dev' }}/media-library-deploy"
-            rm -rf "$DEPLOY_DIR/build"
-            mkdir -p "$DEPLOY_DIR/build"
-            tar xzf /tmp/media-library-src.tar.gz -C "$DEPLOY_DIR/build"
+            DEPLOY_DIR="/home/${{ secrets.USERNAME }}/media-library-deploy"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
-            cd "$DEPLOY_DIR/build"
+            # 登录阿里云镜像仓库（docker 会复用凭据，无需每次重新登录）
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login ${{ env.REGISTRY }} \
+              -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
 
-            # 构建后端镜像（build context 为 backend/，Dockerfile 在 deploy/）
-            docker build \
-              --build-arg APP_VERSION=${{ steps.version.outputs.tag }} \
-              -f deploy/Dockerfile \
-              -t media-library-backend:latest \
-              backend
+            # 确保必要目录存在
+            mkdir -p config secrets data
 
-            # 构建前端产物（服务器需已安装 Node；使用国内镜像加速）
-            cd "$DEPLOY_DIR/build/frontend"
-            npm config set registry https://registry.npmmirror.com
-            npm ci
-            npm run build
-
-            # 启动服务
-            cd "$DEPLOY_DIR/build/deploy"
-
-            # 持久化 secret_key：首次随机生成并保存在 build 目录之外，
-            # 避免每次部署重建导致 secret_key 轮换、已有登录态失效
-            SECRET_FILE="$DEPLOY_DIR/.media_secret_key"
-            if [ ! -f "$SECRET_FILE" ]; then
-              openssl rand -hex 32 > "$SECRET_FILE"
-              chmod 600 "$SECRET_FILE"
+            # docker-compose.yml 必须存在（本地仓库 deploy/ 目录下有模板）
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "ERROR: docker-compose.yml 不存在"
+              echo "      首次部署需手动拷贝：cp /path/to/repo/deploy/docker-compose.yml ./"
+              exit 1
             fi
-            APP_SECRET_KEY="$(cat "$SECRET_FILE")"
-            # 管理员密码：首次随机生成并持久化，避免空密码建号导致无法登录；
-            # 可在服务器 $DEPLOY_DIR/.media_admin_password 查看
-            ADMIN_PW_FILE="$DEPLOY_DIR/.media_admin_password"
-            if [ ! -f "$ADMIN_PW_FILE" ]; then
-              openssl rand -hex 12 > "$ADMIN_PW_FILE"
-              chmod 600 "$ADMIN_PW_FILE"
-            fi
-            APP_ADMIN_PASSWORD="$(cat "$ADMIN_PW_FILE")"
-            # secrets 持久目录放在 build 之外：容器以 root 写入，
-            # 放 build 内会导致 rm -rf 重建时权限拒绝
-            mkdir -p "$DEPLOY_DIR/secrets"
-            # 写入 compose 运行时环境变量：入口脚本据此生成 secrets/config.yaml；
-            # CORS 指向对外域名 media.mz727.top
-            printf 'APP_SECRET_KEY=%s\nAPP_ADMIN_PASSWORD=%s\nCORS_ORIGINS=https://media.mz727.top\nSECRETS_DIR=%s\n' \
-              "$APP_SECRET_KEY" "$APP_ADMIN_PASSWORD" "$DEPLOY_DIR/secrets" > .env
 
-            docker compose down --remove-orphans
-            docker compose up -d
+            # 拉取最新镜像
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # 重建容器（容器入口脚本会自动处理 APP_SECRET_KEY / APP_ADMIN_PASSWORD 兜底）
+            docker compose up -d --remove-orphans
 
             # 健康检查
             for i in $(seq 1 10); do
@@ -204,6 +180,6 @@ jobs:
               echo "attempt $i: service starting, retrying in 3s..."
               sleep 3
             done
-            docker ps --filter name=media-library-backend --format '{{.Status}}'
+            docker ps --filter name=media-library --format '{{.Status}}'
             echo "health check failed after 10 attempts"
             exit 1
