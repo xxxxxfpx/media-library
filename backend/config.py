@@ -120,16 +120,24 @@ class Config:
         return os.path.join(config_dir, "default.yaml")
 
     def _load_config(self):
+        data = {}
         if not os.path.exists(self.config_path):
             print(f"配置文件 {self.config_path} 不存在，使用默认配置")
+        else:
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    data = yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"加载配置文件失败: {e}，使用默认配置")
+
+        # 始终合并 secrets 覆盖：即使主配置文件缺失（如容器内 CONFIG_PATH
+        # 指向不存在的 local.yaml），secrets/config.yaml 中的密钥也必须生效，
+        # 否则启动守卫会因 secret_key 为空而拒绝启动
+        data = _merge_secret_config(data)
+        if not data:
             return
 
         try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                data = _merge_secret_config(yaml.safe_load(f) or {})
-
-            if not data:
-                return
 
             if 'database' in data:
                 db = data['database']

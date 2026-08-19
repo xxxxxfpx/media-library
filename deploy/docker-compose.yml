@@ -8,7 +8,9 @@ services:
     restart: unless-stopped
     environment:
       # 生产环境通过 .env 文件或宿主机环境注入敏感配置
-      CONFIG_PATH: /app/config/local.yaml
+      # local.yaml 为 gitignored 文件不在镜像内，指向已提交的 default.yaml，
+      # 敏感项由入口脚本生成的 secrets/config.yaml 覆盖
+      CONFIG_PATH: /app/config/default.yaml
       SECRETS_PATH: /app/secrets/config.yaml
       # 若未挂载 secrets/config.yaml，入口脚本会据此生成
       APP_SECRET_KEY: ${APP_SECRET_KEY:-}
