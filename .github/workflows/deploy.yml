@@ -137,6 +137,9 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           build-args: |
             APP_VERSION=${{ steps.meta.outputs.version }}
+          # 阿里云 ACR 个人版不支持 OCI provenance/sbom 附件，需关闭
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
