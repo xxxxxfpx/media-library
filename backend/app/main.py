@@ -167,6 +167,13 @@ async def health_check():
     return {"status": "ok", "version": config.app.version}
 
 
+@app.get("/llm.txt", include_in_schema=False)
+async def llm_txt():
+    """为 AI Agent 提供的 API 文档（Markdown 格式），无需认证。"""
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(_LLM_TXT_CONTENT, media_type="text/plain; charset=utf-8")
+
+
 _LLM_TXT_CONTENT = """# Media Library Agent API Guide
 
 ## 概述
@@ -386,13 +393,6 @@ curl -H "Authorization: Bearer <token>" -X POST http://localhost:8000/api/media/
 7. 媒体创建接口需要管理员权限
 8. 不要提交广告/营销信息，只提取核心内容
 """
-
-
-@app.get("/llm.txt", include_in_schema=False)
-async def llm_txt():
-    """为 AI Agent 提供的 API 文档（Markdown 格式），无需认证。"""
-    from fastapi.responses import PlainTextResponse
-    return PlainTextResponse(_LLM_TXT_CONTENT, media_type="text/plain; charset=utf-8")
 
 
 @app.exception_handler(Exception)
