@@ -147,7 +147,34 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .system-container {
-  padding: 20px;
+  padding: 14px 16px 20px;
+
+  @media (max-width: 768px) {
+    padding: 10px 12px 16px;
+  }
+
+  // 列内卡片等高对齐
+  > .el-row > .el-col {
+    display: flex;
+    align-items: stretch;
+  }
+
+  > .el-row .el-card {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  > .el-row .el-card__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  // 进度条贴底
+  > .el-row .el-progress {
+    margin-top: auto;
+  }
 }
 
 .back-link {
@@ -189,6 +216,9 @@ onUnmounted(() => {
 .stat-value {
   font-size: 20px;
   font-weight: bold;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
 .stat-label {

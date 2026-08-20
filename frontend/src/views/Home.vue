@@ -1,6 +1,6 @@
 <template>
   <div class="home-content">
-    <!-- 统计卡片 - 紧凑版 -->
+    <!-- 统计卡片 -->
     <div v-if="visibleStats.length" class="stats-section">
       <div
         v-for="stat in visibleStats"
@@ -18,44 +18,12 @@
         <div class="stat-glow"></div>
       </div>
     </div>
-
-    <!-- 最近添加 - 去大圆角空心卡，直接沉浸式陈列 -->
-    <div class="section">
-      <div class="section-header">
-        <div class="section-title">
-          <AppIcon name="clock" :size="16" />
-          <span>最近添加</span>
-          <span class="section-count">精选</span>
-        </div>
-        <el-button
-          type="primary"
-          link
-          class="view-all-btn"
-          @click="$router.push('/library')"
-        >
-          查看全部 <AppIcon name="arrow-right" :size="13" />
-        </el-button>
-      </div>
-
-      <MediaGrid
-        :params="{ limit: 12 }"
-        :pagination="{ pageSize: 12, pageSizes: [], layout: '' }"
-        empty-text="暂无媒体内容"
-      >
-        <template #empty-action>
-          <el-button type="primary" @click="$router.push('/library')">
-            浏览媒体库
-          </el-button>
-        </template>
-      </MediaGrid>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { mediaAPI } from '@/api'
-import MediaGrid from '@/components/MediaGrid.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const stats = ref([
@@ -96,17 +64,13 @@ onMounted(() => {
   min-height: 100%;
 }
 
-// 统计卡片 - 紧凑，去大留白
 .stats-section {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 18px;
 
   @media (max-width: 1200px) { grid-template-columns: repeat(2, 1fr); }
-
   @media (max-width: 768px) { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-
   @media (max-width: 480px) { grid-template-columns: 1fr; }
 }
 
@@ -155,39 +119,6 @@ onMounted(() => {
     position: absolute; top: -40%; right: -14%; width: 110px; height: 110px;
     background: var(--stat-color); filter: blur(42px); opacity: 0;
     transition: opacity var(--duration-base) var(--ease-standard); pointer-events: none;
-  }
-}
-
-// 内容区域 - 去大圆角空心，去留白
-.section {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 14px;
-  padding: 14px 14px 12px;
-}
-
-.section-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px; padding: 0 2px;
-
-  .section-title {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 0.9375rem; font-weight: 700; color: var(--color-text-primary);
-    letter-spacing: -0.015em;
-
-    .section-count {
-      margin-left: 6px; padding: 2px 7px; border-radius: 999px;
-      background: var(--video-chip-bg); border: 1px solid var(--video-chip-border);
-      color: var(--color-accent); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em;
-    }
-  }
-
-  .view-all-btn {
-    color: var(--color-text-tertiary) !important; font-weight: 600; font-size: 0.8125rem;
-
-    &:hover { color: var(--color-accent) !important; }
-    :deep(.app-icon) { margin-left: 4px; transition: transform var(--duration-fast) var(--ease-standard); }
-    &:hover :deep(.app-icon) { transform: translateX(3px); }
   }
 }
 </style>

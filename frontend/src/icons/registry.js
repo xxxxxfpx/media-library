@@ -28,6 +28,7 @@ import Music from '~icons/lucide/music'
 import Tv from '~icons/lucide/tv'
 import Film from '~icons/lucide/film'
 import Clock from '~icons/lucide/clock'
+import ClockPlus from '~icons/lucide/clock-plus'
 import ArrowRight from '~icons/lucide/arrow-right'
 import ArrowLeft from '~icons/lucide/arrow-left'
 import User from '~icons/lucide/user'
@@ -83,6 +84,7 @@ export const iconRegistry = {
   tv: Tv,
   film: Film,
   clock: Clock,
+  'clock-plus': ClockPlus,
   'arrow-right': ArrowRight,
   'arrow-left': ArrowLeft,
   user: User,

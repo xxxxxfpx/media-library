@@ -13,7 +13,11 @@
     <el-aside
       :width="isMobile ? '240px' : sidebarWidth"
       class="sidebar"
-      :class="{ 'is-drawer': isMobile, 'is-open': isMobile && store.mobileMenuOpen }"
+      :class="{
+        'is-drawer': isMobile,
+        'is-open': isMobile && store.mobileMenuOpen,
+        'is-collapsed': !isMobile && store.sidebarCollapsed
+      }"
     >
       <div class="sidebar-inner">
         <div class="brand">
@@ -136,6 +140,7 @@ const sidebarWidth = computed(() => (store.sidebarCollapsed ? '72px' : '240px'))
 const menuItems = [
   { to: '/', icon: 'home', title: '首页' },
   { to: '/library', icon: 'clapperboard', title: '媒体库' },
+  { to: '/recent', icon: 'clock-plus', title: '最近添加' },
   { to: '/favorites', icon: 'star', title: '收藏' },
   { to: '/history', icon: 'history', title: '最近观看' },
 ]
@@ -312,8 +317,8 @@ function handleCommand(command) {
 // 收缩按钮
 .collapse-btn {
   position: absolute;
-  bottom: 24px;
-  right: -16px;
+  bottom: 72px;
+  right: 8px;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -332,8 +337,14 @@ function handleCommand(command) {
     background: var(--imm-accent);
     color: var(--color-text-inverse);
     border-color: var(--imm-accent);
-    box-shadow: 0 4px 12px var(--color-accent-glow);
+    box-shadow: 0 2px 8px var(--imm-overlay);
   }
+}
+
+// 收起态：按钮居中
+.sidebar.is-collapsed .collapse-btn {
+  left: calc(50% - 16px);
+  right: auto;
 }
 
 // ===== 主内容区 =====

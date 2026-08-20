@@ -1,0 +1,81 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e46]:
+    - complementary [ref=e47]:
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - img [ref=e51]
+          - generic [ref=e53]: Media Library
+        - menubar [ref=e54]:
+          - menuitem "首页" [ref=e55] [cursor=pointer]:
+            - img [ref=e57]
+            - text: 首页
+          - menuitem "媒体库" [ref=e59] [cursor=pointer]:
+            - img [ref=e61]
+            - text: 媒体库
+          - menuitem "收藏" [ref=e63] [cursor=pointer]:
+            - img [ref=e65]
+            - text: 收藏
+          - menuitem "最近观看" [ref=e67] [cursor=pointer]:
+            - img [ref=e69]
+            - text: 最近观看
+          - menuitem "设置" [ref=e74] [cursor=pointer]:
+            - img [ref=e76]
+            - text: 设置
+          - menuitem "系统监控" [ref=e78] [cursor=pointer]:
+            - img [ref=e80]
+            - text: 系统监控
+        - generic [ref=e83]:
+          - generic [ref=e84]: A
+          - generic [ref=e85]:
+            - generic [ref=e86]: admin
+            - generic [ref=e87]: 管理员
+      - button [ref=e88] [cursor=pointer]:
+        - img [ref=e90]
+    - generic [ref=e92]:
+      - banner [ref=e93]:
+        - heading "首页" [level=2] [ref=e95]
+        - generic [ref=e96]:
+          - button [ref=e97] [cursor=pointer]:
+            - img [ref=e100]
+          - button "A" [ref=e103] [cursor=pointer]:
+            - generic [ref=e104]: A
+            - img [ref=e106]
+      - main [ref=e108]:
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - img [ref=e114]
+              - generic [ref=e118]: 最近添加
+            - button "查看全部" [ref=e119] [cursor=pointer]:
+              - generic [ref=e120]:
+                - text: 查看全部
+                - img [ref=e122]
+          - generic [ref=e124]:
+            - generic [ref=e125]:
+              - generic [ref=e127]: 0 个项目
+              - generic [ref=e128]:
+                - generic [ref=e130]:
+                  - img [ref=e133]
+                  - textbox "搜索媒体..." [ref=e135]
+                - generic [ref=e136]:
+                  - button [ref=e137] [cursor=pointer]:
+                    - img [ref=e140]
+                  - button [ref=e142] [cursor=pointer]:
+                    - img [ref=e145]
+            - generic [ref=e147]:
+              - button "电影" [ref=e148] [cursor=pointer]
+              - button "剧集" [ref=e149] [cursor=pointer]
+              - button "季度" [ref=e150] [cursor=pointer]
+              - button "单集" [ref=e151] [cursor=pointer]
+              - button "人物" [ref=e152] [cursor=pointer]
+              - button "媒体源" [ref=e153] [cursor=pointer]
+              - button "工作室" [ref=e154] [cursor=pointer]
+              - button "类型" [ref=e155] [cursor=pointer]
+              - button "标签" [ref=e156] [cursor=pointer]
+              - button "合集" [ref=e157] [cursor=pointer]
+            - generic [ref=e160]:
+              - img [ref=e163]
+              - paragraph [ref=e166]: 暂无内容
+  - alert [ref=e167]:
+    - img [ref=e169]
+    - paragraph [ref=e171]: 登录成功

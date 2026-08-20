@@ -1,0 +1,75 @@
+- generic [ref=f1e3]:
+  - complementary [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - img [ref=f1e8]
+        - generic [ref=f1e10]: Media Library
+      - menubar [ref=f1e11]:
+        - menuitem "首页" [ref=f1e12] [cursor=pointer]:
+          - img [ref=f1e14]
+          - text: 首页
+        - menuitem "媒体库" [ref=f1e16] [cursor=pointer]:
+          - img [ref=f1e18]
+          - text: 媒体库
+        - menuitem "收藏" [ref=f1e20] [cursor=pointer]:
+          - img [ref=f1e22]
+          - text: 收藏
+        - menuitem "最近观看" [ref=f1e24] [cursor=pointer]:
+          - img [ref=f1e26]
+          - text: 最近观看
+        - menuitem "设置" [ref=f1e31] [cursor=pointer]:
+          - img [ref=f1e33]
+          - text: 设置
+        - menuitem "系统监控" [ref=f1e35] [cursor=pointer]:
+          - img [ref=f1e37]
+          - text: 系统监控
+      - generic [ref=f1e40]:
+        - generic [ref=f1e41]: A
+        - generic [ref=f1e42]:
+          - generic [ref=f1e43]: admin
+          - generic [ref=f1e44]: 管理员
+    - button [ref=f1e45] [cursor=pointer]:
+      - img [ref=f1e47]
+  - generic [ref=f1e49]:
+    - banner [ref=f1e50]:
+      - heading "首页" [level=2] [ref=f1e52]
+      - generic [ref=f1e53]:
+        - button [ref=f1e54] [cursor=pointer]:
+          - img [ref=f1e57]
+        - button "A" [ref=f1e60] [cursor=pointer]:
+          - generic [ref=f1e61]: A
+          - img [ref=f1e63]
+    - main [ref=f1e65]:
+      - generic [ref=f1e67]:
+        - generic [ref=f1e68]:
+          - generic [ref=f1e69]:
+            - img [ref=f1e71]
+            - generic [ref=f1e75]: 最近添加
+          - button "查看全部" [ref=f1e76] [cursor=pointer]:
+            - generic [ref=f1e77]:
+              - text: 查看全部
+              - img [ref=f1e79]
+        - generic [ref=f1e81]:
+          - generic [ref=f1e82]:
+            - generic [ref=f1e84]: 0 个项目
+            - generic [ref=f1e85]:
+              - generic [ref=f1e87]:
+                - img [ref=f1e90]
+                - textbox "搜索媒体..." [ref=f1e92]
+              - generic [ref=f1e93]:
+                - button [ref=f1e94] [cursor=pointer]:
+                  - img [ref=f1e97]
+                - button [ref=f1e99] [cursor=pointer]:
+                  - img [ref=f1e102]
+          - generic [ref=f1e104]:
+            - button "电影" [ref=f1e105] [cursor=pointer]
+            - button "剧集" [ref=f1e106] [cursor=pointer]
+            - button "季度" [ref=f1e107] [cursor=pointer]
+            - button "单集" [ref=f1e108] [cursor=pointer]
+            - button "人物" [ref=f1e109] [cursor=pointer]
+            - button "媒体源" [ref=f1e110] [cursor=pointer]
+            - button "工作室" [ref=f1e111] [cursor=pointer]
+            - button "类型" [ref=f1e112] [cursor=pointer]
+            - button "标签" [ref=f1e113] [cursor=pointer]
+            - button "合集" [ref=f1e114] [cursor=pointer]
+          - img [ref=f1e118]

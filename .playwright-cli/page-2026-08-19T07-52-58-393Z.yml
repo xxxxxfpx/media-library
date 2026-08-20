@@ -1,0 +1,18 @@
+- generic [ref=f2e4]:
+  - generic [ref=f2e5]:
+    - img [ref=f2e8]
+    - heading "Media Library" [level=1] [ref=f2e10]
+    - paragraph [ref=f2e11]: 沉浸式媒体管理体验
+  - generic [ref=f2e12]:
+    - heading "欢迎回来" [level=2] [ref=f2e13]
+    - paragraph [ref=f2e14]: 登录以继续探索
+    - generic [ref=f2e15]:
+      - generic [ref=f2e19]:
+        - img [ref=f2e22]
+        - textbox "用户名" [ref=f2e24]
+      - generic [ref=f2e28]:
+        - img [ref=f2e31]
+        - textbox "密码" [ref=f2e34]
+      - button "登 录" [ref=f2e37] [cursor=pointer]:
+        - generic [ref=f2e38]: 登 录
+    - paragraph [ref=f2e40]: "默认账号: admin / admin123"

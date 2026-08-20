@@ -30,6 +30,12 @@ const routes = [
     meta: { requiresAuth: true, title: '媒体库', icon: 'clapperboard', menu: true }
   },
   {
+    path: '/recent',
+    name: 'Recent',
+    component: () => import('@/views/Recent.vue'),
+    meta: { requiresAuth: true, title: '最近添加', icon: 'clock-plus', menu: true }
+  },
+  {
     path: '/favorites',
     name: 'Favorites',
     component: () => import('@/views/Favorites.vue'),
