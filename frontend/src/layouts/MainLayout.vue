@@ -1,19 +1,33 @@
 <template>
-  <div class="layout-container">
-    <!-- 左侧侧边栏 -->
-    <el-aside :width="sidebarWidth" class="sidebar">
+  <div class="layout-container" :class="{ 'is-mobile': isMobile }">
+    <!-- 移动端遮罩层 -->
+    <transition name="fade">
+      <div
+        v-if="isMobile && store.mobileMenuOpen"
+        class="mobile-mask"
+        @click="store.setMobileMenuOpen(false)"
+      ></div>
+    </transition>
+
+    <!-- 左侧侧边栏（移动端为抽屉） -->
+    <el-aside
+      :width="isMobile ? '240px' : sidebarWidth"
+      class="sidebar"
+      :class="{ 'is-drawer': isMobile, 'is-open': isMobile && store.mobileMenuOpen }"
+    >
       <div class="sidebar-inner">
         <div class="brand">
           <AppIcon name="clapperboard" :size="28" class="brand-icon" />
-          <span v-show="!store.sidebarCollapsed" class="brand-text">Media Library</span>
+          <span v-show="isMobile || !store.sidebarCollapsed" class="brand-text">Media Library</span>
         </div>
 
         <el-menu
           :default-active="route.path"
           router
           class="nav-menu"
-          :collapse="store.sidebarCollapsed"
+          :collapse="!isMobile && store.sidebarCollapsed"
           :collapse-transition="false"
+          @select="handleNavSelect"
         >
           <el-menu-item v-for="item in menuItems" :key="item.to" :index="item.to">
             <AppIcon :name="item.icon" :size="18" />
@@ -30,10 +44,10 @@
 
         <div class="sidebar-footer">
           <div class="user-info">
-            <el-avatar :size="store.sidebarCollapsed ? 32 : 36" class="user-avatar">
+            <el-avatar :size="isMobile || !store.sidebarCollapsed ? 36 : 32" class="user-avatar">
               {{ store.userInfo?.username?.charAt(0)?.toUpperCase() || 'U' }}
             </el-avatar>
-            <div v-show="!store.sidebarCollapsed" class="user-meta">
+            <div v-show="isMobile || !store.sidebarCollapsed" class="user-meta">
               <div class="user-name">{{ store.userInfo?.username || '用户' }}</div>
               <div class="user-role">{{ store.isAdmin ? '管理员' : '普通用户' }}</div>
             </div>
@@ -52,6 +66,9 @@
       <!-- 头部 -->
       <el-header class="header">
         <div class="header-left">
+          <button v-if="isMobile" class="icon-btn hamburger-btn" @click="store.setMobileMenuOpen(true)" aria-label="打开菜单">
+            <AppIcon name="menu" :size="20" />
+          </button>
           <h2 class="page-title">{{ pageTitle }}</h2>
         </div>
         <div class="header-right">
@@ -91,7 +108,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/store'
 import { authAPI } from '@/api'
@@ -101,6 +118,17 @@ import ThemeSwitcher from '@/components/ui/ThemeSwitcher.vue'
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
+
+// 移动端断点检测：<768px 视为移动端，侧边栏变抽屉
+const MOBILE_BREAKPOINT = 768
+const isMobile = ref(window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`).matches)
+const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+function handleMqlChange(e) {
+  isMobile.value = e.matches
+  if (e.matches) store.setMobileMenuOpen(false)
+}
+mql.addEventListener('change', handleMqlChange)
+onBeforeUnmount(() => mql.removeEventListener('change', handleMqlChange))
 
 const sidebarWidth = computed(() => (store.sidebarCollapsed ? '72px' : '240px'))
 
@@ -123,6 +151,11 @@ const visibleAdminItems = computed(() =>
 )
 
 const pageTitle = computed(() => route.meta.title || '首页')
+
+// 移动端点击菜单项后关闭抽屉
+function handleNavSelect() {
+  if (isMobile.value) store.setMobileMenuOpen(false)
+}
 
 function handleCommand(command) {
   if (command === 'logout') {
@@ -390,5 +423,75 @@ function handleCommand(command) {
       color: var(--imm-accent) !important;
     }
   }
+}
+
+// ===== 移动端响应式 =====
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1000;
+    box-shadow: none;
+    width: 240px !important;
+
+    &.is-open {
+      transform: translateX(0);
+      box-shadow: 16px 0 48px var(--imm-overlay);
+    }
+
+    .collapse-btn {
+      display: none;
+    }
+  }
+
+  .layout-container.is-mobile .sidebar.is-drawer + .main-area {
+    width: 100%;
+  }
+}
+
+.mobile-mask {
+  position: fixed;
+  inset: 0;
+  background: var(--imm-overlay);
+  z-index: 999;
+}
+
+.header-left {
+  .hamburger-btn {
+    margin-right: 4px;
+  }
+}
+
+// 通用图标按钮
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--imm-border);
+  background: var(--imm-bg-elevated);
+  color: var(--imm-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--imm-hover);
+    color: var(--imm-text-primary);
+  }
+}
+
+// 遮罩淡入淡出
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -70,10 +70,6 @@
             </el-button>
           </el-form-item>
         </el-form>
-
-        <div class="login-footer">
-          <p>默认账号: <span class="highlight">admin</span> / <span class="highlight">admin123</span></p>
-        </div>
       </div>
     </div>
   </div>
@@ -321,19 +317,5 @@ async function handleLogin() {
   }
 }
 
-.login-footer {
-  margin-top: 24px;
-  text-align: center;
-  
-  p {
-    color: var(--color-text-disabled);
-    font-size: 0.8125rem;
-    margin: 0;
-  }
-  
-  .highlight {
-    color: var(--color-accent);
-    font-weight: 500;
-  }
-}
+
 </style>

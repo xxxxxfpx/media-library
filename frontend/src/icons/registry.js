@@ -52,6 +52,12 @@ import Notebook from '~icons/lucide/notebook'
 import ChartLine from '~icons/lucide/chart-line'
 import Cpu from '~icons/lucide/cpu'
 import Coins from '~icons/lucide/coins'
+import Menu from '~icons/lucide/menu'
+import Layers from '~icons/lucide/layers'
+import CirclePlay from '~icons/lucide/circle-play'
+import Tag from '~icons/lucide/tag'
+import Bookmark from '~icons/lucide/bookmark'
+import Package from '~icons/lucide/package'
 
 export const iconRegistry = {
   home: Home,
@@ -101,4 +107,10 @@ export const iconRegistry = {
   'chart-line': ChartLine,
   cpu: Cpu,
   coins: Coins,
+  menu: Menu,
+  layers: Layers,
+  'play-circle': CirclePlay,
+  tag: Tag,
+  bookmark: Bookmark,
+  package: Package,
 }

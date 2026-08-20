@@ -20,15 +20,15 @@ export const TYPE_LABELS = {
 
 export const TYPE_ICONS = {
   'Movie': 'film',
-  'Series': 'film',
-  'Season': 'film',
-  'Episode': 'film',
+  'Series': 'tv',
+  'Season': 'layers',
+  'Episode': 'play-circle',
   'Person': 'user',
   'Source': 'folder-open',
   'Studio': 'clapperboard',
-  'Genre': 'library',
-  'Tag': 'library',
-  'BoxSet': 'library',
+  'Genre': 'tag',
+  'Tag': 'bookmark',
+  'BoxSet': 'package',
 }
 
 export const TYPE_OPTIONS = Object.entries(TYPE_LABELS).map(([value, label]) => ({

@@ -1,7 +1,9 @@
 <template>
   <div class="system-container">
-    <el-page-header content="系统监控" class="mb-4" @back="$router.push('/')" />
-    
+    <button class="back-link" @click="$router.push('/')">
+      <AppIcon name="arrow-left" :size="16" /> 返回
+    </button>
+
     <el-row :gutter="20" class="mb-4">
       <el-col :span="6">
         <el-card shadow="hover">
@@ -146,6 +148,27 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .system-container {
   padding: 20px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--imm-divider);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--imm-text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--imm-hover);
+    color: var(--imm-text-primary);
+    border-color: var(--imm-border);
+  }
 }
 
 .mb-4 {

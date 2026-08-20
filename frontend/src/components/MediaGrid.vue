@@ -48,6 +48,7 @@
         :class="{ active: filters.types.includes(item.value) }"
         @click="toggleType(item.value)"
       >
+        <AppIcon :name="getTypeIconName(item.value)" :size="14" class="type-icon" />
         {{ item.label }}
       </button>
     </div>
@@ -62,10 +63,13 @@
         @click="handleItemClick(item)"
       />
       <div v-if="!loading && (!items || !items.length)" class="grid-empty">
-        <el-empty description="暂无内容">
+        <el-empty :description="emptyDesc">
           <template #image>
             <AppIcon name="video" :size="64" class="empty-icon" />
           </template>
+          <el-button v-if="emptyAction && !isFiltering" type="primary" class="empty-action" @click="handleEmptyAction">
+            {{ emptyAction }}
+          </el-button>
         </el-empty>
       </div>
     </div>
@@ -101,9 +105,13 @@
       </div>
       <el-empty
         v-if="!loading && (!items || !items.length)"
-        description="暂无内容"
+        :description="emptyDesc"
         class="empty-state"
-      />
+      >
+        <el-button v-if="emptyAction && !isFiltering" type="primary" class="empty-action" @click="handleEmptyAction">
+          {{ emptyAction }}
+        </el-button>
+      </el-empty>
     </div>
 
     <!-- Pagination -->
@@ -123,11 +131,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { mediaAPI } from '@/api'
 import { openMediaDetail } from '@/composables/useMediaNavigation'
 import MediaCard from '@/components/MediaCard.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+
+const router = useRouter()
 
 const listConfig = {
   disableClick: false,
@@ -152,10 +163,30 @@ const props = defineProps({
   showSearch: { type: Boolean, default: true },
   showTypeFilter: { type: Boolean, default: true },
   showViewToggle: { type: Boolean, default: true },
-  showCount: { type: Boolean, default: true }
+  showCount: { type: Boolean, default: true },
+  // 空状态定制：emptyText 文案 + emptyAction 引导按钮文本 + emptyActionTo 跳转路由
+  emptyText: { type: String, default: '暂无内容' },
+  emptyAction: { type: String, default: '' },
+  emptyActionTo: { type: String, default: '' }
 })
 
 const emit = defineEmits(['item-click'])
+
+// 是否存在搜索关键词或类型筛选（用于区分"初始为空"与"筛选无结果"的提示）
+const isFiltering = computed(() =>
+  Boolean(searchQuery.value?.trim()) || filters.value.types.length > 0
+)
+
+// 空状态文案：筛选中但未命中 → 提示清除筛选；否则用自定义空文案
+const emptyDesc = computed(() =>
+  isFiltering.value ? '未找到匹配内容，试试清除筛选条件' : props.emptyText
+)
+
+function handleEmptyAction() {
+  if (props.emptyActionTo) {
+    router.push(props.emptyActionTo)
+  }
+}
 
 const items = ref([])
 const loading = ref(false)
@@ -376,9 +407,20 @@ watch(
 // Type Filter Bar
 .type-filter-bar {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
   padding: 8px 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  .type-btn {
+    flex-shrink: 0;
+  }
 }
 
 .type-btn {
@@ -390,6 +432,13 @@ watch(
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  .type-icon {
+    opacity: 0.7;
+  }
 
   &:hover {
     border-color: var(--imm-accent);
@@ -419,6 +468,10 @@ watch(
 
   .empty-icon {
     color: var(--imm-divider);
+  }
+
+  .empty-action {
+    margin-top: 8px;
   }
 }
 

@@ -1,7 +1,9 @@
 <template>
   <div class="settings-container">
-    <el-page-header content="设置" class="mb-4" @back="$router.push('/')" />
-    
+    <button class="back-link" @click="$router.push('/')">
+      <AppIcon name="arrow-left" :size="16" /> 返回
+    </button>
+
     <el-card class="mb-4">
       <template #header>
         <span>个人信息</span>
@@ -307,6 +309,27 @@ async function submitPasswordChange() {
 .settings-container {
   padding: 20px;
   max-width: 800px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--imm-divider);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--imm-text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: var(--imm-hover);
+    color: var(--imm-text-primary);
+    border-color: var(--imm-border);
+  }
 }
 
 .mb-4 {

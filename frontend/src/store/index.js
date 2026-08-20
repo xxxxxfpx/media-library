@@ -33,5 +33,7 @@ export const useAppStore = defineStore('app', () => {
     // 布局
     sidebarCollapsed: layout.sidebarCollapsed,
     toggleSidebar: layout.toggleSidebar,
+    mobileMenuOpen: layout.mobileMenuOpen,
+    setMobileMenuOpen: layout.setMobileMenuOpen,
   }
 })
