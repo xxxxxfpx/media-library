@@ -105,6 +105,15 @@ _STATIC_DIR = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "static")
 )
 
+# /llm.txt 必须在 SPA fallback 之前注册，否则会被 /{full_path:path} 拦截
+# 放在 if 块外确保开发模式（无 static 目录）也能注册
+@app.get("/llm.txt", include_in_schema=False)
+async def llm_txt():
+    """为 AI Agent 提供的 API 文档（Markdown 格式），无需认证。"""
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(_LLM_TXT_CONTENT, media_type="text/plain; charset=utf-8")
+
+
 if os.path.isdir(_STATIC_DIR):
     # Vite 产出的带哈希资源放在 /assets 下，文件名含内容哈希，
     # 可安全地长缓存（immutable）；index.html 必须每次回源校验，否则部署后浏览器持续使用旧入口
@@ -165,13 +174,6 @@ if os.path.isdir(_STATIC_DIR):
 async def health_check():
     """健康检查"""
     return {"status": "ok", "version": config.app.version}
-
-
-@app.get("/llm.txt", include_in_schema=False)
-async def llm_txt():
-    """为 AI Agent 提供的 API 文档（Markdown 格式），无需认证。"""
-    from fastapi.responses import PlainTextResponse
-    return PlainTextResponse(_LLM_TXT_CONTENT, media_type="text/plain; charset=utf-8")
 
 
 _LLM_TXT_CONTENT = """# Media Library Agent API Guide
