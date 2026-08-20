@@ -25,7 +25,7 @@
               <div class="stat-label">CPU 使用率</div>
             </div>
           </div>
-          <el-progress :percentage="systemInfo.cpu || 0" :stroke-width="8" :color="getProgressColor(systemInfo.cpu)" />
+          <el-progress :percentage="systemInfo.cpu || 0" :stroke-width="8" :show-text="false" :color="getProgressColor(systemInfo.cpu)" />
         </el-card>
       </el-col>
       <el-col :span="6">
@@ -37,7 +37,7 @@
               <div class="stat-label">内存使用</div>
             </div>
           </div>
-          <el-progress :percentage="systemInfo.memory_percent || 0" :stroke-width="8" :color="getProgressColor(systemInfo.memory_percent)" />
+          <el-progress :percentage="systemInfo.memory_percent || 0" :stroke-width="8" :show-text="false" :color="getProgressColor(systemInfo.memory_percent)" />
         </el-card>
       </el-col>
       <el-col :span="6">
@@ -49,7 +49,7 @@
               <div class="stat-label">磁盘使用</div>
             </div>
           </div>
-          <el-progress :percentage="systemInfo.disk_percent || 0" :stroke-width="8" :color="getProgressColor(systemInfo.disk_percent)" />
+          <el-progress :percentage="systemInfo.disk_percent || 0" :stroke-width="8" :show-text="false" :color="getProgressColor(systemInfo.disk_percent)" />
         </el-card>
       </el-col>
     </el-row>

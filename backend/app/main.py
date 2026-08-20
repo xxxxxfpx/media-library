@@ -106,19 +106,34 @@ _STATIC_DIR = os.path.abspath(
 )
 
 if os.path.isdir(_STATIC_DIR):
-    # Vite 产出的带哈希资源放在 /assets 下，单独挂载以便缓存优化
+    # Vite 产出的带哈希资源放在 /assets 下，文件名含内容哈希，
+    # 可安全地长缓存（immutable）；index.html 必须每次回源校验，否则部署后浏览器持续使用旧入口
     _assets_dir = os.path.join(_STATIC_DIR, "assets")
     if os.path.isdir(_assets_dir):
+
+        class _ImmutableStaticFiles(StaticFiles):
+            """带内容哈希的静态资源：一年强缓存"""
+
+            async def get_response(self, path, scope):
+                response = await super().get_response(path, scope)
+                response.headers["Cache-Control"] = (
+                    "public, max-age=31536000, immutable"
+                )
+                return response
+
         app.mount(
             "/assets",
-            StaticFiles(directory=_assets_dir),
+            _ImmutableStaticFiles(directory=_assets_dir),
             name="spa-assets",
         )
 
     @app.get("/", include_in_schema=False)
     async def spa_index():
         """首页：服务 index.html"""
-        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+        return FileResponse(
+            os.path.join(_STATIC_DIR, "index.html"),
+            headers={"Cache-Control": "no-cache"},
+        )
 
     @app.api_route(
         "/{full_path:path}",
@@ -136,8 +151,14 @@ if os.path.isdir(_STATIC_DIR):
         candidate = os.path.abspath(os.path.join(_STATIC_DIR, full_path))
         # 安全：防止路径穿越
         if candidate.startswith(_STATIC_DIR) and os.path.isfile(candidate):
-            return FileResponse(candidate)
-        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
+            # 根级静态资源（favicon 等）短缓存即可
+            return FileResponse(
+                candidate, headers={"Cache-Control": "public, max-age=86400"}
+            )
+        return FileResponse(
+            os.path.join(_STATIC_DIR, "index.html"),
+            headers={"Cache-Control": "no-cache"},
+        )
 
 
 @app.get("/health")
