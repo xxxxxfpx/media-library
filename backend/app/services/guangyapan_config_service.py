@@ -28,7 +28,7 @@ def decrypt_value(value: str | None) -> str | None:
     try:
         return _cipher().decrypt(value.encode("ascii")).decode("utf-8")
     except (InvalidToken, ValueError) as exc:
-        raise RuntimeError("光芽云盘配置密文无法解密，请重新配置 Token") from exc
+        raise RuntimeError("光鸭云盘配置密文无法解密，请重新配置 Token") from exc
 
 
 async def get_config(db: AsyncSession) -> GuangYaPanConfig | None:

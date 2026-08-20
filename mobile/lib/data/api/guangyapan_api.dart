@@ -17,4 +17,12 @@ class GuangYaPanApi {
     );
     return Map<String, dynamic>.from(response.data as Map);
   }
+
+  Future<Map<String, dynamic>> testConfig(Map<String, dynamic> payload) async {
+    final response = await _client.post(
+      '/api/drives/guangyapan/test',
+      data: payload,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
 }

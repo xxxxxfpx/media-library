@@ -395,7 +395,7 @@ class _HomeTabMyState extends ConsumerState<HomeTabMy> {
                 child: ListTile(
                   leading: Icon(Icons.cloud_outlined, color: cs.primary),
                   title: Text(
-                    '光芽云盘设置',
+                    '光鸭云盘设置',
                     style: TextStyle(fontSize: 16, color: cs.onSurface),
                   ),
                   subtitle: Text(

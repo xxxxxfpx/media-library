@@ -111,7 +111,7 @@
     <el-card v-if="store.isAdmin" class="mb-4">
       <template #header>
         <div class="card-header-row">
-          <span>光芽云盘</span>
+          <span>光鸭云盘</span>
           <el-tag :type="guangYaPanConfig.configured ? 'success' : 'info'" size="small">
             {{ guangYaPanConfig.configured ? '已配置' : '未配置' }}
           </el-tag>
@@ -151,11 +151,39 @@
           />
           <div class="setting-desc">上传和离线下载统一使用此目录；文件名由源 URL 的 SHA-256 自动生成。</div>
         </el-form-item>
+
+        <!-- 测试连接按钮与结果 -->
+        <el-form-item label="目录连通性">
+          <div class="test-connection-row">
+            <el-button
+              :loading="guangYaPanTesting"
+              :disabled="guangYaPanSaving"
+              @click="testGuangYaPanConfig"
+            >
+              {{ guangYaPanTesting ? '测试中...' : '测试连接' }}
+            </el-button>
+            <div v-if="guangYaPanTestResult" class="test-result test-success">
+              <span class="test-icon">✓</span>
+              <span>目录可访问 · 共 {{ guangYaPanTestResult.total }} 项</span>
+              <span v-if="guangYaPanTestResult.sample?.length" class="test-samples">
+                示例：{{ guangYaPanTestResult.sample.map(s => s.name).join('、') }}
+              </span>
+            </div>
+            <div v-else-if="guangYaPanTestError" class="test-result test-error">
+              <span class="test-icon">✗</span>
+              <span>{{ guangYaPanTestError }}</span>
+            </div>
+            <div v-else class="test-result test-pending">
+              <span>点击「测试连接」验证目录 ID 是否有效</span>
+            </div>
+          </div>
+        </el-form-item>
+
         <div class="drive-actions">
           <span v-if="guangYaPanConfig.updated_at" class="setting-desc">
             最近更新：{{ formatDate(guangYaPanConfig.updated_at) }}
           </span>
-          <el-button type="primary" :loading="guangYaPanSaving" @click="saveGuangYaPanConfig">
+          <el-button type="primary" :loading="guangYaPanSaving" :disabled="guangYaPanTesting" @click="saveGuangYaPanConfig">
             保存云盘设置
           </el-button>
         </div>
@@ -198,6 +226,9 @@ const autoplay = ref(false)
 const defaultMuted = ref(false)
 const syncInterval = ref(8000)
 const guangYaPanSaving = ref(false)
+const guangYaPanTesting = ref(false)
+const guangYaPanTestResult = ref(null) // { ok, parent_id, total, sample }
+const guangYaPanTestError = ref('')
 const guangYaPanConfig = ref({ configured: false, updated_at: null })
 const guangYaPanForm = ref({
   access_token: '',
@@ -238,19 +269,50 @@ async function saveSettings() {
   }
 }
 
+async function testGuangYaPanConfig() {
+  guangYaPanTesting.value = true
+  guangYaPanTestResult.value = null
+  guangYaPanTestError.value = ''
+  try {
+    const payload = { ...guangYaPanForm.value }
+    const result = await guangYaPanAPI.testConfig(payload)
+    guangYaPanTestResult.value = result
+  } catch (error) {
+    guangYaPanTestError.value = error.response?.data?.detail || '测试失败'
+  } finally {
+    guangYaPanTesting.value = false
+  }
+}
+
 async function saveGuangYaPanConfig() {
   guangYaPanSaving.value = true
   try {
+    // 保存前先测试：确保凭据和目录可用
     const payload = { ...guangYaPanForm.value }
+    try {
+      const testResult = await guangYaPanAPI.testConfig(payload)
+      if (!testResult.ok) {
+        guangYaPanTestError.value = '测试未通过，请检查配置'
+        ElMessage.error('保存前测试未通过，无法保存')
+        return
+      }
+      guangYaPanTestResult.value = testResult
+    } catch (testError) {
+      guangYaPanTestError.value = testError.response?.data?.detail || '连接测试失败'
+      ElMessage.error('保存前连接测试失败，请检查 Token 和目录 ID')
+      return
+    }
+
     if (!payload.access_token) delete payload.access_token
     if (!payload.refresh_token) delete payload.refresh_token
     const config = await guangYaPanAPI.updateConfig(payload)
     guangYaPanConfig.value = config
     guangYaPanForm.value.access_token = ''
     guangYaPanForm.value.refresh_token = ''
-    ElMessage.success('光芽云盘设置已保存')
+    guangYaPanTestError.value = ''
+    ElMessage.success('光鸭云盘设置已保存')
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '光芽云盘设置保存失败')
+    ElMessage.error(error.response?.data?.detail || '光鸭云盘设置保存失败')
   } finally {
     guangYaPanSaving.value = false
   }
@@ -391,6 +453,53 @@ async function submitPasswordChange() {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.test-connection-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.test-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 200px;
+}
+
+.test-icon {
+  font-weight: bold;
+}
+
+.test-success {
+  background: var(--el-color-success-light-9, #f0f9eb);
+  color: var(--el-color-success, #67c23a);
+  border: 1px solid var(--el-color-success-light-7, #e1f3d8);
+}
+
+.test-error {
+  background: var(--el-color-danger-light-9, #fef0f0);
+  color: var(--el-color-danger, #f56c6c);
+  border: 1px solid var(--el-color-danger-light-7, #fde2e2);
+}
+
+.test-pending {
+  background: var(--el-color-info-light-9, #f4f4f5);
+  color: var(--el-color-info, #909399);
+  border: 1px dashed var(--el-color-info-light-5, #d3d4d6);
+}
+
+.test-samples {
+  color: inherit;
+  opacity: 0.8;
+  margin-left: 6px;
 }
 
 @media (max-width: 600px) {

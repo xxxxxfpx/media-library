@@ -21,7 +21,10 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
 
   bool _loading = true;
   bool _saving = false;
+  bool _testing = false;
   bool _configured = false;
+  Map<String, dynamic>? _testResult;
+  String _testError = '';
 
   @override
   void initState() {
@@ -59,37 +62,106 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
         category: 'settings',
       );
       if (mounted) {
-        _showMessage('光芽云盘设置加载失败');
+        _showMessage('光鸭云盘设置加载失败');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _testConfig() async {
+    setState(() {
+      _testing = true;
+      _testResult = null;
+      _testError = '';
+    });
+    try {
+      final payload = _buildPayload();
+      final result = await (await _api()).testConfig(payload);
+      if (mounted) {
+        setState(() {
+          _testResult = result;
+        });
+      }
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        'guangyapan_config_test_failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'settings',
+      );
+      if (mounted) {
+        setState(() {
+          _testError = error.toString().contains('detail')
+              ? error.toString().replaceAll('Exception: ', '')
+              : '测试失败，请检查 Token 和目录 ID';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+  }
+
+  Map<String, dynamic> _buildPayload() {
+    final payload = <String, dynamic>{
+      'client_id': _clientIdController.text.trim().isEmpty
+          ? null
+          : _clientIdController.text.trim(),
+      'device_id': _deviceIdController.text.trim().isEmpty
+          ? null
+          : _deviceIdController.text.trim(),
+      'default_parent_id': _parentIdController.text.trim(),
+    };
+    if (_accessTokenController.text.trim().isNotEmpty) {
+      payload['access_token'] = _accessTokenController.text.trim();
+    }
+    if (_refreshTokenController.text.trim().isNotEmpty) {
+      payload['refresh_token'] = _refreshTokenController.text.trim();
+    }
+    return payload;
+  }
+
   Future<void> _saveConfig() async {
+    if (_testing) return;
     setState(() => _saving = true);
     try {
-      final payload = <String, dynamic>{
-        'client_id': _clientIdController.text.trim().isEmpty
-            ? null
-            : _clientIdController.text.trim(),
-        'device_id': _deviceIdController.text.trim().isEmpty
-            ? null
-            : _deviceIdController.text.trim(),
-        'default_parent_id': _parentIdController.text.trim(),
-      };
-      if (_accessTokenController.text.trim().isNotEmpty) {
-        payload['access_token'] = _accessTokenController.text.trim();
-      }
-      if (_refreshTokenController.text.trim().isNotEmpty) {
-        payload['refresh_token'] = _refreshTokenController.text.trim();
+      // 保存前先测试：确保凭据和目录可用
+      final payload = _buildPayload();
+      try {
+        final testResult = await (await _api()).testConfig(payload);
+        if (testResult['ok'] != true) {
+          if (!mounted) return;
+          setState(() {
+            _testError = '测试未通过，请检查配置';
+          });
+          _showMessage('保存前测试未通过，无法保存');
+          return;
+        }
+        if (mounted) {
+          setState(() {
+            _testResult = testResult;
+          });
+        }
+      } catch (testError) {
+        if (!mounted) return;
+        setState(() {
+          _testError = testError.toString().contains('detail')
+              ? testError.toString().replaceAll('Exception: ', '')
+              : '连接测试失败，请检查 Token 和目录 ID';
+        });
+        _showMessage('保存前连接测试失败，请检查 Token 和目录 ID');
+        return;
       }
 
       final config = await (await _api()).updateConfig(payload);
-      _configured = config['configured'] == true;
+      if (!mounted) return;
+      setState(() {
+        _configured = config['configured'] == true;
+        _testError = '';
+      });
       _accessTokenController.clear();
       _refreshTokenController.clear();
-      if (mounted) _showMessage('光芽云盘设置已保存');
+      _showMessage('光鸭云盘设置已保存');
     } catch (error, stackTrace) {
       AppLogger.error(
         'guangyapan_config_save_failed',
@@ -97,7 +169,7 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
         stackTrace: stackTrace,
         category: 'settings',
       );
-      if (mounted) _showMessage('光芽云盘设置保存失败');
+      if (mounted) _showMessage('光鸭云盘设置保存失败');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -114,7 +186,7 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('光芽云盘设置')),
+      appBar: AppBar(title: const Text('光鸭云盘设置')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -180,11 +252,87 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
                             border: OutlineInputBorder(),
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        // 测试连接按钮与结果
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: (_saving || _testing) ? null : _testConfig,
+                              icon: const Icon(Icons.cloud_verified_outlined, size: 18),
+                              label: Text(_testing ? '测试中...' : '测试连接'),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _testResult != null
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: Colors.green.shade200),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(Icons.check_circle, color: Colors.green.shade600, size: 16),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  '目录可访问 · 共 ${_testResult!['total']} 项',
+                                                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (_testResult!['sample'] != null && (_testResult!['sample'] as List).isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Text(
+                                                '示例：${(_testResult!['sample'] as List).map((e) => e['name']).join('、')}',
+                                                style: TextStyle(color: Colors.green.shade600, fontSize: 12),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    )
+                                  : _testError.isNotEmpty
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: Colors.red.shade200),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.error_outline, color: Colors.red.shade600, size: 16),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  _testError,
+                                                  style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      : Text(
+                                          '点击「测试连接」验证目录 ID 是否有效',
+                                          style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+                                        ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 20),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: _saving ? null : _saveConfig,
+                            onPressed: (_saving || _testing) ? null : _saveConfig,
                             icon: _saving
                                 ? const SizedBox(
                                     width: 18,

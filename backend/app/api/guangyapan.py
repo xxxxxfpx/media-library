@@ -18,7 +18,7 @@ from app.services.guangyapan_service import GuangYaPanClient, GuangYaPanError
 from database.core import get_db_session
 from database.models import DriveFile
 
-router = APIRouter(prefix="/api/drives/guangyapan", tags=["光芽盘"])
+router = APIRouter(prefix="/api/drives/guangyapan", tags=["光鸭盘"])
 
 
 class DriveRequest(BaseModel):
@@ -105,7 +105,7 @@ def _decrypt_config_value(encrypted: str | None) -> str | None:
     except RuntimeError as exc:
         raise HTTPException(
             status_code=400,
-            detail="光芽云盘配置密文无法解密，请重新配置 access_token / refresh_token",
+            detail="光鸭云盘配置密文无法解密，请重新配置 access_token / refresh_token",
         ) from exc
 
 
@@ -113,7 +113,7 @@ async def client_for(data: DriveRequest, db: AsyncSession) -> GuangYaPanClient:
     config = await get_config(db)
     access_token = data.access_token or _decrypt_config_value(config.AccessTokenEncrypted if config else None)
     if not access_token:
-        raise HTTPException(status_code=400, detail="未配置光芽云盘 access_token")
+        raise HTTPException(status_code=400, detail="未配置光鸭云盘 access_token")
     refresh_token = data.refresh_token or _decrypt_config_value(config.RefreshTokenEncrypted if config else None)
     return GuangYaPanClient(
         access_token,
@@ -183,6 +183,47 @@ async def update_guangyapan_config(
         config.DefaultParentId = (data.default_parent_id or "").strip()
     await db.flush()
     return await get_guangyapan_config(_, db)
+
+
+class GuangYaPanTestRequest(DriveRequest):
+    default_parent_id: str = ""
+
+
+@router.post("/test")
+async def test_guangyapan(
+    data: GuangYaPanTestRequest,
+    _: int = Depends(get_admin_id),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """测试光鸭云盘凭据与默认目录 ID 是否可用。
+
+    表单传入的 token 优先；留空时回退已存储的配置。
+    通过列目录（最多 5 条）验证权限与目录存在性。
+    """
+    parent_id = (data.default_parent_id or "").strip()
+    client = await client_for(data, db)
+    try:
+        result = await client.list_files(parent_id, page_size=5)
+        items = result.get("list") or []
+        sample = []
+        for item in items[:5]:
+            sample.append({
+                "name": str(item.get("name") or item.get("fileName") or ""),
+                "is_dir": bool(item.get("isDir") or item.get("is_dir") or item.get("dirType")),
+            })
+        return {
+            "ok": True,
+            "parent_id": parent_id,
+            "total": result.get("total") or len(items),
+            "sample": sample,
+        }
+    except GuangYaPanError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"光鸭云盘目录测试失败：{exc}",
+        ) from exc
+    finally:
+        await client.close()
 
 
 @router.post("/list")
