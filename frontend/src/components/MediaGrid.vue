@@ -16,7 +16,7 @@
           clearable
         >
           <template #prefix>
-            <AppIcon name="search" :size="16" />
+            <AppIcon name="search" :size="15" />
           </template>
         </el-input>
 
@@ -26,20 +26,20 @@
             circle
             @click="viewMode = 'grid'"
           >
-            <AppIcon name="layout-grid" :size="16" />
+            <AppIcon name="layout-grid" :size="15" />
           </el-button>
           <el-button
             :class="{ active: viewMode === 'list' }"
             circle
             @click="viewMode = 'list'"
           >
-            <AppIcon name="list" :size="16" />
+            <AppIcon name="list" :size="15" />
           </el-button>
         </div>
       </div>
     </div>
 
-    <!-- Type Filter -->
+    <!-- Type Filter - 粘性醒目筛选栏 -->
     <div v-if="showTypeFilter" class="type-filter-bar">
       <button
         v-for="item in TYPE_OPTIONS"
@@ -48,7 +48,7 @@
         :class="{ active: filters.types.includes(item.value) }"
         @click="toggleType(item.value)"
       >
-        <AppIcon :name="getTypeIconName(item.value)" :size="14" class="type-icon" />
+        <AppIcon :name="getTypeIconName(item.value)" :size="13" class="type-icon" />
         {{ item.label }}
       </button>
     </div>
@@ -65,7 +65,7 @@
       <div v-if="!loading && (!items || !items.length)" class="grid-empty">
         <el-empty :description="emptyDesc">
           <template #image>
-            <AppIcon name="video" :size="64" class="empty-icon" />
+            <AppIcon name="video" :size="56" class="empty-icon" />
           </template>
           <el-button v-if="emptyAction && !isFiltering" type="primary" class="empty-action" @click="handleEmptyAction">
             {{ emptyAction }}
@@ -85,7 +85,7 @@
         <div class="list-poster">
           <img v-if="item.poster_url" :src="item.poster_url" :alt="item.name" />
           <div v-else class="poster-placeholder">
-            <AppIcon :name="getTypeIconName(item.type)" :size="20" />
+            <AppIcon :name="getTypeIconName(item.type)" :size="18" />
           </div>
         </div>
         <div class="list-info">
@@ -94,7 +94,7 @@
             <span v-if="item.production_year">{{ item.production_year }}</span>
             <span v-if="item.type">{{ getTypeLabel(item.type) }}</span>
             <span v-if="item.community_rating" class="rating">
-              <AppIcon name="star" :size="14" :filled="true" /> {{ item.community_rating.toFixed(1) }}
+              <AppIcon name="star" :size="12" :filled="true" /> {{ item.community_rating.toFixed(1) }}
             </span>
           </p>
           <p v-if="item.overview" class="list-overview">{{ item.overview }}</p>
@@ -164,7 +164,6 @@ const props = defineProps({
   showTypeFilter: { type: Boolean, default: true },
   showViewToggle: { type: Boolean, default: true },
   showCount: { type: Boolean, default: true },
-  // 空状态定制：emptyText 文案 + emptyAction 引导按钮文本 + emptyActionTo 跳转路由
   emptyText: { type: String, default: '暂无内容' },
   emptyAction: { type: String, default: '' },
   emptyActionTo: { type: String, default: '' }
@@ -172,12 +171,10 @@ const props = defineProps({
 
 const emit = defineEmits(['item-click'])
 
-// 是否存在搜索关键词或类型筛选（用于区分"初始为空"与"筛选无结果"的提示）
 const isFiltering = computed(() =>
   Boolean(searchQuery.value?.trim()) || filters.value.types.length > 0
 )
 
-// 空状态文案：筛选中但未命中 → 提示清除筛选；否则用自定义空文案
 const emptyDesc = computed(() =>
   isFiltering.value ? '未找到匹配内容，试试清除筛选条件' : props.emptyText
 )
@@ -292,7 +289,6 @@ watch(() => filters.value.types, () => {
   fetchData()
 }, { deep: true })
 
-// 搜索防抖：300ms 内连续输入只触发一次请求
 watch(searchQuery, (val) => {
   currentPage.value = 1
   if (searchTimer) clearTimeout(searchTimer)
@@ -319,320 +315,295 @@ watch(
 .media-grid-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-// Toolbar
+// Toolbar - 更紧凑，信息层级清晰
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  gap: 16px;
+  padding: 4px 0 2px;
 }
 
 .toolbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
 
   .item-count {
     font-size: 0.8125rem;
-    color: var(--imm-text-disabled);
+    font-weight: 600;
+    color: var(--color-text-secondary);
     white-space: nowrap;
+    letter-spacing: -0.01em;
   }
 }
 
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
 .search-input {
-  width: 260px;
+  width: 220px;
 
   :deep(.el-input__wrapper) {
-    background: var(--imm-hover) !important;
-    border: 1px solid var(--imm-border);
-    border-radius: 10px;
+    background: var(--color-bg-elevated) !important;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 999px;
     box-shadow: none;
-    padding: 4px 16px;
+    padding: 3px 14px;
 
     &:hover, &:focus, &.is-focus {
-      border-color: var(--imm-accent);
-      box-shadow: 0 0 0 3px var(--imm-accent-bg);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-soft);
     }
   }
 
   :deep(.el-input__inner) {
-    color: var(--imm-text-primary);
+    color: var(--color-text-primary);
+    font-size: 0.875rem;
 
-    &::placeholder {
-      color: var(--imm-text-disabled);
-    }
+    &::placeholder { color: var(--color-text-disabled); }
   }
 
   :deep(.el-input__prefix) {
-    color: var(--imm-text-disabled);
-    margin-right: 8px;
+    color: var(--color-text-disabled);
+    margin-right: 6px;
   }
 }
 
 .view-toggle {
   display: flex;
-  gap: 8px;
-  padding: 4px;
-  background: var(--imm-hover);
-  border-radius: 10px;
+  gap: 4px;
+  padding: 3px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
 
   .el-button {
+    width: 30px; height: 30px;
     background: transparent !important;
     border: none !important;
-    color: var(--imm-text-tertiary) !important;
+    color: var(--color-text-tertiary) !important;
 
     &:hover {
-      color: var(--imm-text-secondary) !important;
-      background: var(--imm-hover-strong) !important;
+      color: var(--color-text-primary) !important;
+      background: var(--color-hover) !important;
     }
 
     &.active {
-      background: var(--imm-accent-bg) !important;
-      color: var(--imm-accent) !important;
+      background: var(--color-accent) !important;
+      color: white !important;
+      box-shadow: 0 2px 8px var(--color-accent-glow);
     }
   }
 }
 
-// Type Filter Bar
+// Type Filter Bar - 粘性醒目，方便快速过滤
 .type-filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   gap: 8px;
-  padding: 8px 0;
+  padding: 10px 0 12px;
+  margin: 0 -2px;
+  background: var(--video-filter-sticky-bg);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border-bottom: 1px solid var(--color-border-subtle);
   overflow-x: auto;
   flex-wrap: nowrap;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 
-  &::-webkit-scrollbar {
-    display: none;
-  }
+  &::-webkit-scrollbar { display: none; }
 
-  .type-btn {
-    flex-shrink: 0;
-  }
+  .type-btn { flex-shrink: 0; }
 }
 
 .type-btn {
-  padding: 6px 16px;
-  border-radius: 20px;
-  border: 1px solid var(--imm-divider);
-  background: transparent;
-  color: var(--imm-text-secondary);
-  font-size: 0.875rem;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--duration-fast) var(--ease-standard);
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 
-  .type-icon {
-    opacity: 0.7;
-  }
+  .type-icon { opacity: 0.75; }
 
   &:hover {
-    border-color: var(--imm-accent);
-    color: var(--imm-accent);
-    background: var(--imm-accent-bg);
+    border-color: var(--video-chip-border);
+    color: var(--color-accent);
+    background: var(--video-chip-bg);
+    transform: translateY(-1px);
   }
 
   &.active {
-    background: var(--imm-accent);
-    border-color: var(--imm-accent);
-    color: var(--color-text-inverse);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
+    box-shadow: 0 4px 12px var(--color-accent-glow);
   }
 }
 
-// Grid View
+// Grid View - 高密度
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--video-grid-gap);
   align-items: start;
-  min-height: 100px;
+  min-height: 120px;
+
+  @media (max-width: 1280px) {
+    grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+    gap: 12px;
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 10px;
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 8px;
+  }
 }
 
 .grid-empty {
   grid-column: 1 / -1;
-  padding: 60px 0;
+  padding: 48px 0;
 
-  .empty-icon {
-    color: var(--imm-divider);
-  }
-
-  .empty-action {
-    margin-top: 8px;
-  }
+  .empty-icon { color: var(--color-border-strong); }
+  .empty-action { margin-top: 8px; }
 }
 
-// List View
+// List View - 密度优化，保留详情阅读
 .media-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .list-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  background: var(--imm-hover);
-  border: 1px solid var(--imm-divider);
+  gap: 14px;
+  padding: 10px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-base) var(--ease-standard);
 
   &:hover {
-    background: var(--imm-hover-strong);
-    border-color: var(--imm-border);
-    transform: translateX(4px);
+    background: var(--color-hover-strong);
+    border-color: var(--video-card-border-hover);
+    transform: translateX(3px);
+    box-shadow: var(--shadow-sm);
   }
 }
 
 .list-poster {
-  width: 60px;
-  height: 90px;
+  width: 52px;
+  height: 78px;
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--imm-accent) 0%, var(--imm-accent-dark) 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, color-mix(in oklch, var(--color-accent) 68%, black) 100%);
 
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+  img { width: 100%; height: 100%; object-fit: cover; }
 
   .poster-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--imm-text-secondary);
-    font-size: 1.5rem;
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; opacity: 0.9;
   }
 }
 
 .list-info {
-  flex: 1;
-  min-width: 0;
+  flex: 1; min-width: 0;
 
   .list-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--imm-text-primary);
-    margin: 0 0 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.9375rem; font-weight: 650; color: var(--color-text-primary);
+    margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    letter-spacing: -0.01em;
   }
 
   .list-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 0 0 6px;
-    font-size: 0.8125rem;
-    color: var(--imm-text-tertiary);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: 0 0 4px; font-size: 0.76rem; color: var(--color-text-tertiary);
 
     .rating {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      color: var(--imm-warning);
-
-      .el-icon {
-        font-size: 0.875rem;
-      }
+      display: inline-flex; align-items: center; gap: 3px;
+      color: var(--color-warning); font-weight: 700;
     }
   }
 
   .list-overview {
-    margin: 0;
-    font-size: 0.8125rem;
-    color: var(--imm-text-disabled);
-    line-height: 1.5;
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    margin: 0; font-size: 0.76rem; color: var(--color-text-disabled);
+    line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
   }
 }
 
-.list-actions {
-  display: flex;
-  gap: 8px;
-}
+.list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.empty-state { padding: 64px 0; }
 
-.empty-state {
-  padding: 80px 0;
-}
-
-// Pagination
+// Pagination - 清晰聚焦浏览
 .pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  padding-top: 16px;
+  display: flex; justify-content: center;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--color-border-subtle);
 
   :deep(.el-pagination) {
-    .el-pagination__total,
-    .el-pagination__sizes {
-      color: var(--imm-text-tertiary);
-    }
+    .el-pagination__total, .el-pagination__sizes { color: var(--color-text-tertiary); font-size: 0.8125rem; }
 
     button, .el-pager li {
-      background: transparent !important;
-      color: var(--imm-text-secondary) !important;
-      border-radius: 8px;
+      background: var(--color-bg-elevated) !important;
+      color: var(--color-text-secondary) !important;
+      border-radius: 8px; border: 1px solid var(--color-border-subtle); margin: 0 3px; min-width: 32px; height: 32px;
 
       &:hover {
-        background: var(--imm-hover-strong) !important;
-        color: var(--imm-text-primary) !important;
+        background: var(--color-hover-strong) !important;
+        color: var(--color-text-primary) !important;
+        border-color: var(--color-border-default);
       }
 
       &.is-active {
-        background: var(--imm-accent) !important;
-        color: var(--imm-text-primary) !important;
+        background: var(--color-accent) !important;
+        color: white !important;
+        border-color: var(--color-accent) !important;
+        box-shadow: 0 2px 8px var(--color-accent-glow);
       }
 
-      &:disabled {
-        color: var(--imm-text-disabled) !important;
-      }
+      &:disabled { opacity: 0.45; }
     }
 
     .el-input__wrapper {
-      background: var(--imm-hover) !important;
-      border: 1px solid var(--imm-border);
+      background: var(--color-bg-elevated) !important;
+      border: 1px solid var(--color-border-subtle);
       box-shadow: none !important;
+      border-radius: 8px;
 
-      &:hover {
-        border-color: var(--imm-accent);
-      }
+      &:hover { border-color: var(--color-accent); }
     }
 
-    .el-input__inner {
-      color: var(--imm-text-primary);
-    }
-
-    .el-pagination__jump {
-      color: var(--imm-text-tertiary);
-
-      .el-input__inner {
-        color: var(--imm-text-primary);
-      }
-    }
+    .el-input__inner { color: var(--color-text-primary); }
+    .el-pagination__jump { color: var(--color-text-tertiary); font-size: 0.8125rem; }
   }
 }
 </style>

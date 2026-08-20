@@ -28,26 +28,27 @@ html, body {
 // ===== Element Plus 组件覆盖 =====
 
 .el-card {
-  background: var(--imm-bg-tertiary);
-  border: none;
-  border-radius: 8px;
-  box-shadow: none;
-  transition: transform 0.3s ease, background 0.3s ease;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
 
   .el-card__header {
-    border-bottom: 1px solid var(--imm-divider);
-    padding: 16px 20px;
-    color: var(--imm-text-primary);
-    font-weight: 600;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding: 14px 16px;
+    color: var(--color-text-primary);
+    font-weight: 650;
+    font-size: 0.9375rem;
   }
 
   .el-card__body {
-    color: var(--imm-text-secondary);
+    color: var(--color-text-secondary);
   }
 
   &:hover {
-    background: var(--imm-bg-elevated);
-    transform: translateY(-2px);
+    border-color: var(--color-border-default);
+    box-shadow: var(--shadow-md);
   }
 }
 
