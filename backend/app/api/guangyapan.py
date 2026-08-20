@@ -1,5 +1,6 @@
 """GuangYaPan drive proxy API."""
 
+import base64
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -82,6 +83,13 @@ class SaveUrlRequest(DriveRequest):
     mode: Literal["offline", "upload"]
     parent_id: str = ""
     name: str | None = None
+
+
+class UploadBytesRequest(DriveRequest):
+    """上传 base64 编码的文件字节到光鸭云盘（用于密文/加密内容）"""
+    file_data: str = Field(..., min_length=1, description="base64 编码的文件内容")
+    name: str = Field(..., min_length=1, description="文件名（含扩展名）")
+    parent_id: str = ""
 
 
 class GuangYaPanConfigUpdate(BaseModel):
@@ -313,6 +321,69 @@ async def save_url(
         record.SourceUrl = data.url
         record.PlaybackUrl = result.url
         record.Mode = result.mode
+        record.Name = result.name
+        record.Size = result.size
+        record.Status = "ready"
+        record.ErrorMessage = None
+    await db.flush()
+    return {
+        "id": record.Id,
+        "provider": result.provider,
+        "provider_file_id": result.file_id,
+        "url": result.url,
+        "mode": result.mode,
+        "name": result.name,
+        "size": result.size,
+        "status": record.Status,
+    }
+
+
+@router.post("/upload-bytes")
+async def upload_bytes(
+    data: UploadBytesRequest,
+    _: int = Depends(get_admin_id),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """将 base64 编码的文件内容上传到光鸭云盘。
+
+    适用于 URL 是密文/加密内容，无法通过后端直接下载的场景。
+    Agent 可通过浏览器工具提取图片后，将 base64 数据提交此接口。
+    """
+    MAX_SIZE = 50 * 1024 * 1024  # 50 MB 上限
+    try:
+        content = base64.b64decode(data.file_data, validate=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"base64 解码失败: {exc}")
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=400, detail=f"文件过大: {len(content)} 字节，上限 {MAX_SIZE} 字节")
+
+    parent_id = await default_parent_id(db, data.parent_id)
+
+    async def _upload(client: GuangYaPanClient):
+        return await client.upload_file_bytes(content, data.name, parent_id)
+
+    result = await execute(data, db, _upload)
+
+    record = await db.scalar(
+        select(DriveFile).where(
+            DriveFile.Provider == result.provider,
+            DriveFile.ProviderFileId == result.file_id,
+        )
+    )
+    if record is None:
+        record = DriveFile(
+            Provider=result.provider,
+            ProviderFileId=result.file_id,
+            SourceUrl=None,
+            PlaybackUrl=result.url,
+            Mode=result.mode,
+            Name=result.name,
+            Size=result.size,
+            Status="ready",
+        )
+        db.add(record)
+    else:
+        record.PlaybackUrl = result.url
         record.Name = result.name
         record.Size = result.size
         record.Status = "ready"

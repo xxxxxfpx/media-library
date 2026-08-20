@@ -312,6 +312,41 @@ class GuangYaPanClient:
         playable = await self.download_url(file_id)
         return SavedFile("guangyapan", file_id, playable["url"], "offline", completed.get("fileName"), completed.get("totalSize"))
 
+    async def upload_file_bytes(self, content: bytes, name: str, parent_id: str = "") -> SavedFile:
+        """Upload raw bytes directly to GuangYaPan (for encrypted/ciphered content).
+
+        Unlike upload_url, this method accepts pre-downloaded bytes so callers can
+        fetch content via a browser or custom decryption before uploading.
+        """
+        with tempfile.NamedTemporaryFile(prefix="guangyapan-", suffix=".upload", delete=False) as temp:
+            temp_path = temp.name
+            temp.write(content)
+            size = len(content)
+        try:
+            session = await self.upload_session(parent_id, name, size)
+            task_id = str(session.get("taskId") or "").strip()
+            if not task_id:
+                raise GuangYaPanError("upload session returned no task id")
+            access_key = session.get("accessKeyID") or (session.get("creds") or {}).get("accessKeyID")
+            secret_key = session.get("secretAccessKey") or (session.get("creds") or {}).get("secretAccessKey")
+            security_token = session.get("sessionToken") or (session.get("creds") or {}).get("sessionToken")
+            endpoint = session.get("endPoint") or session.get("fullEndPoint")
+            bucket_name = session.get("bucketName")
+            object_path = session.get("objectPath")
+            if not all((access_key, secret_key, endpoint, bucket_name, object_path)):
+                raise GuangYaPanError("upload session credentials are incomplete")
+            auth = oss2.StsAuth(access_key, secret_key, security_token)
+            bucket = oss2.Bucket(auth, self._upload_endpoint(endpoint, bucket_name), bucket_name)
+            await asyncio.to_thread(bucket.put_object_from_file, object_path, temp_path)
+            file_id = await self.wait_upload_file(task_id)
+            playable = await self.download_url(file_id)
+            return SavedFile("guangyapan", file_id, playable["url"], "upload", name, size)
+        finally:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
     @staticmethod
     def _source_file_name(source_url: str) -> str:
         """Use a stable URL digest so repeated saves cannot rename the file."""
