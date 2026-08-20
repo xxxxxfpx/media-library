@@ -314,11 +314,11 @@ function handleCommand(command) {
   }
 }
 
-// 收缩按钮
+// 收缩按钮（统一用 left 定位，展开/收起平滑过渡）
 .collapse-btn {
   position: absolute;
   bottom: 72px;
-  right: 8px;
+  left: calc(240px - 32px - 8px);  // 展开态：距侧边栏右边缘 8px
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -330,7 +330,11 @@ function handleCommand(command) {
   align-items: center;
   justify-content: center;
   z-index: 11;
-  transition: all 0.3s ease;
+  transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.3s ease,
+              color 0.3s ease,
+              border-color 0.3s ease,
+              box-shadow 0.3s ease;
   box-shadow: 0 2px 8px var(--imm-overlay);
 
   &:hover {
@@ -341,10 +345,9 @@ function handleCommand(command) {
   }
 }
 
-// 收起态：按钮居中
+// 收起态：按钮居中（72px/2 - 16px = 20px）
 .sidebar.is-collapsed .collapse-btn {
-  left: calc(50% - 16px);
-  right: auto;
+  left: calc(72px / 2 - 16px);
 }
 
 // ===== 主内容区 =====
