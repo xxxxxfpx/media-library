@@ -59,10 +59,13 @@ const fileTypeClass = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--imm-hover);
-  border: 1px solid var(--imm-divider);
+  padding: 10px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+
+  &:hover { border-color: var(--color-border-default); }
 }
 
 .file-icon {

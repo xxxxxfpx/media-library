@@ -179,11 +179,11 @@ function handleCommand(command) {
 // ===== 侧边栏 =====
 .sidebar {
   position: relative;
-  background: var(--imm-bg-secondary);
-  border-right: 1px solid var(--imm-divider);
+  background: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border-subtle);
   display: flex;
   flex-direction: column;
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   z-index: 10;
 }
@@ -192,28 +192,29 @@ function handleCommand(command) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 24px 12px;
+  padding: 16px 10px;
   overflow: hidden;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 12px 24px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--imm-divider);
-  color: var(--imm-text-primary);
+  gap: 10px;
+  padding: 0 10px 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary);
   white-space: nowrap;
 
   .brand-icon {
-    color: var(--imm-accent);
+    color: var(--color-accent);
   }
 
   .brand-text {
-    font-size: 1.125rem;
-    font-weight: 600;
-    background: linear-gradient(135deg, var(--imm-text-primary) 0%, var(--imm-text-secondary) 100%);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--color-text-primary) 0%, var(--color-text-secondary) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -226,27 +227,32 @@ function handleCommand(command) {
   border: none !important;
 
   :deep(.el-menu-item) {
-    color: var(--imm-text-tertiary) !important;
+    color: var(--color-text-tertiary) !important;
     border-radius: 10px;
-    margin: 4px 0;
-    height: 48px;
-    line-height: 48px;
-    font-size: 0.9375rem;
+    margin: 3px 0;
+    height: 40px;
+    line-height: 40px;
+    font-size: 0.875rem;
+    font-weight: 550;
     white-space: nowrap;
+    border: 1px solid transparent;
 
     .app-icon {
-      margin-right: 12px;
+      margin-right: 10px;
     }
 
     &:hover {
-      background: var(--imm-hover) !important;
-      color: var(--imm-text-secondary) !important;
+      background: var(--color-hover) !important;
+      color: var(--color-text-primary) !important;
+      border-color: var(--color-border-subtle);
     }
 
     &.is-active {
-      background: var(--imm-accent-bg) !important;
-      color: var(--imm-accent) !important;
-      font-weight: 500;
+      background: var(--video-chip-bg) !important;
+      color: var(--color-accent) !important;
+      font-weight: 650;
+      border-color: var(--video-chip-border);
+      box-shadow: 0 2px 10px color-mix(in oklch, var(--color-accent) 18%, transparent);
     }
   }
 
@@ -260,13 +266,13 @@ function handleCommand(command) {
 
 .nav-divider {
   height: 1px;
-  background: var(--imm-divider);
-  margin: 16px 12px;
+  background: var(--color-border-subtle);
+  margin: 10px;
 }
 
 .sidebar-footer {
-  padding-top: 16px;
-  border-top: 1px solid var(--imm-divider);
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-subtle);
   white-space: nowrap;
 
   .user-info {
@@ -339,26 +345,41 @@ function handleCommand(command) {
   background: var(--imm-bg-primary);
 }
 
-// 头部
+// 头部 - 去玻璃，实色 + 强调分隔，突出导航存在感
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--imm-glass-bg);
-  backdrop-filter: var(--imm-backdrop);
-  border-bottom: 1px solid var(--imm-divider);
-  padding: 0 32px;
-  height: 64px !important;
+  background: color-mix(in oklch, var(--color-bg-surface) 96%, var(--color-bg-page));
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 0 20px;
+  height: 56px !important;
   flex-shrink: 0;
 }
 
 .header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
   .page-title {
-    font-size: 1.375rem;
-    font-weight: 600;
-    color: var(--imm-text-primary);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
     margin: 0;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    &::before {
+      content: '';
+      width: 3px;
+      height: 18px;
+      border-radius: 999px;
+      background: var(--color-accent);
+      opacity: 0.95;
+    }
   }
 }
 
@@ -397,7 +418,8 @@ function handleCommand(command) {
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  background: var(--imm-bg-primary);
+  background: var(--color-bg-page);
+  scrollbar-gutter: stable;
 }
 
 // 下拉菜单
@@ -489,9 +511,14 @@ function handleCommand(command) {
 
 // 遮罩淡入淡出
 .fade-enter-active, .fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
+
+@media (max-width: 1280px) {
+  .header { padding: 0 16px; }
+}
+
 </style>

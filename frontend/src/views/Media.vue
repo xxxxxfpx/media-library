@@ -504,21 +504,21 @@ watch(() => route.params.id, (newId, oldId) => {
   to { transform: rotate(360deg); }
 }
 
-// ====== 英雄区域 ======
+// ====== 英雄区域 - 密度收紧，去留白 ======
 .hero-section {
   position: relative;
   background-size: cover;
   background-position: center;
-  background-color: var(--imm-bg-secondary);
-  min-height: 520px;
+  background-color: var(--color-bg-surface);
+  min-height: 420px;
   overflow: hidden;
 
   &::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--imm-bg-primary);
-    opacity: 0.65;
+    background: var(--color-bg-page);
+    opacity: 0.68;
   }
 }
 
@@ -527,50 +527,59 @@ watch(() => route.params.id, (newId, oldId) => {
   inset: 0;
   background: linear-gradient(
     180deg,
-    color-mix(in oklch, black 10%, transparent) 0%,
-    color-mix(in oklch, black 40%, transparent) 50%,
-    var(--imm-bg-primary) 100%
+    color-mix(in oklch, black 12%, transparent) 0%,
+    color-mix(in oklch, black 44%, transparent) 48%,
+    var(--color-bg-page) 100%
   );
 }
 
 .hero-content {
   position: relative;
   z-index: 2;
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 20px 0 40px;
+  padding: 16px 16px 28px;
 }
 
 .back-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: var(--color-hover);
+  padding: 7px 12px;
+  background: color-mix(in oklch, var(--color-bg-elevated) 88%, transparent);
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  border-radius: 999px;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 0.875rem;
-  transition: all var(--duration-base) var(--ease-standard);
-  margin-bottom: 32px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: all var(--duration-fast) var(--ease-standard);
+  margin-bottom: 18px;
+  backdrop-filter: blur(8px);
 
   &:hover {
-    background: var(--imm-accent);
-    border-color: var(--imm-accent);
-    color: var(--color-text-inverse);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
   }
 }
 
 .hero-layout {
   display: flex;
-  gap: 40px;
+  gap: 24px;
   align-items: flex-start;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+  }
 }
 
 .hero-media-card {
   flex-shrink: 0;
-  width: 300px;
+  width: 260px;
+
+  @media (max-width: 768px) { width: 200px; }
 }
 
 .hero-info {
@@ -623,10 +632,13 @@ watch(() => route.params.id, (newId, oldId) => {
 }
 
 .hero-title {
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 800;
   margin: 0;
   line-height: 1.2;
+  letter-spacing: -0.02em;
+
+  @media (max-width: 768px) { font-size: 1.4rem; }
 }
 
 .detail-favorite-btn {
@@ -762,9 +774,9 @@ watch(() => route.params.id, (newId, oldId) => {
 
 // ====== 视频选择和播放区域 ======
 .hero-video-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--imm-divider);
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .hero-video-section .video-select {
@@ -828,24 +840,24 @@ watch(() => route.params.id, (newId, oldId) => {
 .video-info-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 16px 0;
+  gap: 10px;
+  margin: 12px 0;
 }
 
 .video-info-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px 16px;
-  background: var(--imm-bg-elevated);
-  border: 1px solid var(--imm-divider);
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 8px;
-  min-width: 80px;
-  transition: all 0.3s ease;
+  min-width: 76px;
+  transition: all var(--duration-fast) var(--ease-standard);
 
   &:hover {
-    background: var(--imm-hover);
-    border-color: var(--imm-border);
+    background: var(--color-hover);
+    border-color: var(--color-border-default);
   }
 }
 
@@ -862,30 +874,39 @@ watch(() => route.params.id, (newId, oldId) => {
   color: var(--imm-text-primary);
 }
 
-// ====== 主体区域 ======
+// ====== 主体区域 - 密度提升 ======
 .body-section {
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 32px 0 60px;
+  padding: 18px 16px 32px;
 }
 
 .content-section {
-  margin-bottom: 40px;
+  margin-bottom: 22px;
 }
 
 .section-title {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
-  margin: 0 0 20px;
+  margin: 0 0 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  letter-spacing: -0.01em;
+
+  &::before {
+    content: '';
+    width: 3px; height: 16px; border-radius: 999px;
+    background: var(--color-accent);
+  }
 }
 
 .links-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+
+  @media (max-width: 480px) { grid-template-columns: repeat(2, 1fr); }
 }
 
 .season-list {
@@ -902,14 +923,14 @@ watch(() => route.params.id, (newId, oldId) => {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
 }
 
 .detail-item {
-  padding: 16px 20px;
-  background: var(--imm-hover);
-  border: 1px solid var(--imm-divider);
+  padding: 12px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
 }
 
@@ -929,14 +950,14 @@ watch(() => route.params.id, (newId, oldId) => {
 
 .media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--video-grid-gap);
 }
 
 .file-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .empty-state {

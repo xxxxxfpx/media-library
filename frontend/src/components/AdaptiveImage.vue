@@ -39,6 +39,8 @@ const cssVars = computed(() => ({
   height: 100%;
   object-fit: fill;
   filter: blur(var(--ai-blur));
+  will-change: filter;
+  contain: paint;
   pointer-events: none;
 }
 

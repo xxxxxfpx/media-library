@@ -28,21 +28,22 @@ function handleClick() {
 
 <style scoped lang="scss">
 .link-card {
-  padding: 16px;
-  background: var(--imm-hover);
-  border: 1px solid var(--imm-divider);
+  padding: 12px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--duration-base) var(--ease-standard);
 
   &:hover {
-    background: var(--imm-hover-strong);
-    border-color: var(--imm-accent);
+    background: var(--color-hover-strong);
+    border-color: var(--video-card-border-hover);
     transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
   }
 }
 
-.link-icon { margin-bottom: 8px; color: var(--imm-accent); }
-.link-name { font-size: 0.9375rem; font-weight: 600; margin-bottom: 4px; }
-.link-type { font-size: 0.8125rem; color: var(--imm-text-tertiary); }
+.link-icon { margin-bottom: 6px; color: var(--color-accent); }
+.link-name { font-size: 0.875rem; font-weight: 650; margin-bottom: 2px; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-type { font-size: 0.72rem; color: var(--color-text-tertiary); font-weight: 500; }
 </style>
