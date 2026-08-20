@@ -1,4 +1,6 @@
-/* 现代黑（必备，默认主题）—— 中性近黑 + 靛蓝强调，类 shadcn/ui 暗色 */
+/* 现代黑（必备，默认主题）—— 中性近黑 + 靛蓝强调，类 shadcn/ui 暗色
+   :root 作为兜底，确保 data-theme 未设置时也有完整主题变量 */
+:root,
 [data-theme="modern-dark"] {
   --color-bg-page:        var(--zinc-1025);
   --color-bg-surface:     var(--zinc-975);
