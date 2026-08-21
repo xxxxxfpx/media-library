@@ -175,8 +175,13 @@ async def get_file_data(
         file_path = file.Path
         _trace.info(f"  Path={file_path}", extra={'file_id': file_id})
 
-        # STEP 3: 请求 WebDAV
-        if config.cloud_auth.username:
+        # STEP 3: 如果是外部 URL，直接重定向
+        if file_path and (file_path.startswith('http://') or file_path.startswith('https://')):
+            _trace.info("→ 外部 URL，直接重定向", extra={'file_id': file_id})
+            redirect_url = file_path
+            _cache_url(redirect_url, file_id)
+        # STEP 4: 请求 WebDAV
+        elif config.cloud_auth.username:
             _trace.info(f"STEP 3/3: 请求 WebDAV | username={config.cloud_auth.username[:4]}**", extra={'file_id': file_id})
             t4 = time.perf_counter()
             try:
