@@ -3,6 +3,7 @@
 # - 若已挂载 secrets/config.yaml 则直接使用
 # - 否则根据环境变量生成 secrets/config.yaml（避免启动守卫因 secret_key 为空拒绝启动）
 # - 若 APP_SECRET_KEY / APP_ADMIN_PASSWORD 未设置，则自动生成随机值并持久化
+# - 启动前自动执行 Alembic 数据库迁移
 set -e
 
 SECRETS_FILE="${SECRETS_PATH:-/app/secrets/config.yaml}"
@@ -42,6 +43,15 @@ YAML
     echo "[entrypoint] 已生成 ${SECRETS_FILE}（secret_key=set, admin_password=set）"
 else
     echo "[entrypoint] 已存在 ${SECRETS_FILE}，沿用现有配置"
+fi
+
+# ── 3. 执行 Alembic 数据库迁移 ──
+echo "[entrypoint] 执行数据库迁移..."
+cd /app
+if python -m alembic -c database/alembic.ini upgrade head; then
+    echo "[entrypoint] 数据库迁移完成"
+else
+    echo "[entrypoint] ⚠️ 数据库迁移失败，将继续启动（表结构可能不完整）"
 fi
 
 exec "$@"
