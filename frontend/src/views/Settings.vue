@@ -191,94 +191,131 @@
     </el-card>
 
     <!-- 采集源管理（仅管理员可见） -->
-    <el-card v-if="store.isAdmin" class="mb-4">
+    <el-card v-if="store.isAdmin" class="collection-card mb-4">
       <template #header>
         <div class="card-header-row">
-          <span>采集源管理</span>
+          <div class="card-header-title">
+            <span class="card-title-icon">📡</span>
+            <span>采集源管理</span>
+          </div>
           <el-button type="primary" size="small" @click="openSourceDialog()">+ 添加采集源</el-button>
         </div>
       </template>
 
-      <el-table :data="collectionSources" v-loading="sourcesLoading" stripe>
-        <el-table-column prop="name" label="名称" width="120" />
-        <el-table-column prop="base_url" label="API地址" show-overflow-tooltip />
-        <el-table-column label="启用" width="80" align="center">
+      <el-table :data="collectionSources" v-loading="sourcesLoading" stripe size="small" class="source-table">
+        <el-table-column prop="name" label="名称" width="100" />
+        <el-table-column prop="base_url" label="API地址" show-overflow-tooltip min-width="200" />
+        <el-table-column label="开关" width="120" align="center">
           <template #default="{ row }">
-            <el-switch
-              v-model="row.enabled"
-              @change="(val) => toggleSource(row.id, { enabled: val })"
-            />
+            <div class="switch-group">
+              <el-switch
+                v-model="row.enabled"
+                size="small"
+                @change="(val) => toggleSource(row.id, { enabled: val })"
+              />
+              <el-tooltip :content="'自动采集'" placement="top">
+                <el-switch
+                  v-model="row.auto_collect"
+                  size="small"
+                  @change="(val) => toggleSource(row.id, { auto_collect: val })"
+                />
+              </el-tooltip>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="自动采集" width="90" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.auto_collect"
-              @change="(val) => toggleSource(row.id, { auto_collect: val })"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column prop="interval_minutes" label="间隔(分)" width="85" align="center" />
-        <el-table-column label="状态" width="90" align="center">
+        <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag
               v-if="row.last_status"
               :type="row.last_status === 'success' ? 'success' : row.last_status === 'failed' ? 'danger' : 'warning'"
               size="small"
+              effect="dark"
+              round
             >
               {{ row.last_status === 'success' ? '成功' : row.last_status === 'failed' ? '失败' : '运行中' }}
             </el-tag>
-            <span v-else class="setting-desc">-</span>
+            <span v-else class="col-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="上次采集" width="150">
+        <el-table-column label="上次采集" width="120">
           <template #default="{ row }">
-            <span v-if="row.last_collected_at" class="setting-desc">{{ formatDate(row.last_collected_at) }}</span>
-            <span v-else class="setting-desc">未采集</span>
+            <span v-if="row.last_collected_at" class="col-muted">{{ formatDate(row.last_collected_at) }}</span>
+            <span v-else class="col-muted">未采集</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="testSource(row.id)" :loading="row._testing">测试</el-button>
-            <el-button size="small" type="primary" @click="triggerCollect(row.id)" :loading="row._triggering">采集</el-button>
-            <el-button size="small" @click="openSourceDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="deleteSource(row.id)">删除</el-button>
+            <div class="action-group">
+              <el-button size="small" @click="testSource(row.id)" :loading="row._testing" text>测试</el-button>
+              <el-button size="small" type="primary" @click="triggerCollect(row.id)" :loading="row._triggering" text>采集</el-button>
+              <el-button size="small" @click="openSourceDialog(row)" text>编辑</el-button>
+              <el-button size="small" type="danger" @click="deleteSource(row.id)" text>删除</el-button>
+              <el-tag size="small" type="info" effect="plain" class="interval-tag">{{ row.interval_minutes }}分</el-tag>
+            </div>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 采集日志 -->
-      <div v-if="collectionLogs.length" class="collect-logs">
-        <h4 class="logs-title">采集日志（最近 10 条）</h4>
-        <el-table :data="collectionLogs" size="small" stripe>
-          <el-table-column prop="trigger_type" label="触发" width="70" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.trigger_type === 'manual' ? 'warning' : 'info'">
-                {{ row.trigger_type === 'manual' ? '手动' : '自动' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="status" label="状态" width="75" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'">
-                {{ row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '运行中' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="新增" width="60" align="center">
-            <template #default="{ row }"><b>{{ row.new_count }}</b></template>
-          </el-table-column>
-          <el-table-column label="更新" width="60" align="center">
-            <template #default="{ row }"><b>{{ row.update_count }}</b></template>
-          </el-table-column>
-          <el-table-column prop="error_count" label="错误" width="60" align="center" />
-          <el-table-column prop="total_fetched" label="拉取" width="60" align="center" />
-          <el-table-column label="时间" width="150">
-            <template #default="{ row }">{{ formatDate(row.started_at) }}</template>
-          </el-table-column>
-          <el-table-column prop="error_message" label="错误信息" show-overflow-tooltip />
-        </el-table>
+      <!-- 分隔线 -->
+      <div v-if="collectionLogs.length" class="logs-divider">
+        <span>采集日志</span>
       </div>
+
+      <!-- 采集日志 -->
+      <el-table v-if="collectionLogs.length" :data="collectionLogs" size="small" stripe class="logs-table">
+        <el-table-column label="触发" width="60" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.trigger_type === 'manual' ? 'warning' : 'info'" effect="plain" round>
+              {{ row.trigger_type === 'manual' ? '手动' : '自动' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="60" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'" effect="plain" round>
+              {{ row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '运行中' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="新增" width="50" align="center">
+          <template #default="{ row }">
+            <span class="log-count log-new">{{ row.new_count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="更新" width="50" align="center">
+          <template #default="{ row }">
+            <span class="log-count log-update">{{ row.update_count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="错误" width="50" align="center">
+          <template #default="{ row }">
+            <span :class="['log-count', row.error_count > 0 ? 'log-error' : '']">{{ row.error_count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="拉取" width="55" align="center">
+          <template #default="{ row }">{{ row.total_fetched }}</template>
+        </el-table-column>
+        <el-table-column label="耗时" width="60" align="center">
+          <template #default="{ row }">
+            <span v-if="row.started_at && row.finished_at" class="col-muted">
+              {{ Math.round((new Date(row.finished_at) - new Date(row.started_at)) / 1000) }}s
+            </span>
+            <span v-else class="col-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" min-width="130">
+          <template #default="{ row }">
+            <span class="col-muted">{{ formatDate(row.started_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="error_message" label="备注" show-overflow-tooltip min-width="100">
+          <template #default="{ row }">
+            <span v-if="row.error_message" class="error-text">{{ row.error_message }}</span>
+            <span v-else class="col-muted">-</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-else class="empty-hint">暂无采集日志</div>
     </el-card>
 
     <!-- 采集源添加/编辑对话框 -->
@@ -857,14 +894,110 @@ async function toggleSource(id, data) {
   }
 }
 
-.collect-logs {
-  margin-top: 16px;
-}
+// ── 采集源管理卡片 ──
+.collection-card {
+  .card-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+  }
 
-.logs-title {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--imm-text-secondary);
+  .card-title-icon {
+    font-size: 18px;
+  }
+
+  .col-muted {
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+  }
+
+  // 开关组
+  .switch-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  // 操作按钮组
+  .action-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-wrap: nowrap;
+    justify-content: center;
+  }
+
+  .interval-tag {
+    margin-left: 4px;
+    font-size: 11px;
+  }
+
+  // 日志分隔线
+  .logs-divider {
+    display: flex;
+    align-items: center;
+    margin: 12px 0 8px;
+    gap: 12px;
+
+    &::before, &::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--color-border-subtle);
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--color-text-tertiary);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+  }
+
+  // 日志表格
+  .logs-table {
+    :deep(.el-table__cell) {
+      padding: 6px 0;
+    }
+  }
+
+  .log-count {
+    font-weight: 600;
+    font-size: 13px;
+
+    &.log-new {
+      color: var(--color-accent);
+    }
+
+    &.log-update {
+      color: var(--color-warning, #e6a23c);
+    }
+
+    &.log-error {
+      color: var(--color-danger, #f56c6c);
+    }
+  }
+
+  .error-text {
+    color: var(--color-danger, #f56c6c);
+    font-size: 12px;
+  }
+
+  .empty-hint {
+    text-align: center;
+    padding: 16px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+  }
+
+  // 源表格紧凑化
+  .source-table {
+    :deep(.el-table__cell) {
+      padding: 8px 0;
+    }
+  }
 }
 </style>
