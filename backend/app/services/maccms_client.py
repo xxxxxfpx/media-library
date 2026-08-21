@@ -15,7 +15,8 @@ MaccmsClient - 苹果CMS V10 采集协议客户端
 from __future__ import annotations
 
 import logging
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import requests
 
@@ -224,7 +225,7 @@ class MaccmsClient:
         except (ValueError, requests.exceptions.RequestException) as e:
             raise MaccmsError(f"解析失败: {e}") from e
 
-    def __enter__(self) -> "MaccmsClient":
+    def __enter__(self) -> MaccmsClient:
         return self
 
     def __exit__(self, *args: Any) -> None:

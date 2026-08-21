@@ -15,7 +15,6 @@ CollectionLogs: 采集日志表
 from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 
 from .base import Base

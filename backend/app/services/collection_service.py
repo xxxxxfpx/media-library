@@ -16,14 +16,12 @@ from __future__ import annotations
 
 import logging
 import re
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .maccms_client import MaccmsClient, MaccmsError
 from database.models import (
     CollectionLog,
     CollectionSource,
@@ -35,6 +33,8 @@ from database.models import (
     MediaItem,
     MediaType,
 )
+
+from .maccms_client import MaccmsClient, MaccmsError
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ async def create_source(
 ) -> dict[str, Any]:
     """创建采集源（同时创建/查找对应的 Source 类型 MediaItem）"""
     # 创建 Source 类型锚点
-    source_anchor = await _ensure_source_anchor(db, name)
+    await _ensure_source_anchor(db, name)
 
     cs = CollectionSource(
         Name=name,
@@ -215,6 +215,7 @@ async def trigger_collect(
 async def _run_collected(source_id: int, log_id: int) -> None:
     """实际采集执行（在后台任务中运行，同步HTTP请求放入线程池）"""
     import asyncio
+
     from database.core import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -358,7 +359,7 @@ async def _upsert_vod(
             MediaItem.SourceItemId == source_item_id,
             MediaItem.SourceId == vod_id,
             MediaItem.Type == MediaType.Movie,
-            MediaItem.IsDeleted == False,
+            not MediaItem.IsDeleted,
         )
     )
     existing = result.scalar_one_or_none()
@@ -495,7 +496,7 @@ async def _ensure_source_anchor(db: AsyncSession, name: str) -> MediaItem:
         select(MediaItem).where(
             MediaItem.Name == name,
             MediaItem.Type == MediaType.Source,
-            MediaItem.IsDeleted == False,
+            not MediaItem.IsDeleted,
         )
     )
     anchor = result.scalar_one_or_none()
@@ -522,7 +523,7 @@ async def list_logs(
     query = query.order_by(CollectionLog.StartedAt.desc()).limit(limit)
     result = await db.execute(query)
     logs = result.scalars().all()
-    return [_log_to_dict(l) for l in logs]
+    return [_log_to_dict(log) for log in logs]
 
 
 # ======================================================================
@@ -536,9 +537,8 @@ def start_scheduler() -> None:
         return
 
     try:
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
         from apscheduler.jobstores.memory import MemoryJobStore
-        from database.core import AsyncSessionLocal
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
     except ImportError as e:
         logger.warning("APScheduler 未安装，定时采集功能不可用: %s", e)
         return
@@ -566,8 +566,8 @@ async def _load_auto_jobs() -> None:
         async with AsyncSessionLocal() as db:
             result = await db.execute(
                 select(CollectionSource).where(
-                    CollectionSource.Enabled == True,
-                    CollectionSource.AutoCollect == True,
+                    CollectionSource.Enabled,
+                    CollectionSource.AutoCollect,
                 )
             )
             sources = result.scalars().all()
