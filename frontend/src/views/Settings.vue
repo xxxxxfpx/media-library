@@ -998,8 +998,13 @@ async function toggleSource(id, data) {
       overflow-x: auto;
     }
 
+    // 隐藏表头的横向滚动条，只保留底部一条
     :deep(.el-table__header-wrapper) {
-      overflow-x: auto;
+      overflow-x: hidden;
+    }
+
+    :deep(.el-table__header-wrapper .el-scrollbar__bar.is-horizontal) {
+      display: none;
     }
   }
 }
