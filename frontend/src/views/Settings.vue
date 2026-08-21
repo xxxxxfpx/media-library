@@ -502,9 +502,8 @@ onMounted(async () => {
     } catch {
       // 光鸭配置加载失败不影响其他功能
     }
-    // 加载采集源
+    // 加载采集源（含日志）
     await loadSources()
-    await loadLogs()
   }
 })
 
