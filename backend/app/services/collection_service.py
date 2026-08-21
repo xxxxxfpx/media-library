@@ -546,7 +546,7 @@ def _do_collect_sync(
 
             # 定期输出进度
             if count % 100 == 0:
-                logger.info("采集进度: %s/%s (%.1f%%)", count, max_items or total_fetched, 
+                logger.info("采集进度: %s/%s (%.1f%%)", count, max_items or total_fetched,
                           100 * count / (max_items or total_fetched) if total_fetched > 0 else 0)
 
         logger.info("采集完成: 获取%s条, 最大ID=%s", total_fetched, max_item_id)

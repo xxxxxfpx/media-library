@@ -902,23 +902,6 @@ async function testSource(id) {
   }
 }
 
-async function triggerCollect(id) {
-  const src = collectionSources.value.find(s => s.id === id)
-  if (src) src._triggering = true
-  try {
-    await collectionAPI.triggerCollect(id)
-    ElMessage.success('采集已触发，请稍候查看日志')
-    setTimeout(async () => {
-      await loadSources()
-      await loadLogs()
-    }, 3000)
-  } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '触发失败')
-  } finally {
-    if (src) src._triggering = false
-  }
-}
-
 async function toggleSource(id, data) {
   try {
     await collectionAPI.toggleSource(id, data)
