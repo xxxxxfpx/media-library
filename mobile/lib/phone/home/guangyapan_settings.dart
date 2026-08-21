@@ -258,7 +258,7 @@ class _GuangYaPanSettingsPageState extends State<GuangYaPanSettingsPage> {
                           children: [
                             OutlinedButton.icon(
                               onPressed: (_saving || _testing) ? null : _testConfig,
-                              icon: const Icon(Icons.cloud_verified_outlined, size: 18),
+                              icon: const Icon(Icons.cloud_done_outlined, size: 18),
                               label: Text(_testing ? '测试中...' : '测试连接'),
                             ),
                             const SizedBox(width: 12),
