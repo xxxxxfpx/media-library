@@ -173,8 +173,10 @@ async def trigger_collect(
     db: AsyncSession,
     source_id: int,
     trigger_type: str = "manual",
-) -> int:
+) -> dict[str, Any]:
     """触发一次采集（手动或自动）。
+
+    如果采集源正在运行中（LastStatus=running），则拒绝触发。
 
     Args:
         db: 数据库会话
@@ -182,7 +184,7 @@ async def trigger_collect(
         trigger_type: auto/manual
 
     Returns:
-        采集日志ID
+        {"log_id": int, "status": str}
     """
     result = await db.execute(
         select(CollectionSource).where(CollectionSource.Id == source_id)
@@ -190,6 +192,10 @@ async def trigger_collect(
     cs = result.scalar_one_or_none()
     if not cs:
         raise ValueError(f"采集源不存在: id={source_id}")
+
+    # 工作状态检查：防止重复触发
+    if cs.LastStatus == "running":
+        raise ValueError("采集源正在运行中，请等待完成后再触发")
 
     # 创建日志
     log = CollectionLog(
@@ -211,7 +217,7 @@ async def trigger_collect(
     import asyncio
     asyncio.create_task(_run_collected(source_id, log.Id))
 
-    return log.Id
+    return {"log_id": log.Id, "status": "running"}
 
 
 async def _run_collected(source_id: int, log_id: int) -> None:
@@ -255,6 +261,8 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             new_count = 0
             update_count = 0
             error_count = 0
+            progress_max_id = cs.LastMaxItemId
+            progress_checkpoint = 0  # 每50条更新一次进度
 
             for vod in vod_details:
                 try:
@@ -263,10 +271,25 @@ async def _run_collected(source_id: int, log_id: int) -> None:
                         new_count += 1
                     elif result == "update":
                         update_count += 1
+
+                    # 实时更新进度：每50条或每批更新 LastMaxItemId
+                    vid = vod.get("vod_id", 0)
+                    if vid and vid > progress_max_id:
+                        progress_max_id = vid
+                    progress_checkpoint += 1
+
+                    if progress_checkpoint >= 50:
+                        cs.LastMaxItemId = progress_max_id
+                        cs.UpdatedAt = datetime.now(timezone.utc)
+                        log.TotalFetched = progress_checkpoint
+                        await db.commit()
+                        progress_checkpoint = 0
+
                 except Exception:
                     error_count += 1
                     logger.warning("入库失败 vod_id=%s", vod.get("vod_id"), exc_info=True)
 
+            # 最终状态更新
             log.Status = "success"
             log.FinishedAt = datetime.now(timezone.utc)
             log.NewCount = new_count

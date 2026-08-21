@@ -146,9 +146,11 @@ async def trigger_collect(
 ) -> dict[str, Any]:
     """手动触发采集"""
     try:
-        log_id = await collection_service.trigger_collect(db, source_id, trigger_type="manual")
-        return {"log_id": log_id, "status": "running"}
+        result = await collection_service.trigger_collect(db, source_id, trigger_type="manual")
+        return result
     except ValueError as e:
+        if "正在运行中" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
 
