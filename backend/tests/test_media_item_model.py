@@ -32,16 +32,19 @@ class TestMediaItemHardening:
             await db_session.flush()
 
     @pytest.mark.asyncio
-    async def test_json_fields_round_trip_as_containers(self, init_database, db_session):
+    async def test_string_fields_round_trip(self, init_database, db_session):
+        """测试字符串字段的往返存储"""
         movie = MediaItem(
             Type=MediaType.Movie,
-            LockedFields=["Overview"],
+            Name="Test Movie",
+            Overview="Test overview content",
         )
         db_session.add(movie)
         await db_session.flush()
         await db_session.refresh(movie)
 
-        assert movie.LockedFields == ["Overview"]
+        assert movie.Name == "Test Movie"
+        assert movie.Overview == "Test overview content"
 
     @pytest.mark.asyncio
     async def test_timestamps_are_returned_as_utc(self, init_database, db_session):

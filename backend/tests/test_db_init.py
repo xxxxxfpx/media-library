@@ -23,6 +23,10 @@ EXPECTED_TABLES = [
     "ItemLinks",
     "UserData",
     "Aliases",
+    "CollectionSources",
+    "CollectionLogs",
+    "DriveFiles",
+    "GuangYaPanConfig",
 ]
 
 
@@ -41,16 +45,16 @@ USERS_EXPECTED_COLUMNS = {
 }
 
 
-# MediaItems 表的关键列（视频化精简后，无 AlbumId/DisplayOrder）
+# MediaItems 表的关键列
 MEDIAITEMS_KEY_COLUMNS = [
     "Id", "Type", "Name", "Overview", "Tagline",
-    "PremiereDate", "EndDate", "StartDate",
+    "StartDate", "EndDate",
     "OfficialRating", "CustomRating", "CommunityRating", "CriticRating",
-    "Status", "ChannelNumber",
+    "Status",
     "DateCreated", "DateModified",
     "CreatedAt", "UpdatedAt", "IsDeleted",
-    "PresentationUniqueKey", "LockedFields",
-    "SourceId", "SourceLink", "SourceItemId",
+    "SourceId", "SourceItemId",
+    "RunTimeTicks", "BirthPlace", "OriginalLanguage",
 ]
 
 
@@ -83,10 +87,12 @@ class TestDatabaseInit:
                 await conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
             await conn.execute(text("PRAGMA foreign_keys = ON"))
 
-        # 4. 验证所有表已删除
+        # 4. 验证预期表已删除
         async with AsyncSessionLocal() as session:
             tables_after = await get_all_tables(session)
-            assert len(tables_after) == 0, f"所有表应已删除，实际剩余: {tables_after}"
+            # 只检查预期表已删除，可能还有其他表如 FTS5
+            for expected_table in EXPECTED_TABLES:
+                assert expected_table not in tables_after, f"表 {expected_table} 应该已删除"
 
         # 5. 重建所有表
         async with engine.begin() as conn:

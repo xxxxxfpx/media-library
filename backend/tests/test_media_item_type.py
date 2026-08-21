@@ -11,13 +11,14 @@ from database.models import MediaItem, MediaType
 
 class TestMediaItemTypeField:
     async def test_query_returns_unified_model(self, db_session: AsyncSession):
+        """测试查询返回统一模型"""
         movie = MediaItem(
             Name="Test Movie",
             Type=MediaType.Movie,
-            ProductionYear=2024,
+            StartDate=None,  # 使用 StartDate 替代 ProductionYear
             RunTimeTicks=72_000_000_000,
         )
-        series = MediaItem(Name="Test Series", Type=MediaType.Series, SeasonCount=5)
+        series = MediaItem(Name="Test Series", Type=MediaType.Series)
         db_session.add_all([movie, series])
         await db_session.flush()
 
@@ -26,15 +27,13 @@ class TestMediaItemTypeField:
 
         assert all(type(item) is MediaItem for item in items)
         assert [item.Type for item in items] == [MediaType.Movie, MediaType.Series]
-        assert items[0].ProductionYear == 2024
-        assert items[1].SeasonCount == 5
+        assert items[0].RunTimeTicks == 72_000_000_000
 
     async def test_type_specific_fields_are_available_on_unified_model(self, db_session: AsyncSession):
+        """测试类型特有字段在统一模型上可用"""
         item = MediaItem(
             Type=MediaType.Person,
             BirthPlace="New York",
-            GenreName=None,
-            StudioName=None,
         )
         db_session.add(item)
         await db_session.flush()
