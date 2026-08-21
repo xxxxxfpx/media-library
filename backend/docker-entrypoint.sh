@@ -50,32 +50,45 @@ DB_PATH="/app/data/database/media.db"
 if [ -f "$DB_PATH" ]; then
     echo "[entrypoint] 检测到现有数据库，检查并修复缺失的列..."
     
-    # 修复 CollectionSources 表
     python -c "
 import sqlite3
 conn = sqlite3.connect('$DB_PATH')
 cursor = conn.cursor()
 
-# 检查 CollectionSources 表是否存在
-cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name='CollectionSources'\")
-if cursor.fetchone():
-    # 检查并添加 SortOrder 列
-    cursor.execute(\"PRAGMA table_info(CollectionSources)\")
-    columns = [col[1] for col in cursor.fetchall()]
+# 定义需要检查的表和列
+required_columns = {
+    'CollectionSources': {
+        'SortOrder': \"TEXT DEFAULT 'time'\",
+        'LastMaxItemId': 'INTEGER DEFAULT 0',
+    },
+    'MediaItems': {
+        'OriginalLanguage': 'TEXT',
+        'BirthPlace': 'TEXT',
+    },
+}
+
+for table, columns in required_columns.items():
+    cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name='\" + table + \"'\")
+    if not cursor.fetchone():
+        print(f'[entrypoint] {table} 表不存在，跳过')
+        continue
     
-    if 'SortOrder' not in columns:
-        print('[entrypoint] 为 CollectionSources 添加 SortOrder 列...')
-        cursor.execute(\"ALTER TABLE CollectionSources ADD COLUMN SortOrder TEXT DEFAULT 'time'\")
-        cursor.execute(\"UPDATE CollectionSources SET SortOrder = 'time' WHERE SortOrder IS NULL\")
+    cursor.execute(f'PRAGMA table_info({table})')
+    existing_columns = [col[1] for col in cursor.fetchall()]
     
-    if 'LastMaxItemId' not in columns:
-        print('[entrypoint] 为 CollectionSources 添加 LastMaxItemId 列...')
-        cursor.execute(\"ALTER TABLE CollectionSources ADD COLUMN LastMaxItemId INTEGER DEFAULT 0\")
-        cursor.execute(\"UPDATE CollectionSources SET LastMaxItemId = 0 WHERE LastMaxItemId IS NULL\")
+    for col_name, col_def in columns.items():
+        if col_name not in existing_columns:
+            print(f'[entrypoint] 为 {table} 添加 {col_name} 列...')
+            cursor.execute(f'ALTER TABLE {table} ADD COLUMN {col_name} {col_def}')
+            if col_def.startswith('TEXT DEFAULT'):
+                default_val = col_def.split(\"'\")[1] if \"'\" in col_def else ''
+                if default_val:
+                    cursor.execute(f\"UPDATE {table} SET {col_name} = '{default_val}' WHERE {col_name} IS NULL\")
+            elif 'DEFAULT' in col_def:
+                default_val = col_def.split('DEFAULT')[1].strip()
+                cursor.execute(f'UPDATE {table} SET {col_name} = {default_val} WHERE {col_name} IS NULL')
     
-    print('[entrypoint] CollectionSources 表检查完成')
-else:
-    print('[entrypoint] CollectionSources 表不存在，将由应用创建')
+    print(f'[entrypoint] {table} 表检查完成')
 
 conn.commit()
 conn.close()
