@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.collection import router as collection_router
 from app.api.file import router as file_router
 from app.api.guangyapan import router as guangyapan_router
 from app.api.media import router as media_router
@@ -61,7 +62,15 @@ async def lifespan(app: FastAPI):
             await db.rollback()
             logger.error(f"创建管理员账户失败: {e}")
 
+    # 启动采集调度器
+    from app.services.collection_service import start_scheduler
+    start_scheduler()
+
     yield
+
+    # 停止采集调度器
+    from app.services.collection_service import stop_scheduler
+    stop_scheduler()
 
     from app.api.file import close_http_client
     await close_http_client()
@@ -96,6 +105,7 @@ app.include_router(user_router)
 app.include_router(media_router)
 app.include_router(file_router)
 app.include_router(guangyapan_router)
+app.include_router(collection_router)
 app.include_router(system_router, prefix="/api")
 
 

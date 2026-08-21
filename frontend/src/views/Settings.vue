@@ -190,6 +190,132 @@
       </el-form>
     </el-card>
 
+    <!-- 采集源管理（仅管理员可见） -->
+    <el-card v-if="store.isAdmin" class="mb-4">
+      <template #header>
+        <div class="card-header-row">
+          <span>采集源管理</span>
+          <el-button type="primary" size="small" @click="openSourceDialog()">+ 添加采集源</el-button>
+        </div>
+      </template>
+
+      <el-table :data="collectionSources" v-loading="sourcesLoading" stripe>
+        <el-table-column prop="name" label="名称" width="120" />
+        <el-table-column prop="base_url" label="API地址" show-overflow-tooltip />
+        <el-table-column label="启用" width="80" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.enabled"
+              @change="(val) => toggleSource(row.id, { enabled: val })"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="自动采集" width="90" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.auto_collect"
+              @change="(val) => toggleSource(row.id, { auto_collect: val })"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="interval_minutes" label="间隔(分)" width="85" align="center" />
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.last_status"
+              :type="row.last_status === 'success' ? 'success' : row.last_status === 'failed' ? 'danger' : 'warning'"
+              size="small"
+            >
+              {{ row.last_status === 'success' ? '成功' : row.last_status === 'failed' ? '失败' : '运行中' }}
+            </el-tag>
+            <span v-else class="setting-desc">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次采集" width="150">
+          <template #default="{ row }">
+            <span v-if="row.last_collected_at" class="setting-desc">{{ formatDate(row.last_collected_at) }}</span>
+            <span v-else class="setting-desc">未采集</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="testSource(row.id)" :loading="row._testing">测试</el-button>
+            <el-button size="small" type="primary" @click="triggerCollect(row.id)" :loading="row._triggering">采集</el-button>
+            <el-button size="small" @click="openSourceDialog(row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="deleteSource(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 采集日志 -->
+      <div v-if="collectionLogs.length" class="collect-logs">
+        <h4 class="logs-title">采集日志（最近 10 条）</h4>
+        <el-table :data="collectionLogs" size="small" stripe>
+          <el-table-column prop="trigger_type" label="触发" width="70" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.trigger_type === 'manual' ? 'warning' : 'info'">
+                {{ row.trigger_type === 'manual' ? '手动' : '自动' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="75" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'failed' ? 'danger' : 'warning'">
+                {{ row.status === 'success' ? '成功' : row.status === 'failed' ? '失败' : '运行中' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="新增" width="60" align="center">
+            <template #default="{ row }"><b>{{ row.new_count }}</b></template>
+          </el-table-column>
+          <el-table-column label="更新" width="60" align="center">
+            <template #default="{ row }"><b>{{ row.update_count }}</b></template>
+          </el-table-column>
+          <el-table-column prop="error_count" label="错误" width="60" align="center" />
+          <el-table-column prop="total_fetched" label="拉取" width="60" align="center" />
+          <el-table-column label="时间" width="150">
+            <template #default="{ row }">{{ formatDate(row.started_at) }}</template>
+          </el-table-column>
+          <el-table-column prop="error_message" label="错误信息" show-overflow-tooltip />
+        </el-table>
+      </div>
+    </el-card>
+
+    <!-- 采集源添加/编辑对话框 -->
+    <el-dialog v-model="showSourceDialog" :title="editingSource?.id ? '编辑采集源' : '添加采集源'" width="480px" destroy-on-close>
+      <el-form label-position="top" @submit.prevent>
+        <el-form-item label="采集源名称">
+          <el-input v-model="sourceForm.name" placeholder="如：155资源" />
+        </el-form-item>
+        <el-form-item label="API基础URL">
+          <el-input v-model="sourceForm.base_url" placeholder="https://155api.com/api.php/provide/vod/" />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="启用">
+            <el-switch v-model="sourceForm.enabled" />
+          </el-form-item>
+          <el-form-item label="自动采集">
+            <el-switch v-model="sourceForm.auto_collect" />
+          </el-form-item>
+        </div>
+        <el-form-item label="轮询间隔（分钟）">
+          <el-select v-model="sourceForm.interval_minutes" style="width: 100%">
+            <el-option label="15 分钟" :value="15" />
+            <el-option label="30 分钟" :value="30" />
+            <el-option label="1 小时" :value="60" />
+            <el-option label="2 小时" :value="120" />
+            <el-option label="6 小时" :value="360" />
+            <el-option label="12 小时" :value="720" />
+            <el-option label="24 小时" :value="1440" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showSourceDialog = false">取消</el-button>
+        <el-button type="primary" :loading="sourceSaving" @click="saveSource">保存</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="showPasswordDialog" title="修改密码" width="420px" destroy-on-close>
       <el-form label-width="90px" @submit.prevent>
         <el-form-item label="旧密码">
@@ -211,10 +337,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useAppStore } from '@/store'
-import { guangYaPanAPI, userAPI } from '@/api'
-import { ElMessage } from 'element-plus'
+import { guangYaPanAPI, userAPI, collectionAPI } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const store = useAppStore()
@@ -250,6 +376,9 @@ onMounted(async () => {
       guangYaPanForm.value.client_id = config.client_id || ''
       guangYaPanForm.value.device_id = config.device_id || ''
       guangYaPanForm.value.default_parent_id = config.default_parent_id || ''
+      // 加载采集源
+      await loadSources()
+      await loadLogs()
     }
   } catch {
     // 获取设置失败时使用默认值，静默忽略
@@ -363,6 +492,139 @@ async function submitPasswordChange() {
     ElMessage.error(error.response?.data?.detail || '密码修改失败')
   } finally {
     passwordLoading.value = false
+  }
+}
+
+// ── 采集源管理 ──
+const collectionSources = ref([])
+const collectionLogs = ref([])
+const sourcesLoading = ref(false)
+const showSourceDialog = ref(false)
+const editingSource = ref(null)
+const sourceSaving = ref(false)
+const sourceForm = ref({
+  name: '',
+  base_url: '',
+  enabled: true,
+  auto_collect: false,
+  interval_minutes: 60,
+})
+
+async function loadSources() {
+  if (!store.isAdmin) return
+  sourcesLoading.value = true
+  try {
+    collectionSources.value = await collectionAPI.listSources()
+  } catch (e) {
+    ElMessage.error('加载采集源失败')
+  } finally {
+    sourcesLoading.value = false
+  }
+}
+
+async function loadLogs() {
+  if (!store.isAdmin) return
+  try {
+    collectionLogs.value = await collectionAPI.listLogs(null, 10)
+  } catch {
+    // 静默忽略
+  }
+}
+
+function openSourceDialog(source = null) {
+  if (source) {
+    editingSource.value = source
+    sourceForm.value = {
+      name: source.name,
+      base_url: source.base_url,
+      enabled: source.enabled,
+      auto_collect: source.auto_collect,
+      interval_minutes: source.interval_minutes,
+    }
+  } else {
+    editingSource.value = null
+    sourceForm.value = {
+      name: '',
+      base_url: '',
+      enabled: true,
+      auto_collect: false,
+      interval_minutes: 60,
+    }
+  }
+  showSourceDialog.value = true
+}
+
+async function saveSource() {
+  if (!sourceForm.value.name || !sourceForm.value.base_url) {
+    ElMessage.warning('请填写名称和API地址')
+    return
+  }
+  sourceSaving.value = true
+  try {
+    if (editingSource.value) {
+      await collectionAPI.updateSource(editingSource.value.id, sourceForm.value)
+      ElMessage.success('更新成功')
+    } else {
+      await collectionAPI.createSource(sourceForm.value)
+      ElMessage.success('添加成功')
+    }
+    showSourceDialog.value = false
+    await loadSources()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '保存失败')
+  } finally {
+    sourceSaving.value = false
+  }
+}
+
+async function deleteSource(id) {
+  try {
+    await ElMessageBox.confirm('确定删除此采集源？相关日志也会一并删除。', '确认删除', { type: 'warning' })
+    await collectionAPI.deleteSource(id)
+    ElMessage.success('删除成功')
+    await loadSources()
+  } catch {
+    // 取消或失败
+  }
+}
+
+async function testSource(id) {
+  const src = collectionSources.value.find(s => s.id === id)
+  if (src) src._testing = true
+  try {
+    const result = await collectionAPI.testSource(id)
+    ElMessage.success(`连接成功！共 ${result.total} 条数据`)
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '测试失败')
+  } finally {
+    if (src) src._testing = false
+  }
+}
+
+async function triggerCollect(id) {
+  const src = collectionSources.value.find(s => s.id === id)
+  if (src) src._triggering = true
+  try {
+    await collectionAPI.triggerCollect(id)
+    ElMessage.success('采集已触发，请稍候查看日志')
+    setTimeout(async () => {
+      await loadSources()
+      await loadLogs()
+    }, 3000)
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '触发失败')
+  } finally {
+    if (src) src._triggering = false
+  }
+}
+
+async function toggleSource(id, data) {
+  try {
+    await collectionAPI.toggleSource(id, data)
+    ElMessage.success('已更新')
+    await loadSources()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
   }
 }
 </script>
@@ -587,5 +849,16 @@ async function submitPasswordChange() {
   .theme-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.collect-logs {
+  margin-top: 16px;
+}
+
+.logs-title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--imm-text-secondary);
 }
 </style>

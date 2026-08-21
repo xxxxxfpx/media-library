@@ -10,6 +10,7 @@ Database Models - ORM 模型包
 
 from .alias import Alias
 from .base import Base
+from .collection_source import CollectionLog, CollectionSource
 from .drive_file import DriveFile
 from .enums import (
     ChapterMarkerType,
@@ -46,4 +47,6 @@ __all__ = [
     "Alias",
     "DriveFile",
     "GuangYaPanConfig",
+    "CollectionSource",
+    "CollectionLog",
 ]
