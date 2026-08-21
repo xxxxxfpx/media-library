@@ -208,17 +208,11 @@
         <el-table-column label="开关" width="120" align="center">
           <template #default="{ row }">
             <div class="switch-group">
-              <el-switch
-                v-model="row.enabled"
-                size="small"
-                @change="(val) => toggleSource(row.id, { enabled: val })"
-              />
-              <el-tooltip :content="'自动采集'" placement="top">
-                <el-switch
-                  v-model="row.auto_collect"
-                  size="small"
-                  @change="(val) => toggleSource(row.id, { auto_collect: val })"
-                />
+              <el-tooltip content="启用采集源" placement="top">
+                <el-switch v-model="row.enabled" size="small" @change="(val) => toggleSource(row.id, { enabled: val })" />
+              </el-tooltip>
+              <el-tooltip content="自动采集" placement="top">
+                <el-switch v-model="row.auto_collect" size="small" @change="(val) => toggleSource(row.id, { auto_collect: val })" />
               </el-tooltip>
             </div>
           </template>
@@ -243,13 +237,13 @@
             <span v-else class="col-muted">未采集</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" align="center" fixed="right">
+        <el-table-column label="操作" width="300" align="center">
           <template #default="{ row }">
             <div class="action-group">
               <el-button size="small" @click="testSource(row.id)" :loading="row._testing" text>测试</el-button>
-              <el-button size="small" type="primary" @click="triggerCollect(row.id)" :loading="row._triggering" text>采集</el-button>
+              <el-button size="small" type="primary" @click="triggerCollect(row.id)" :loading="row._triggering">采集</el-button>
               <el-button size="small" @click="openSourceDialog(row)" text>编辑</el-button>
-              <el-button size="small" type="danger" @click="deleteSource(row.id)" text>删除</el-button>
+              <el-button size="small" type="danger" @click="deleteSource(row.id)">删除</el-button>
               <el-tag size="small" type="info" effect="plain" class="interval-tag">{{ row.interval_minutes }}分</el-tag>
             </div>
           </template>
@@ -921,13 +915,14 @@ async function toggleSource(id, data) {
     justify-content: center;
   }
 
-  // 操作按钮组
+  // 操作按钮组 - 禁止换行，横向展开
   .action-group {
     display: flex;
     align-items: center;
     gap: 2px;
     flex-wrap: nowrap;
     justify-content: center;
+    white-space: nowrap;
   }
 
   .interval-tag {
@@ -993,10 +988,18 @@ async function toggleSource(id, data) {
     font-size: 13px;
   }
 
-  // 源表格紧凑化
+  // 源表格紧凑化，允许横向滚动
   .source-table {
     :deep(.el-table__cell) {
       padding: 8px 0;
+    }
+
+    :deep(.el-table__body-wrapper) {
+      overflow-x: auto;
+    }
+
+    :deep(.el-table__header-wrapper) {
+      overflow-x: auto;
     }
   }
 }
