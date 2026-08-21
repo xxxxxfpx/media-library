@@ -3,7 +3,7 @@
 STI 已移除，媒体类型由 MediaItem.Type 和 ItemLinks 表达。
 """
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import MediaItem, MediaType
@@ -12,10 +12,14 @@ from database.models import MediaItem, MediaType
 class TestMediaItemTypeField:
     async def test_query_returns_unified_model(self, db_session: AsyncSession):
         """测试查询返回统一模型"""
+        # 先清理现有数据
+        await db_session.execute(delete(MediaItem))
+        await db_session.flush()
+
         movie = MediaItem(
             Name="Test Movie",
             Type=MediaType.Movie,
-            StartDate=None,  # 使用 StartDate 替代 ProductionYear
+            StartDate=None,
             RunTimeTicks=72_000_000_000,
         )
         series = MediaItem(Name="Test Series", Type=MediaType.Series)
@@ -26,7 +30,9 @@ class TestMediaItemTypeField:
         items = result.scalars().all()
 
         assert all(type(item) is MediaItem for item in items)
-        assert [item.Type for item in items] == [MediaType.Movie, MediaType.Series]
+        assert len(items) == 2
+        assert items[0].Type == MediaType.Movie
+        assert items[1].Type == MediaType.Series
         assert items[0].RunTimeTicks == 72_000_000_000
 
     async def test_type_specific_fields_are_available_on_unified_model(self, db_session: AsyncSession):
