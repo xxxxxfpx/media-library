@@ -31,6 +31,7 @@ class CollectionSource(Base):
     Enabled = Column("Enabled", Boolean, default=True, server_default="1", nullable=False, comment="是否启用")
     AutoCollect = Column("AutoCollect", Boolean, default=False, server_default="0", nullable=False, comment="自动轮询采集开关")
     IntervalMinutes = Column("IntervalMinutes", Integer, default=60, nullable=False, comment="轮询间隔(分钟)")
+    SortOrder = Column("SortOrder", String(20), default="time", server_default="time", nullable=False, comment="排序方式: time/id/hits")
     LastCollectedAt = Column("LastCollectedAt", DateTime(timezone=True), nullable=True, comment="上次成功采集时间")
     LastStatus = Column("LastStatus", String(20), nullable=True, comment="上次采集状态: success/failed/running")
     LastError = Column("LastError", Text, nullable=True, comment="上次错误信息")

@@ -22,6 +22,7 @@ class SourceCreateRequest(BaseModel):
     base_url: str = Field(..., min_length=1, max_length=500, description="API基础URL")
     auto_collect: bool = Field(default=False, description="自动轮询采集开关")
     interval_minutes: int = Field(default=60, ge=1, le=10080, description="轮询间隔(分钟)")
+    sort_order: str = Field(default="time", description="排序方式: time/id/hits")
     enabled: bool = Field(default=True, description="是否启用")
 
 
@@ -30,6 +31,7 @@ class SourceUpdateRequest(BaseModel):
     base_url: str | None = Field(None, min_length=1, max_length=500)
     auto_collect: bool | None = None
     interval_minutes: int | None = Field(None, ge=1, le=10080)
+    sort_order: str | None = None
     enabled: bool | None = None
 
 
@@ -64,6 +66,7 @@ async def create_source(
         base_url=data.base_url,
         auto_collect=data.auto_collect,
         interval_minutes=data.interval_minutes,
+        sort_order=data.sort_order,
         enabled=data.enabled,
     )
 
@@ -97,6 +100,7 @@ async def update_source(
         "enabled": "Enabled",
         "auto_collect": "AutoCollect",
         "interval_minutes": "IntervalMinutes",
+        "sort_order": "SortOrder",
     }
     orm_kwargs = {field_map[k]: v for k, v in kwargs.items() if k in field_map}
     try:

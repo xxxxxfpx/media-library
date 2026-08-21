@@ -62,6 +62,7 @@ class MaccmsClient:
         h: int | None = None,
         t: int | None = None,
         wd: str | None = None,
+        order: str | None = None,
         at: str = "json",
     ) -> dict[str, Any]:
         """请求视频列表。
@@ -71,6 +72,7 @@ class MaccmsClient:
             h: 仅返回最近N小时更新的数据（增量采集）
             t: 分类ID
             wd: 关键词搜索
+            order: 排序方式，如 'time'（按时间）, 'id'（按ID）, 'hits'（按点击量）
             at: 输出格式 json/xml
 
         Returns:
@@ -83,6 +85,8 @@ class MaccmsClient:
             params["t"] = t
         if wd:
             params["wd"] = wd
+        if order:
+            params["order"] = order
         return self._get(params)
 
     def detail(self, ids: int | str | list[int]) -> list[dict[str, Any]]:
@@ -122,19 +126,22 @@ class MaccmsClient:
                 logger.warning("detail_batch: 批次 %d-%d 失败，跳过", i, i + len(batch))
         return all_details
 
-    def iter_incremental(self, h: int | None = None, max_pages: int = 50) -> Iterator[dict[str, Any]]:
+    def iter_incremental(
+        self, h: int | None = None, max_pages: int = 50, order: str | None = None
+    ) -> Iterator[dict[str, Any]]:
         """增量迭代器，自动翻页。
 
         Args:
             h: 仅最近N小时；None则全量
             max_pages: 最大翻页数（安全阀）
+            order: 排序方式，如 'time', 'id', 'hits'
 
         Yields:
             每条 vod 列表记录的字典
         """
         pg = 1
         while pg <= max_pages:
-            data = self.list(pg=pg, h=h)
+            data = self.list(pg=pg, h=h, order=order)
             items = data.get("list", [])
             if not items:
                 break

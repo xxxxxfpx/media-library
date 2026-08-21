@@ -343,6 +343,13 @@
             <el-option label="24 小时" :value="1440" />
           </el-select>
         </el-form-item>
+        <el-form-item label="排序方式">
+          <el-select v-model="sourceForm.sort_order" style="width: 100%">
+            <el-option label="按更新时间" value="time" />
+            <el-option label="按ID倒序" value="id" />
+            <el-option label="按点击量" value="hits" />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showSourceDialog = false">取消</el-button>
@@ -548,6 +555,7 @@ const sourceForm = ref({
   enabled: true,
   auto_collect: false,
   interval_minutes: 60,
+  sort_order: 'time',
 })
 
 async function loadSources() {
@@ -580,6 +588,7 @@ function openSourceDialog(source = null) {
       enabled: source.enabled,
       auto_collect: source.auto_collect,
       interval_minutes: source.interval_minutes,
+      sort_order: source.sort_order || 'time',
     }
   } else {
     editingSource.value = null
@@ -589,6 +598,7 @@ function openSourceDialog(source = null) {
       enabled: true,
       auto_collect: false,
       interval_minutes: 60,
+      sort_order: 'time',
     }
   }
   showSourceDialog.value = true

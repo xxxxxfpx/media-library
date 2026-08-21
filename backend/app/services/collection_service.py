@@ -71,6 +71,7 @@ async def create_source(
     auto_collect: bool = False,
     interval_minutes: int = 60,
     enabled: bool = True,
+    sort_order: str = "time",
 ) -> dict[str, Any]:
     """创建采集源（同时创建/查找对应的 Source 类型 MediaItem）"""
     # 创建 Source 类型锚点
@@ -82,6 +83,7 @@ async def create_source(
         Enabled=enabled,
         AutoCollect=auto_collect,
         IntervalMinutes=interval_minutes,
+        SortOrder=sort_order,
     )
     db.add(cs)
     await db.commit()
@@ -107,7 +109,7 @@ async def update_source(
     if not cs:
         raise ValueError(f"采集源不存在: id={source_id}")
 
-    for key in ("Name", "BaseUrl", "Enabled", "AutoCollect", "IntervalMinutes"):
+    for key in ("Name", "BaseUrl", "Enabled", "AutoCollect", "IntervalMinutes", "SortOrder"):
         if key in kwargs:
             setattr(cs, key, kwargs[key])
 
@@ -244,7 +246,7 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             # 在线程池中执行阻塞的HTTP请求
             loop = asyncio.get_running_loop()
             vod_details, total_fetched = await loop.run_in_executor(
-                None, _do_collect_sync, str(cs.BaseUrl), h
+                None, _do_collect_sync, str(cs.BaseUrl), h, cs.SortOrder
             )
 
             # 入库在异步上下文执行
@@ -306,12 +308,14 @@ async def _run_collected(source_id: int, log_id: int) -> None:
 def _do_collect_sync(
     base_url: str,
     h: int | None,
+    order: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     """同步抓取苹果CMS数据（在线程池中执行，避免阻塞事件循环）。
 
     Args:
         base_url: 采集源API基础URL
         h: 增量小时数，None则全量
+        order: 排序方式
 
     Returns:
         (vod_details_list, total_fetched_count)
@@ -322,7 +326,7 @@ def _do_collect_sync(
     try:
         # 1. 拉取列表
         vod_ids: list[int] = []
-        for item in client.iter_incremental(h=h):
+        for item in client.iter_incremental(h=h, order=order):
             total_fetched += 1
             vid = item.get("vod_id")
             if vid:
@@ -656,6 +660,7 @@ def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
         "enabled": cs.Enabled,
         "auto_collect": cs.AutoCollect,
         "interval_minutes": cs.IntervalMinutes,
+        "sort_order": cs.SortOrder,
         "last_collected_at": cs.LastCollectedAt.isoformat() if cs.LastCollectedAt else None,
         "last_status": cs.LastStatus,
         "last_error": cs.LastError,
