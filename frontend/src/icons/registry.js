@@ -59,6 +59,12 @@ import CirclePlay from '~icons/lucide/circle-play'
 import Tag from '~icons/lucide/tag'
 import Bookmark from '~icons/lucide/bookmark'
 import Package from '~icons/lucide/package'
+import MousePointer from '~icons/lucide/mouse-pointer'
+import GitBranch from '~icons/lucide/git-branch'
+import Calendar from '~icons/lucide/calendar'
+import ChevronsUpDown from '~icons/lucide/chevrons-up-down'
+import Database from '~icons/lucide/database'
+import Hash from '~icons/lucide/hash'
 
 export const iconRegistry = {
   home: Home,
@@ -115,4 +121,10 @@ export const iconRegistry = {
   tag: Tag,
   bookmark: Bookmark,
   package: Package,
+  'mouse-pointer': MousePointer,
+  'git-branch': GitBranch,
+  calendar: Calendar,
+  'chevrons-up-down': ChevronsUpDown,
+  database: Database,
+  hash: Hash,
 }

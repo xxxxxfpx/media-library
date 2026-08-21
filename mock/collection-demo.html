@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>采集管理 - 任务状态模拟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e1e8ed;
+            min-height: 100vh;
+            padding: 24px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header h1::before {
+            content: '📡';
+            font-size: 28px;
+        }
+        
+        .btn-add {
+            background: #1677ff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .btn-add:hover { background: #4096ff; }
+        
+        /* 采集源卡片 */
+        .source-card {
+            background: #1a1f2e;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            border: 1px solid #2a3040;
+            transition: border-color 0.2s;
+        }
+        
+        .source-card:hover {
+            border-color: #3a4050;
+        }
+        
+        /* 采集源头部 */
+        .source-header {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        
+        .source-header:hover {
+            background: #1f2536;
+        }
+        
+        .expand-icon {
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            background: #2a3040;
+            margin-right: 14px;
+            transition: transform 0.25s, background 0.15s;
+            flex-shrink: 0;
+        }
+        
+        .source-card.expanded .expand-icon {
+            transform: rotate(90deg);
+            background: #1677ff;
+        }
+        
+        .source-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .source-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        
+        .source-url {
+            font-size: 12px;
+            color: #8b95a5;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 400px;
+        }
+        
+        .source-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        /* 开关 */
+        .switch {
+            position: relative;
+            width: 44px;
+            height: 22px;
+            cursor: pointer;
+        }
+        
+        .switch input { display: none; }
+        
+        .switch-slider {
+            position: absolute;
+            inset: 0;
+            background: #2a3040;
+            border-radius: 22px;
+            transition: background 0.2s;
+        }
+        
+        .switch-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 2px;
+            top: 2px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        
+        .switch input:checked + .switch-slider {
+            background: #1677ff;
+        }
+        
+        .switch input:checked + .switch-slider::before {
+            transform: translateX(22px);
+        }
+        
+        /* 状态标签 */
+        .status-tag {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-idle {
+            background: #2a3040;
+            color: #8b95a5;
+        }
+        
+        .status-running {
+            background: #1890ff;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-success {
+            background: #00c853;
+            color: white;
+        }
+        
+        .status-error {
+            background: #ff3d00;
+            color: white;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .btn-action {
+            background: #2a3040;
+            color: #e1e8ed;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.15s;
+        }
+        
+        .btn-action:hover { background: #3a4050; }
+        .btn-action.primary { background: #1677ff; }
+        .btn-action.primary:hover { background: #4096ff; }
+        .btn-action.danger:hover { background: #ff3d00; color: white; }
+        
+        /* 展开区域 */
+        .source-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .source-card.expanded .source-body {
+            max-height: 800px;
+        }
+        
+        .body-content {
+            padding: 0 16px 16px 58px;
+            border-top: 1px solid #2a3040;
+            padding-top: 16px;
+            margin-left: 42px;
+        }
+        
+        /* 任务面板 */
+        .task-panel {
+            background: #141820;
+            border-radius: 10px;
+            padding: 16px;
+        }
+        
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        
+        .task-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e1e8ed;
+        }
+        
+        .task-time {
+            font-size: 12px;
+            color: #8b95a5;
+        }
+        
+        /* 进度条 */
+        .progress-section {
+            margin-bottom: 16px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+        
+        .progress-text {
+            font-size: 13px;
+            color: #8b95a5;
+        }
+        
+        .progress-text strong {
+            color: #e1e8ed;
+            font-weight: 600;
+        }
+        
+        .progress-percent {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1677ff;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #2a3040;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1677ff, #00c853);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        /* 统计网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .stat-item {
+            background: #1a1f2e;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #8b95a5;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .stat-value.total { color: #1677ff; }
+        .stat-value.success { color: #00c853; }
+        .stat-value.error { color: #ff3d00; }
+        .stat-value.speed { color: #ffd600; }
+        
+        /* 当前正在爬取 */
+        .current-fetch {
+            background: #1a2332;
+            border: 1px solid #1677ff;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .current-fetch.active { display: block; }
+        
+        .fetch-label {
+            font-size: 11px;
+            color: #1677ff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .fetch-label::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: #1677ff;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .fetch-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #e1e8ed;
+            margin-bottom: 4px;
+        }
+        
+        .fetch-detail {
+            font-size: 12px;
+            color: #8b95a5;
+            font-family: monospace;
+        }
+        
+        /* 日志区域 */
+        .log-section {
+            border-top: 1px solid #2a3040;
+            padding-top: 12px;
+        }
+        
+        .log-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .log-clear {
+            font-size: 12px;
+            color: #8b95a5;
+            cursor: pointer;
+        }
+        
+        .log-clear:hover { color: #e1e8ed; }
+        
+        .log-list {
+            max-height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .log-list::-webkit-scrollbar { width: 4px; }
+        .log-list::-webkit-scrollbar-track { background: transparent; }
+        .log-list::-webkit-scrollbar-thumb { background: #2a3040; border-radius: 2px; }
+        
+        .log-item {
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+            padding: 4px 0;
+            font-family: 'Menlo', monospace;
+        }
+        
+        .log-time {
+            color: #5a6470;
+            flex-shrink: 0;
+        }
+        
+        .log-msg { color: #b0bac5; flex: 1; }
+        .log-msg.success { color: #00c853; }
+        .log-msg.error { color: #ff3d00; }
+        .log-msg.info { color: #1677ff; }
+        
+        /* 完成面板 */
+        .completed-panel {
+            text-align: center;
+            padding: 24px;
+            color: #8b95a5;
+        }
+        
+        .completed-icon {
+            font-size: 48px;
+            margin-bottom: 8px;
+        }
+        
+        .completed-text {
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .completed-stats {
+            font-size: 13px;
+        }
+        .completed-stats span {
+            color: #e1e8ed;
+            font-weight: 600;
+        }
+        
+        /* 空状态 */
+        .idle-panel {
+            text-align: center;
+            padding: 32px 16px;
+            color: #5a6470;
+        }
+        
+        .idle-icon {
+            font-size: 36px;
+            margin-bottom: 8px;
+        }
+        
+        .idle-text {
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>采集源管理</h1>
+            <button class="btn-add" onclick="addSource()">+ 添加采集源</button>
+        </div>
+        
+        <div id="sourceList"></div>
+    </div>
+    
+    <script>
+    // 模拟数据
+    const mockData = {
+        source1: {
+            id: 1,
+            name: '杏吧',
+            url: 'https://json.xingba222.com/api.php/provide/vod/',
+            enabled: true,
+            autoCollect: true,
+            status: 'idle', // idle | running | success | error
+            interval: 60
+        },
+        source2: {
+            id: 2,
+            name: '155API',
+            url: 'https://155api.com/api.php/provide/vod/',
+            enabled: true,
+            autoCollect: false,
+            status: 'idle',
+            interval: 30
+        },
+        source3: {
+            id: 3,
+            name: 'Slapibf',
+            url: 'https://slapibf.com/api.php/provide/vod/',
+            enabled: false,
+            autoCollect: false,
+            status: 'idle',
+            interval: 120
+        }
+    };
+    
+    // 已完成的历史任务
+    const historyTasks = [
+        { time: '2026-08-21 05:26:13', trigger: '手动', status: 'success', total: 1000, success: 670, errors: 0, duration: '157s' },
+        { time: '2026-08-20 18:30:00', trigger: '自动', status: 'success', total: 1000, success: 890, errors: 2, duration: '180s' }
+    ];
+    
+    let tasks = {}; // { sourceId: { total, current, success, errors, startTime, logs, currentFetch } }
+    
+    // 初始化
+    function init() {
+        const list = document.getElementById('sourceList');
+        list.innerHTML = '';
+        
+        Object.values(mockData).forEach(source => {
+            list.appendChild(createSourceCard(source));
+        });
+    }
+    
+    function createSourceCard(source) {
+        const card = document.createElement('div');
+        card.className = 'source-card';
+        card.id = `source-${source.id}`;
+        
+        card.innerHTML = `
+            <div class="source-header" onclick="toggleExpand(${source.id})">
+                <div class="expand-icon">▶</div>
+                <div class="source-info">
+                    <div class="source-name">${source.name}</div>
+                    <div class="source-url">${source.url}</div>
+                </div>
+                <div class="source-actions" onclick="event.stopPropagation()">
+                    <label class="switch" title="启用/禁用">
+                        <input type="checkbox" ${source.enabled ? 'checked' : ''} onchange="toggleEnabled(${source.id}, this.checked)">
+                        <span class="switch-slider"></span>
+                    </label>
+                    <span class="status-tag status-${source.status}" id="status-${source.id}">${getStatusText(source.status)}</span>
+                    <button class="btn-action primary" onclick="startCollect(${source.id})" ${!source.enabled ? 'disabled' : ''}>▶ 采集</button>
+                    <button class="btn-action" onclick="editSource(${source.id})">⚙</button>
+                </div>
+            </div>
+            <div class="source-body">
+                <div class="body-content" id="body-${source.id}">
+                    ${renderBody(source)}
+                </div>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    function renderBody(source) {
+        const task = tasks[source.id];
+        
+        if (source.status === 'running' && task) {
+            return renderRunningPanel(source, task);
+        } else if (source.status === 'success') {
+            return renderCompletedPanel(source);
+        } else if (source.status === 'error') {
+            return renderErrorPanel(source);
+        } else {
+            return renderIdlePanel(source);
+        }
+    }
+    
+    function renderIdlePanel(source) {
+        return `
+            <div class="idle-panel">
+                <div class="idle-icon">⏸</div>
+                <div class="idle-text">等待采集中…</div>
+                <div class="idle-text" style="font-size:11px;margin-top:4px;">
+                    ${source.autoCollect ? `自动采集间隔 ${source.interval} 分钟` : '手动触发'}
+                </div>
+            </div>
+        `;
+    }
+    
+    function renderRunningPanel(source, task) {
+        const percent = Math.round((task.current / task.total) * 100);
+        const elapsed = Math.round((Date.now() - task.startTime) / 1000);
+        const speed = task.current / Math.max(elapsed, 1);
+        const eta = task.current > 0 ? Math.round((task.total - task.current) / speed) : 0;
+        
+        return `
+            <div class="task-panel">
+                <div class="task-header">
+                    <div class="task-title">🔄 正在采集</div>
+                    <div class="task-time">开始于 ${formatTime(task.startTime)} · 已运行 ${elapsed}s</div>
+                </div>
+                
+                <!-- 进度条 -->
+                <div class="progress-section">
+                    <div class="progress-header">
+                        <div class="progress-text">
+                            进度: <strong>${task.current}</strong> / ${task.total} 条
+                        </div>
+                        <div class="progress-percent">${percent}%</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%"></div>
+                    </div>
+                </div>
+                
+                <!-- 统计 -->
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">总数</div>
+                        <div class="stat-value total">${task.total}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">成功</div>
+                        <div class="stat-value success">${task.success}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">失败</div>
+                        <div class="stat-value error">${task.errors}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">速度</div>
+                        <div class="stat-value speed">${speed.toFixed(1)}/s</div>
+                    </div>
+                </div>
+                
+                <!-- 当前正在爬取 -->
+                <div class="current-fetch active" id="currentFetch-${source.id}">
+                    <div class="fetch-label">正在爬取</div>
+                    <div class="fetch-title">${task.currentFetch ? task.currentFetch.title : '初始化中...'}</div>
+                    <div class="fetch-detail">${task.currentFetch ? task.currentFetch.detail : ''}</div>
+                </div>
+                
+                <!-- 实时日志 -->
+                <div class="log-section">
+                    <div class="log-title">
+                        <span>实时日志</span>
+                        <span class="log-clear" onclick="clearLogs(${source.id})">清空</span>
+                    </div>
+                    <div class="log-list" id="logList-${source.id}">
+                        ${task.logs.map(log => `
+                            <div class="log-item">
+                                <span class="log-time">${log.time}</span>
+                                <span class="log-msg ${log.type}">${log.msg}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div style="margin-top: 16px; text-align: right;">
+                    <button class="btn-action danger" onclick="stopCollect(${source.id})">⏹ 停止采集</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    function renderCompletedPanel(source) {
+        // 获取最近一次历史
+        const history = historyTasks[0];
+        return `
+            <div class="task-panel">
+                <div class="completed-panel">
+                    <div class="completed-icon">✅</div>
+                    <div class="completed-text">上次采集完成</div>
+                    <div class="completed-stats">
+                        处理 <span>${history.total}</span> 条 · 
+                        成功 <span style="color:#00c853">${history.success}</span> · 
+                        失败 <span style="color:#ff3d00">${history.errors}</span> · 
+                        耗时 <span>${history.duration}</span>
+                    </div>
+                    <div class="completed-text" style="color:#5a6470;margin-top:8px;font-size:12px;">
+                        ${history.time}
+                    </div>
+                </div>
+                
+                <!-- 历史日志 -->
+                <div class="log-section">
+                    <div class="log-title"><span>采集历史</span></div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        ${historyTasks.map(h => `
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#1a1f2e; border-radius:6px;">
+                                <div>
+                                    <span style="font-size:13px;">${h.trigger === '手动' ? '👆' : '⚙️'} ${h.trigger}触发</span>
+                                    <span style="margin-left:8px;">${h.total}条 / ${h.duration}</span>
+                                </div>
+                                <div>
+                                    <span style="color:${h.status === 'success' ? '#00c853' : '#ff3d00'}; font-size:12px;">
+                                        ${h.status === 'success' ? '✓ 成功' : '✗ 失败'}
+                                    </span>
+                                    <span style="color:#5a6470; font-size:11px; margin-left:8px;">${h.time}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    function renderErrorPanel(source) {
+        return `
+            <div class="task-panel">
+                <div class="completed-panel" style="color:#ff3d00;">
+                    <div class="completed-icon">❌</div>
+                    <div class="completed-text">采集失败</div>
+                    <div class="completed-stats" style="color:#b0bac5;">
+                        错误信息: 连接超时 / API不可用
+                    </div>
+                </div>
+                <div style="text-align:center; margin-top:12px;">
+                    <button class="btn-action primary" onclick="startCollect(${source.id})">🔄 重试</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    function getStatusText(status) {
+        const map = { idle: '空闲', running: '运行中', success: '完成', error: '错误' };
+        return map[status] || status;
+    }
+    
+    function toggleExpand(id) {
+        const card = document.getElementById(`source-${id}`);
+        card.classList.toggle('expanded');
+        
+        // 展开时，如果在运行中，刷新内容
+        const source = Object.values(mockData).find(s => s.id === id);
+        if (card.classList.contains('expanded') && source.status === 'running') {
+            updateBody(id);
+        }
+    }
+    
+    function updateBody(id) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        const body = document.getElementById(`body-${id}`);
+        if (body) {
+            body.innerHTML = renderBody(source);
+        }
+    }
+    
+    function toggleEnabled(id, checked) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        source.enabled = checked;
+        
+        // 如果禁用了，停止正在进行的采集
+        if (!checked && source.status === 'running') {
+            stopCollect(id);
+        }
+        
+        // 刷新按钮状态
+        const btn = document.querySelector(`#source-${id} .btn-action.primary`);
+        if (btn) btn.disabled = !checked;
+    }
+    
+    function startCollect(id) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        if (!source.enabled) return;
+        
+        source.status = 'running';
+        
+        // 初始化任务
+        tasks[id] = {
+            total: 1000 + Math.floor(Math.random() * 500),
+            current: 0,
+            success: 0,
+            errors: 0,
+            startTime: Date.now(),
+            logs: [
+                { time: formatTime(Date.now()), type: 'info', msg: `开始采集 ${source.name}` },
+                { time: formatTime(Date.now()), type: 'info', msg: `连接 API: ${source.url}` },
+                { time: formatTime(Date.now()), type: 'info', msg: `获取列表成功，共 ${tasks[id].total} 条` }
+            ],
+            currentFetch: null
+        };
+        
+        // 更新UI
+        updateStatusTag(id, 'running');
+        const card = document.getElementById(`source-${id}`);
+        if (!card.classList.contains('expanded')) {
+            card.classList.add('expanded');
+        }
+        updateBody(id);
+        
+        // 模拟爬取
+        simulateFetch(id);
+    }
+    
+    function simulateFetch(id) {
+        const task = tasks[id];
+        const source = Object.values(mockData).find(s => s.id === id);
+        
+        if (!task || source.status !== 'running') return;
+        
+        // 模拟每次获取1-3条
+        const batchSize = 1 + Math.floor(Math.random() * 3);
+        
+        for (let i = 0; i < batchSize && task.current < task.total; i++) {
+            task.current++;
+            
+            // 95% 成功率
+            if (Math.random() > 0.05) {
+                task.success++;
+                const title = randomTitle();
+                task.currentFetch = {
+                    title: title,
+                    detail: `ID: ${task.current} · 分类: ${randomCategory()}`
+                };
+                task.logs.push({
+                    time: formatTime(Date.now()),
+                    type: 'success',
+                    msg: `✓ [${task.current}/${task.total}] ${title}`
+                });
+            } else {
+                task.errors++;
+                task.logs.push({
+                    time: formatTime(Date.now()),
+                    type: 'error',
+                    msg: `✗ [${task.current}/${task.total}] ID ${task.current} 获取失败`
+                });
+            }
+        }
+        
+        // 限制日志数量
+        if (task.logs.length > 100) {
+            task.logs = task.logs.slice(-50);
+        }
+        
+        // 更新UI
+        const card = document.getElementById(`source-${id}`);
+        if (card.classList.contains('expanded')) {
+            updateBody(id);
+        }
+        
+        // 判断是否完成
+        if (task.current >= task.total) {
+            completeCollect(id);
+            return;
+        }
+        
+        // 继续
+        setTimeout(() => simulateFetch(id), 80 + Math.random() * 120);
+    }
+    
+    function stopCollect(id) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        source.status = 'idle';
+        delete tasks[id];
+        
+        updateStatusTag(id, 'idle');
+        updateBody(id);
+        
+        addLog(id, 'info', '用户手动停止采集');
+    }
+    
+    function completeCollect(id) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        const task = tasks[id];
+        
+        source.status = 'success';
+        
+        // 添加到历史
+        historyTasks.unshift({
+            time: formatTime(new Date()),
+            trigger: '手动',
+            status: 'success',
+            total: task.total,
+            success: task.success,
+            errors: task.errors,
+            duration: `${Math.round((Date.now() - task.startTime) / 1000)}s`
+        });
+        
+        updateStatusTag(id, 'success');
+        updateBody(id);
+    }
+    
+    function updateStatusTag(id, status) {
+        const tag = document.getElementById(`status-${id}`);
+        if (tag) {
+            tag.className = `status-tag status-${status}`;
+            tag.textContent = getStatusText(status);
+        }
+    }
+    
+    function addLog(id, type, msg) {
+        const task = tasks[id];
+        if (task) {
+            task.logs.push({ time: formatTime(Date.now()), type, msg });
+        }
+    }
+    
+    function clearLogs(id) {
+        if (tasks[id]) {
+            tasks[id].logs = [];
+            updateBody(id);
+        }
+    }
+    
+    function addSource() {
+        const name = prompt('采集源名称:');
+        if (!name) return;
+        const url = prompt('API地址:');
+        if (!url) return;
+        
+        const newId = Object.keys(mockData).length + 1;
+        mockData[`source${newId}`] = {
+            id: newId,
+            name,
+            url,
+            enabled: true,
+            autoCollect: false,
+            status: 'idle',
+            interval: 60
+        };
+        
+        init();
+    }
+    
+    function editSource(id) {
+        const source = Object.values(mockData).find(s => s.id === id);
+        alert(`编辑采集源: ${source.name}\n\n此处打开编辑对话框`);
+    }
+    
+    function formatTime(ts) {
+        const d = new Date(ts);
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+    }
+    
+    function randomTitle() {
+        const titles = [
+            '庆余年 第二季', '狂飙', '三体', '繁花', '与凤行',
+            '封神第一部', '孤注一掷', '满江红', '消失的她', '长安三万里',
+            '狂飙之下', '南风知我意', '墨雨云间', '度华年', '承欢记'
+        ];
+        return titles[Math.floor(Math.random() * titles.length)];
+    }
+    
+    function randomCategory() {
+        const cats = ['剧情', '古装', '悬疑', '喜剧', '动作', '爱情', '科幻'];
+        return cats[Math.floor(Math.random() * cats.length)];
+    }
+    
+    // 启动
+    init();
+    </script>
+</body>
+</html>
