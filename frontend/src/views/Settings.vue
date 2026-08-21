@@ -239,7 +239,7 @@
                 @change="(val) => toggleSource(source.id, { enabled: val })"
               />
               <el-tag
-                v-if="mockTasks[source.id]?.status === 'running'"
+                v-if="getTaskStatus(source.id)?.status === 'running'"
                 type="primary"
                 effect="dark"
                 size="small"
@@ -262,11 +262,22 @@
               >失败</el-tag>
               <el-tag v-else type="info" effect="dark" size="small" round>空闲</el-tag>
               
+              <el-select
+                v-model="source.collectLimit"
+                size="small"
+                style="width: 90px; margin-right: 6px"
+                @click.stop
+              >
+                <el-option label="100 条" :value="100" />
+                <el-option label="500 条" :value="500" />
+                <el-option label="1000 条" :value="1000" />
+                <el-option label="全量" :value="null" />
+              </el-select>
               <el-button
                 size="small"
                 type="primary"
-                @click="startMockCollect(source.id)"
-                :disabled="!source.enabled || mockTasks[source.id]?.status === 'running'"
+                @click="triggerCollect(source.id, source.collectLimit)"
+                :disabled="!source.enabled || isSourceRunning(source)"
               ><AppIcon name="play" :size="12" style="margin-right:4px" />采集</el-button>
               <el-button size="small" @click="openSourceDialog(source)" text>编辑</el-button>
               <el-button size="small" type="danger" @click="deleteSource(source.id)" text>删除</el-button>
@@ -276,11 +287,11 @@
           <!-- 展开区域 -->
           <div class="source-body" v-if="expandedIds.has(source.id)">
             <!-- 运行中面板 -->
-            <div v-if="mockTasks[source.id]?.status === 'running'" class="task-panel">
+            <div v-if="getTaskStatus(source.id)?.status === 'running'" class="task-panel">
               <div class="task-header">
                 <div class="task-title"><AppIcon name="loader-circle" :size="14" style="display:inline-block;margin-right:6px;animation:spin 1s linear infinite" />正在采集</div>
                 <div class="task-time">
-                  开始于 {{ mockTasks[source.id].startTimeText }} · 已运行 {{ mockTasks[source.id].elapsed }}s
+                  开始于 {{ formatTimeStr(getTaskStatus(source.id).startedAt) }}
                 </div>
               </div>
 
@@ -288,12 +299,12 @@
               <div class="progress-section">
                 <div class="progress-header">
                   <div class="progress-text">
-                    进度: <strong>{{ mockTasks[source.id].current }}</strong> / {{ mockTasks[source.id].total }} 条
+                    进度: <strong>{{ getTaskStatus(source.id).progress }}</strong> / {{ getTaskStatus(source.id).total }} 条
                   </div>
-                  <div class="progress-percent">{{ mockTasks[source.id].percent }}%</div>
+                  <div class="progress-percent">{{ getTaskStatus(source.id).total > 0 ? Math.round((getTaskStatus(source.id).progress / getTaskStatus(source.id).total) * 100) : 0 }}%</div>
                 </div>
                 <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: mockTasks[source.id].percent + '%' }"></div>
+                  <div class="progress-fill" :style="{ width: (getTaskStatus(source.id).total > 0 ? Math.round((getTaskStatus(source.id).progress / getTaskStatus(source.id).total) * 100) : 0) + '%' }"></div>
                 </div>
               </div>
 
@@ -301,56 +312,61 @@
               <div class="stats-grid">
                 <div class="stat-item">
                   <div class="stat-label">总数</div>
-                  <div class="stat-value total">{{ mockTasks[source.id].total }}</div>
+                  <div class="stat-value total">{{ getTaskStatus(source.id).total }}</div>
                 </div>
                 <div class="stat-item">
                   <div class="stat-label">成功</div>
-                  <div class="stat-value success">{{ mockTasks[source.id].success }}</div>
+                  <div class="stat-value success">{{ getTaskStatus(source.id).successCount }}</div>
                 </div>
                 <div class="stat-item">
                   <div class="stat-label">失败</div>
-                  <div class="stat-value error">{{ mockTasks[source.id].errors }}</div>
+                  <div class="stat-value error">{{ getTaskStatus(source.id).failCount }}</div>
                 </div>
                 <div class="stat-item">
                   <div class="stat-label">速度</div>
-                  <div class="stat-value speed">{{ mockTasks[source.id].speed }}/s</div>
+                  <div class="stat-value speed">{{ getTaskStatus(source.id).speed }}/s</div>
                 </div>
               </div>
 
               <!-- 当前正在爬取 -->
-              <div class="current-fetch" v-if="mockTasks[source.id].currentFetch">
+              <div class="current-fetch" v-if="getTaskStatus(source.id).currentItem">
                 <div class="fetch-label"><AppIcon name="activity" :size="12" style="display:inline-block;margin-right:4px" />正在爬取</div>
-                <div class="fetch-title">{{ mockTasks[source.id].currentFetch.title }}</div>
-                <div class="fetch-detail">{{ mockTasks[source.id].currentFetch.detail }}</div>
+                <div class="fetch-title">{{ getTaskStatus(source.id).currentItem.name }}</div>
+                <div class="fetch-detail">ID: {{ getTaskStatus(source.id).currentItem.vod_id }} · {{ getTaskStatus(source.id).currentItem.status === 'new' ? '新增' : '更新' }}</div>
               </div>
 
               <!-- 实时日志 -->
               <div class="log-section">
                 <div class="log-title">
                   <span><AppIcon name="file-text" :size="14" style="display:inline-block;margin-right:4px" />实时日志</span>
-                  <span class="log-clear" @click="clearMockLogs(source.id)">清空</span>
                 </div>
                 <div class="log-list">
-                  <div v-for="(log, idx) in mockTasks[source.id].logs" :key="idx" class="log-item">
-                    <span class="log-time">{{ log.time }}</span>
-                    <span :class="['log-msg', log.type]">{{ log.msg }}</span>
+                  <div v-for="(log, idx) in getTaskStatus(source.id).logs" :key="idx" class="log-item">
+                    <span class="log-time">{{ log.time ? formatTimeStr(log.time) : '' }}</span>
+                    <span :class="['log-msg', log.status === 'new' ? 'success' : log.status === 'update' ? 'info' : 'error']">
+                      [{{ log.index }}/{{ log.total }}] {{ log.name }}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div class="task-footer">
-                <el-button size="small" type="danger" plain @click="stopMockCollect(source.id)"><AppIcon name="pause" :size="12" style="margin-right:4px" />停止采集</el-button>
+                <el-button size="small" type="danger" plain @click="stopCollect(source.id)"><AppIcon name="pause" :size="12" style="margin-right:4px" />停止采集</el-button>
               </div>
             </div>
 
             <!-- 空闲/历史面板 -->
             <div v-else class="task-panel">
-              <div class="history-list" v-if="getMockHistory(source.id).length">
-                <div v-for="(h, idx) in getMockHistory(source.id)" :key="idx" class="history-item">
+              <div class="history-list" v-if="getTaskHistory(source.id).length">
+                <div v-for="(h, idx) in getTaskHistory(source.id)" :key="idx" class="history-item">
                   <div class="history-left">
                     <AppIcon :name="h.trigger === '手动' ? 'mouse-pointer' : 'settings'" :size="13" class="history-icon" />
                     <span class="history-trigger">{{ h.trigger }}触发</span>
-                    <span class="history-count">{{ h.total }}条 / {{ h.duration }}</span>
+                    <span class="history-count">
+                      共{{ h.total }}条
+                      <span v-if="h.newCount">· 新增{{ h.newCount }}</span>
+                      <span v-if="h.updateCount">· 更新{{ h.updateCount }}</span>
+                    </span>
                   </div>
                   <div class="history-right">
                     <el-tag
@@ -363,6 +379,7 @@
                     </el-tag>
                     <span class="history-time">{{ h.time }}</span>
                   </div>
+                  <div v-if="h.errorMessage" class="history-error">{{ h.errorMessage }}</div>
                 </div>
               </div>
               <div v-else class="empty-hint">暂无采集历史</div>
@@ -566,6 +583,8 @@ watch([autoplay, defaultMuted, syncInterval], () => {
 
 onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
+  // 清理所有轮询
+  Object.keys(pollingTimers).forEach(id => stopPolling(id))
 })
 
 function openPasswordDialog() {
@@ -627,179 +646,134 @@ function toggleExpand(id) {
   }
 }
 
-// ── 模拟采集任务 ──
-const mockTasks = reactive({})
-const mockHistory = reactive({})
-let mockTimer = null
-
-// 模拟数据：标题池
-const mockTitles = [
-  '庆余年 第二季', '狂飙', '三体', '繁花', '与凤行',
-  '封神第一部', '孤注一掷', '满江红', '消失的她', '长安三万里',
-  '狂飙之下', '南风知我意', '墨雨云间', '度华年', '承欢记',
-  '三体 Ⅱ', '流浪地球 3', '无间道 重启', '神雕侠侣 新版', '雪山飞狐',
-]
-const mockCategories = ['剧情', '古装', '悬疑', '喜剧', '动作', '爱情', '科幻']
-
-function randomMockTitle() {
-  return mockTitles[Math.floor(Math.random() * mockTitles.length)]
-}
-
-function randomMockCategory() {
-  return mockCategories[Math.floor(Math.random() * mockCategories.length)]
-}
+// ── 采集任务状态 ──
+const taskStatus = reactive({})  // { sourceId: { status, progress, total, ... } }
+const taskHistory = reactive({})  // { sourceId: [ { time, trigger, ... } ] }
+const pollingTimers = {}  // sourceId -> setInterval
 
 function formatTimeStr(ts) {
   const d = new Date(ts)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
 
-function startMockCollect(id) {
+function getTaskStatus(id) {
+  return taskStatus[id] || null
+}
+
+function getTaskHistory(id) {
+  return taskHistory[id] || []
+}
+
+function isSourceRunning(source) {
+  return source.last_status === 'running' || (taskStatus[source.id]?.status === 'running')
+}
+
+async function triggerCollect(id, maxItems = null) {
   const source = collectionSources.value.find(s => s.id === id)
   if (!source || !source.enabled) return
 
-  // 初始化任务
-  const startTime = Date.now()
-  const total = 800 + Math.floor(Math.random() * 400)
-
-  mockTasks[id] = {
-    status: 'running',
-    total,
-    current: 0,
-    success: 0,
-    errors: 0,
-    startTime,
-    startTimeText: formatTimeStr(startTime),
-    elapsed: 0,
-    percent: 0,
-    speed: 0,
-    logs: [
-      { time: formatTimeStr(startTime), type: 'info', msg: `开始采集 ${source.name}` },
-      { time: formatTimeStr(startTime), type: 'info', msg: `连接 API: ${source.base_url}` },
-      { time: formatTimeStr(startTime), type: 'info', msg: `获取列表成功，共 ${total} 条` },
-    ],
-    currentFetch: null,
-  }
-
-  // 确保展开
-  expandedIds.add(id)
-
-  // 启动模拟爬取
-  runMockFetch(id)
-}
-
-function runMockFetch(id) {
-  const task = mockTasks[id]
-  if (!task || task.status !== 'running') return
-
-  const batchSize = 1 + Math.floor(Math.random() * 3)
-  const now = Date.now()
-  task.elapsed = Math.round((now - task.startTime) / 1000)
-
-  for (let i = 0; i < batchSize && task.current < task.total; i++) {
-    task.current++
-
-    if (Math.random() > 0.05) {
-      task.success++
-      const title = randomMockTitle()
-      task.currentFetch = {
-        title,
-        detail: `ID: ${task.current} · 分类: ${randomMockCategory()}`,
+  try {
+    const result = await collectionAPI.triggerCollect(id, maxItems)
+    if (result.status === 'running') {
+      taskStatus[id] = {
+        status: 'running',
+        logId: result.log_id,
+        progress: 0,
+        total: 0,
+        successCount: 0,
+        failCount: 0,
+        currentItem: null,
+        logs: [],
+        speed: 0,
+        startedAt: new Date().toISOString(),
+        maxItems: maxItems,
       }
-      task.logs.push({
-        time: formatTimeStr(now),
-        type: 'success',
-        msg: `✓ [${task.current}/${task.total}] ${title}`,
-      })
+      source.last_status = 'running'
+      startPolling(id)
+      expandedIds.add(id)
+    }
+  } catch (err) {
+    if (err.response?.status === 409) {
+      ElMessage.warning('采集源正在运行中')
     } else {
-      task.errors++
-      task.logs.push({
-        time: formatTimeStr(now),
-        type: 'error',
-        msg: `✗ [${task.current}/${task.total}] ID ${task.current} 获取失败`,
-      })
+      ElMessage.error(err.response?.data?.detail || '触发采集失败')
     }
   }
+}
 
-  // 限制日志数量
-  if (task.logs.length > 100) {
-    task.logs = task.logs.slice(-50)
+async function stopCollect(id) {
+  try {
+    await collectionAPI.stopCollect(id)
+    stopPolling(id)
+    if (taskStatus[id]) {
+      taskStatus[id].status = 'failed'
+      taskStatus[id].errorMessage = '用户手动停止'
+    }
+    ElMessage.success('已停止采集')
+    await refreshSourceStatus(id)
+  } catch (err) {
+    ElMessage.error(err.response?.data?.detail || '停止失败')
   }
+}
 
-  // 更新统计
-  task.percent = Math.round((task.current / task.total) * 100)
-  task.speed = task.elapsed > 0 ? (task.current / task.elapsed).toFixed(1) : '0.0'
+function startPolling(id) {
+  stopPolling(id)
+  pollingTimers[id] = setInterval(() => pollStatus(id), 2000)
+}
 
-  // 判断是否完成
-  if (task.current >= task.total) {
-    completeMockCollect(id)
-    return
+function stopPolling(id) {
+  if (pollingTimers[id]) {
+    clearInterval(pollingTimers[id])
+    delete pollingTimers[id]
   }
-
-  // 继续
-  mockTimer = setTimeout(() => runMockFetch(id), 80 + Math.random() * 120)
 }
 
-function stopMockCollect(id) {
-  const task = mockTasks[id]
-  if (!task) return
+async function pollStatus(id) {
+  try {
+    const status = await collectionAPI.getSourceStatus(id)
+    if (!taskStatus[id]) return
 
-  task.status = 'idle'
-  task.logs.push({
-    time: formatTimeStr(Date.now()),
-    type: 'info',
-    msg: '⏹ 用户手动停止采集',
-  })
-
-  // 保存到历史
-  saveMockHistory(id)
-}
-
-function completeMockCollect(id) {
-  const task = mockTasks[id]
-  if (!task) return
-
-  task.status = 'completed'
-  task.logs.push({
-    time: formatTimeStr(Date.now()),
-    type: 'info',
-    msg: `✅ 采集完成，共处理 ${task.total} 条`,
-  })
-
-  // 保存到历史
-  saveMockHistory(id)
-}
-
-function saveMockHistory(id) {
-  const task = mockTasks[id]
-  if (!task) return
-
-  if (!mockHistory[id]) mockHistory[id] = []
-
-  mockHistory[id].unshift({
-    time: formatDate(new Date()),
-    trigger: '手动',
-    status: 'success',
-    total: task.total,
-    duration: `${task.elapsed}s`,
-  })
-
-  // 只保留最近 5 条
-  if (mockHistory[id].length > 5) {
-    mockHistory[id] = mockHistory[id].slice(0, 5)
+    if (status.status === 'running') {
+      taskStatus[id].progress = status.progress || 0
+      taskStatus[id].total = status.total || 0
+      taskStatus[id].successCount = status.success_count || 0
+      taskStatus[id].failCount = status.fail_count || 0
+      taskStatus[id].currentItem = status.current_item
+      taskStatus[id].logs = status.logs || []
+      taskStatus[id].speed = status.speed || 0
+      taskStatus[id].startedAt = status.started_at || taskStatus[id].startedAt
+    } else {
+      stopPolling(id)
+      taskStatus[id].status = status.status
+      taskStatus[id].total = status.total || status.total_fetched || taskStatus[id].total
+      taskStatus[id].successCount = status.success_count || (status.new_count || 0) + (status.update_count || 0)
+      taskStatus[id].failCount = status.fail_count || status.error_count || 0
+      taskStatus[id].errorMessage = status.error_message
+      taskStatus[id].finishedAt = status.finished_at
+      await refreshSourceStatus(id)
+    }
+  } catch (err) {
+    console.warn('轮询状态失败:', err)
   }
-
-  // 清理任务
-  delete mockTasks[id]
 }
 
-function getMockHistory(id) {
-  return mockHistory[id] || []
-}
-
-function clearMockLogs(id) {
-  if (mockTasks[id]) {
-    mockTasks[id].logs = []
+async function refreshSourceStatus(id) {
+  try {
+    collectionSources.value = await collectionAPI.listSources()
+    const logs = await collectionAPI.listLogs(id, 50)
+    if (Array.isArray(logs) && logs.length > 0) {
+      taskHistory[id] = logs.map(log => ({
+        time: log.started_at ? new Date(log.started_at).toLocaleString('zh-CN') : '-',
+        trigger: log.trigger_type === 'manual' ? '手动' : '自动',
+        status: log.status === 'success' ? 'success' : 'failed',
+        total: log.total_fetched || 0,
+        newCount: log.new_count || 0,
+        updateCount: log.update_count || 0,
+        errorMessage: log.error_message || '',
+      }))
+    }
+  } catch (err) {
+    console.warn('刷新状态失败:', err)
   }
 }
 
@@ -808,96 +782,52 @@ async function loadSources() {
   sourcesLoading.value = true
   try {
     collectionSources.value = await collectionAPI.listSources()
-    // 为每个采集源初始化模拟历史数据
-    collectionSources.value.forEach(source => {
-      if (!mockHistory[source.id]) {
-        mockHistory[source.id] = [
-          {
-            time: new Date(Date.now() - 3600000).toLocaleString('zh-CN'),
-            trigger: source.auto_collect ? '自动' : '手动',
-            status: 'success',
-            total: 800 + Math.floor(Math.random() * 400),
-            duration: `${60 + Math.floor(Math.random() * 120)}s`,
-          },
-          {
-            time: new Date(Date.now() - 86400000).toLocaleString('zh-CN'),
-            trigger: '自动',
-            status: 'success',
-            total: 800 + Math.floor(Math.random() * 400),
-            duration: `${60 + Math.floor(Math.random() * 120)}s`,
-          },
-        ]
+    // 为每个采集源添加默认的采集限制，并加载真实日志
+    for (const source of collectionSources.value) {
+      if (source.collectLimit === undefined) {
+        source.collectLimit = 100  // 默认采集 100 条
       }
-    })
-  } catch (e) {
-    // API 失败时使用模拟数据
-    console.warn('加载采集源失败，使用模拟数据:', e)
-    collectionSources.value = [
-      {
-        id: 1,
-        name: '杏吧',
-        base_url: 'https://json.xingba222.com/api.php/provide/vod/',
-        enabled: true,
-        auto_collect: true,
-        interval_minutes: 60,
-        last_status: 'success',
-        last_collected_at: new Date(Date.now() - 3600000).toISOString(),
-        total_count: 12580,
-        last_max_id: 12580,
-      },
-      {
-        id: 2,
-        name: '155API',
-        base_url: 'https://155api.com/api.php/provide/vod/',
-        enabled: true,
-        auto_collect: false,
-        interval_minutes: 30,
-        last_status: 'success',
-        last_collected_at: new Date(Date.now() - 7200000).toISOString(),
-        total_count: 8360,
-        last_max_id: 8360,
-      },
-      {
-        id: 3,
-        name: 'Slapibf',
-        base_url: 'https://slapibf.com/api.php/provide/vod/',
-        enabled: false,
-        auto_collect: false,
-        interval_minutes: 120,
-        last_status: null,
-        last_collected_at: null,
-        total_count: 0,
-        last_max_id: 0,
-      },
-    ]
-
-    // 初始化模拟历史数据
-    if (!mockHistory[1]) {
-      mockHistory[1] = [
-        {
-          time: '2026/08/21 05:26:13',
-          trigger: '手动',
-          status: 'success',
-          total: 1000,
-          duration: '157s',
-        },
-        {
-          time: '2026/08/20 18:30:00',
-          trigger: '自动',
-          status: 'success',
-          total: 1000,
-          duration: '180s',
-        },
-      ]
+      try {
+        const logs = await collectionAPI.listLogs(source.id, 50)
+        if (Array.isArray(logs) && logs.length > 0) {
+          taskHistory[source.id] = logs.map(log => ({
+            time: log.started_at ? new Date(log.started_at).toLocaleString('zh-CN') : '-',
+            trigger: log.trigger_type === 'manual' ? '手动' : '自动',
+            status: log.status === 'success' ? 'success' : 'failed',
+            total: log.total_fetched || 0,
+            newCount: log.new_count || 0,
+            updateCount: log.update_count || 0,
+            errorMessage: log.error_message || '',
+          }))
+        }
+        // 如果有正在运行的任务，启动轮询
+        if (source.last_status === 'running') {
+          const status = await collectionAPI.getSourceStatus(source.id)
+          if (status && status.status === 'running') {
+            taskStatus[source.id] = {
+              status: 'running',
+              logId: status.log_id,
+              progress: status.progress || 0,
+              total: status.total || 0,
+              successCount: status.success_count || 0,
+              failCount: status.fail_count || 0,
+              currentItem: status.current_item,
+              logs: status.logs || [],
+              speed: status.speed || 0,
+              startedAt: status.started_at,
+            }
+            startPolling(source.id)
+          }
+        }
+      } catch (err) {
+        console.warn(`加载采集源 ${source.id} 日志失败:`, err)
+      }
     }
+  } catch (e) {
+    console.warn('加载采集源失败:', e)
   } finally {
     sourcesLoading.value = false
   }
-}
-
-// 加载采集日志（占位函数，当前使用模拟数据）
-async function loadLogs() {
-  // TODO: 当后端 API 就绪时，从 collectionAPI 获取真实日志
 }
 
 function openSourceDialog(source = null) {
@@ -1611,6 +1541,17 @@ async function toggleSource(id, data) {
   .history-time {
     font-size: 12px;
     color: var(--color-text-tertiary);
+  }
+
+  .history-error {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--el-color-danger);
+    background: var(--el-color-danger-light-9);
+    border-radius: 4px;
+    overflow-wrap: anywhere;
   }
 
   .empty-hint {

@@ -30,8 +30,10 @@ from database.models import (
     FileLinkType,
     FileType,
     ImageType,
+    ItemLinks,
     MediaItem,
     MediaType,
+    PersonType,
 )
 
 from .maccms_client import MaccmsClient, MaccmsError
@@ -48,11 +50,29 @@ _scheduler = None
 
 async def list_sources(db: AsyncSession) -> list[dict[str, Any]]:
     """获取所有采集源列表"""
+    from sqlalchemy import func
+
     result = await db.execute(
         select(CollectionSource).order_by(CollectionSource.Id.desc())
     )
     sources = result.scalars().all()
-    return [_source_to_dict(s) for s in sources]
+
+    # 并行查询每个源的采集总数
+    source_ids = [s.Id for s in sources]
+    count_map: dict[int, int] = {}
+    if source_ids:
+        count_result = await db.execute(
+            select(MediaItem.SourceItemId, func.count(MediaItem.Id))
+            .where(
+                MediaItem.SourceItemId.in_(source_ids),
+                MediaItem.Type == MediaType.Movie,
+                not MediaItem.IsDeleted,
+            )
+            .group_by(MediaItem.SourceItemId)
+        )
+        count_map = {row[0]: row[1] for row in count_result.all()}
+
+    return [_source_to_dict(s, total_count=count_map.get(s.Id, 0)) for s in sources]
 
 
 async def get_source(db: AsyncSession, source_id: int) -> dict[str, Any] | None:
@@ -173,6 +193,7 @@ async def trigger_collect(
     db: AsyncSession,
     source_id: int,
     trigger_type: str = "manual",
+    max_items: int | None = None,
 ) -> dict[str, Any]:
     """触发一次采集（手动或自动）。
 
@@ -182,6 +203,7 @@ async def trigger_collect(
         db: 数据库会话
         source_id: 采集源ID
         trigger_type: auto/manual
+        max_items: 最大采集数量，None 表示不限制（全量）
 
     Returns:
         {"log_id": int, "status": str}
@@ -202,6 +224,7 @@ async def trigger_collect(
         SourceId=source_id,
         TriggerType=trigger_type,
         Status="running",
+        Details={"progress": 0, "logs": [], "max_items": max_items},
     )
     db.add(log)
     await db.commit()
@@ -215,14 +238,101 @@ async def trigger_collect(
 
     # 后台执行采集
     import asyncio
-    asyncio.create_task(_run_collected(source_id, log.Id))
+    asyncio.create_task(_run_collected(source_id, log.Id, max_items))
 
     return {"log_id": log.Id, "status": "running"}
 
 
-async def _run_collected(source_id: int, log_id: int) -> None:
-    """实际采集执行（在后台任务中运行，同步HTTP请求放入线程池）"""
+async def get_running_status(db: AsyncSession, source_id: int) -> dict[str, Any] | None:
+    """获取采集源的运行中任务状态（实时进度）"""
+    source_result = await db.execute(
+        select(CollectionSource).where(CollectionSource.Id == source_id)
+    )
+    cs = source_result.scalar_one_or_none()
+    if not cs:
+        return None
+
+    if cs.LastStatus != "running":
+        return None
+
+    # 获取最新的 running 日志
+    log_result = await db.execute(
+        select(CollectionLog)
+        .where(
+            CollectionLog.SourceId == source_id,
+            CollectionLog.Status == "running",
+        )
+        .order_by(CollectionLog.StartedAt.desc())
+        .limit(1)
+    )
+    log = log_result.scalar_one_or_none()
+    if not log:
+        return None
+
+    details = log.Details or {}
+    return {
+        "log_id": log.Id,
+        "status": "running",
+        "started_at": log.StartedAt.isoformat() if log.StartedAt else None,
+        "progress": details.get("progress", 0),
+        "total": details.get("total", 0),
+        "success_count": details.get("success_count", 0),
+        "fail_count": details.get("fail_count", 0),
+        "current_item": details.get("current_item"),
+        "logs": details.get("logs", []),
+        "speed": details.get("speed", 0),
+    }
+
+
+async def stop_collect(db: AsyncSession, source_id: int) -> dict[str, Any]:
+    """停止正在运行的采集任务"""
+    result = await db.execute(
+        select(CollectionSource).where(CollectionSource.Id == source_id)
+    )
+    cs = result.scalar_one_or_none()
+    if not cs:
+        raise ValueError(f"采集源不存在: id={source_id}")
+
+    if cs.LastStatus != "running":
+        raise ValueError("当前没有正在运行的采集任务")
+
+    # 查找 running 状态的日志
+    log_result = await db.execute(
+        select(CollectionLog)
+        .where(
+            CollectionLog.SourceId == source_id,
+            CollectionLog.Status == "running",
+        )
+        .order_by(CollectionLog.StartedAt.desc())
+        .limit(1)
+    )
+    log = log_result.scalar_one_or_none()
+
+    # 更新日志状态为 failed（用户主动停止）
+    if log:
+        log.Status = "failed"
+        log.FinishedAt = datetime.now(timezone.utc)
+        log.ErrorMessage = "用户手动停止"
+        log.UpdatedAt = datetime.now(timezone.utc)
+
+    cs.LastStatus = "failed"
+    cs.LastError = "用户手动停止"
+    cs.UpdatedAt = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {"message": "已停止采集"}
+
+
+async def _run_collected(source_id: int, log_id: int, max_items: int | None = None) -> None:
+    """实际采集执行（在后台任务中运行，同步HTTP请求放入线程池）
+
+    Args:
+        source_id: 采集源ID
+        log_id: 日志ID
+        max_items: 最大采集数量，None 表示不限制
+    """
     import asyncio
+    import time as time_module
 
     from database.core import AsyncSessionLocal
 
@@ -252,7 +362,7 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             # 在线程池中执行阻塞的HTTP请求
             loop = asyncio.get_running_loop()
             vod_details, total_fetched, max_item_id = await loop.run_in_executor(
-                None, _do_collect_sync, str(cs.BaseUrl), h, cs.SortOrder, cs.LastMaxItemId
+                None, _do_collect_sync, str(cs.BaseUrl), h, cs.SortOrder, cs.LastMaxItemId, max_items
             )
 
             # 入库在异步上下文执行
@@ -262,26 +372,60 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             update_count = 0
             error_count = 0
             progress_max_id = cs.LastMaxItemId
-            progress_checkpoint = 0  # 每50条更新一次进度
+            start_time = time_module.time()
+            recent_logs: list[dict[str, Any]] = []  # 保存最近的日志条目
+            progress_checkpoint = 0
 
-            for vod in vod_details:
+            for idx, vod in enumerate(vod_details):
                 try:
                     result = await _upsert_vod(db, source_anchor.Id, vod)
                     if result == "new":
                         new_count += 1
+                        status = "new"
                     elif result == "update":
                         update_count += 1
+                        status = "update"
+                    else:
+                        status = "skip"
 
-                    # 实时更新进度：每50条或每批更新 LastMaxItemId
                     vid = vod.get("vod_id", 0)
                     if vid and vid > progress_max_id:
                         progress_max_id = vid
+
+                    elapsed = time_module.time() - start_time
+                    speed = (idx + 1) / elapsed if elapsed > 0 else 0
+
+                    # 添加日志条目
+                    log_entry = {
+                        "index": idx + 1,
+                        "total": len(vod_details),
+                        "vod_id": vid,
+                        "name": vod.get("vod_name", ""),
+                        "status": status,
+                        "time": datetime.now(timezone.utc).isoformat(),
+                    }
+                    recent_logs.append(log_entry)
+                    # 只保留最近 50 条日志
+                    if len(recent_logs) > 50:
+                        recent_logs = recent_logs[-50:]
+
                     progress_checkpoint += 1
 
-                    if progress_checkpoint >= 50:
+                    if progress_checkpoint >= 10:
+                        # 更新进度到 log.Details
+                        details = {
+                            "progress": idx + 1,
+                            "total": len(vod_details),
+                            "success_count": new_count + update_count,
+                            "fail_count": error_count,
+                            "current_item": log_entry,
+                            "logs": recent_logs,
+                            "speed": round(speed, 1),
+                        }
+                        log.Details = details
+                        log.TotalFetched = idx + 1
                         cs.LastMaxItemId = progress_max_id
                         cs.UpdatedAt = datetime.now(timezone.utc)
-                        log.TotalFetched = progress_checkpoint
                         await db.commit()
                         progress_checkpoint = 0
 
@@ -296,6 +440,13 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             log.UpdateCount = update_count
             log.ErrorCount = error_count
             log.TotalFetched = total_fetched
+            log.Details = {
+                "progress": len(vod_details),
+                "total": len(vod_details),
+                "success_count": new_count + update_count,
+                "fail_count": error_count,
+                "logs": recent_logs,
+            }
             log.UpdatedAt = datetime.now(timezone.utc)
 
             cs.LastCollectedAt = datetime.now(timezone.utc)
@@ -335,23 +486,21 @@ def _do_collect_sync(
     h: int | None,
     order: str | None = None,
     last_max_item_id: int = 0,
+    max_items: int | None = None,
 ) -> tuple[list[dict[str, Any]], int, int]:
     """同步抓取苹果CMS数据（在线程池中执行，避免阻塞事件循环）。
 
-    统一使用 iter_by_id_range 按 ID 范围遍历：
-    - 全量采集（last_max_item_id=0）：从 ID=1 开始遍历到当前最大值
-    - 增量采集（last_max_item_id>0）：从 last_max_item_id+1 开始遍历到当前最大值
-
-    优势：
-    - 不依赖分页顺序，稳定可靠
-    - 可断点续传
-    - 直接获取完整详情，无需二次请求
+    使用 ID 范围遍历采集数据：
+    - 全量采集（last_max_item_id=0）：探测最大 ID，从最新开始向下遍历
+    - 增量采集（last_max_item_id>0）：从 last_max_item_id+1 开始遍历
+    - 限量采集（max_items>0）：最多采集 max_items 条数据
 
     Args:
         base_url: 采集源API基础URL
         h: 增量小时数（保留参数）
         order: 排序方式（保留参数）
         last_max_item_id: 上次遍历到的最大vod_id（游标）
+        max_items: 最大采集数量，None 表示不限制
 
     Returns:
         (vod_details_list, total_fetched_count, max_item_id_seen)
@@ -361,23 +510,51 @@ def _do_collect_sync(
     max_item_id = last_max_item_id
 
     try:
-        start_id = last_max_item_id + 1
-        if last_max_item_id == 0:
-            logger.info("全量采集: 使用ID范围遍历, start_id=1")
-        else:
-            logger.info("增量采集: start_id=%s", start_id)
+        # 探测最大 ID
+        first = client.list(pg=1, order="id")
+        items = first.get("list", [])
+        if not items:
+            logger.warning("采集源返回空列表")
+            return [], 0, last_max_item_id
 
+        current_max_id = int(items[0].get("vod_id", 0))
+        logger.info("探测到最大 vod_id=%s", current_max_id)
+
+        # 确定起始 ID
+        if last_max_item_id == 0:
+            start_id = 1
+            logger.info("全量采集: 从 ID=1 开始遍历, 预计范围 1-%s", current_max_id)
+        else:
+            start_id = last_max_item_id + 1
+            logger.info("增量采集: 从 ID=%s 开始遍历", start_id)
+
+        # 使用 iter_by_id_range 遍历，支持限量
         details: list[dict[str, Any]] = []
-        for item in client.iter_by_id_range(start_id=start_id):
+        count = 0
+        for item in client.iter_by_id_range(start_id=start_id, end_id=current_max_id):
+            # 检查限量
+            if max_items and count >= max_items:
+                logger.info("达到限量 %s，停止采集", max_items)
+                break
+
             total_fetched += 1
+            count += 1
             vid = item.get("vod_id", 0)
             if vid > max_item_id:
                 max_item_id = vid
             details.append(item)
 
+            # 定期输出进度
+            if count % 100 == 0:
+                logger.info("采集进度: %s/%s (%.1f%%)", count, max_items or total_fetched, 
+                          100 * count / (max_items or total_fetched) if total_fetched > 0 else 0)
+
         logger.info("采集完成: 获取%s条, 最大ID=%s", total_fetched, max_item_id)
         return details, total_fetched, max_item_id
 
+    except Exception as e:
+        logger.error("采集异常: %s", str(e), exc_info=True)
+        raise
     finally:
         client.close()
 
@@ -413,7 +590,10 @@ async def _upsert_vod(
         if created_time and existing.StartDate and created_time > existing.StartDate:
             # 内容有更新才更新
             existing.Name = vod.get("vod_name") or existing.Name
-            existing.Overview = _strip_html(vod.get("vod_content", "")) or existing.Overview
+            overview = _strip_html(vod.get("vod_content", "")) or existing.Overview
+            if not overview and vod.get("vod_blurb"):
+                overview = vod["vod_blurb"]
+            existing.Overview = overview
             if vod.get("vod_remarks"):
                 existing.Tagline = vod["vod_remarks"]
             if vod.get("vod_score"):
@@ -423,8 +603,23 @@ async def _upsert_vod(
                         existing.CommunityRating = score
                 except (ValueError, TypeError):
                     pass
+            # 更新时长
+            duration_ticks = _parse_duration_to_ticks(vod.get("vod_duration"))
+            if duration_ticks and duration_ticks != existing.RunTimeTicks:
+                existing.RunTimeTicks = duration_ticks
+            # 更新地区和语言
+            area = vod.get("vod_area")
+            if area and isinstance(area, str) and area.strip():
+                existing.BirthPlace = area.strip()
+            lang = vod.get("vod_lang")
+            if lang and isinstance(lang, str) and lang.strip():
+                existing.OriginalLanguage = lang.strip()
             existing.UpdatedAt = datetime.now(timezone.utc)
+
+            # 同步文件和关联
             await _sync_files(db, existing.Id, vod)
+            await _sync_genres(db, existing.Id, vod)
+            await _sync_persons(db, existing.Id, vod)
             return "update"
         return "skip"
     else:
@@ -433,12 +628,19 @@ async def _upsert_vod(
         if not name:
             return "skip"
 
+        # 简介：优先用 vod_content，其次 vod_blurb
         overview = _strip_html(vod.get("vod_content", ""))
-        year = vod.get("vod_year", "")
-        start_date = None
-        if year and year.isdigit():
-            start_date = datetime(int(year), 1, 1, tzinfo=timezone.utc)
+        if not overview and vod.get("vod_blurb"):
+            overview = vod["vod_blurb"]
 
+        # 日期：优先 vod_time，其次 vod_year
+        start_date = _parse_vod_date(vod.get("vod_time"))
+        if not start_date:
+            year = vod.get("vod_year", "")
+            if year and year.isdigit():
+                start_date = datetime(int(year), 1, 1, tzinfo=timezone.utc)
+
+        # 评分
         community_rating = None
         if vod.get("vod_score"):
             try:
@@ -448,6 +650,15 @@ async def _upsert_vod(
             except (ValueError, TypeError):
                 pass
 
+        # 时长
+        duration_ticks = _parse_duration_to_ticks(vod.get("vod_duration"))
+
+        # 地区和语言
+        area = vod.get("vod_area")
+        birth_place = area.strip() if area and isinstance(area, str) and area.strip() else None
+        lang = vod.get("vod_lang")
+        original_language = lang.strip() if lang and isinstance(lang, str) and lang.strip() else None
+
         item = MediaItem(
             Type=MediaType.Movie,
             Name=name,
@@ -455,6 +666,9 @@ async def _upsert_vod(
             Tagline=vod.get("vod_remarks") or None,
             StartDate=start_date,
             CommunityRating=community_rating,
+            RunTimeTicks=duration_ticks,
+            BirthPlace=birth_place,
+            OriginalLanguage=original_language,
             SourceItemId=source_item_id,
             SourceId=vod_id,
         )
@@ -471,6 +685,12 @@ async def _upsert_vod(
         for src in play_urls:
             for ep in src.get("episodes", []):
                 await _ensure_file_link(db, item.Id, ep["url"], FileType.Video, FileLinkType.MediaSource, None, ep.get("name", "") or "video")
+
+        # 创建分类关联
+        await _sync_genres(db, item.Id, vod)
+
+        # 创建人员关联
+        await _sync_persons(db, item.Id, vod)
 
         await db.commit()
         return "new"
@@ -548,6 +768,163 @@ async def _ensure_source_anchor(db: AsyncSession, name: str) -> MediaItem:
         db.add(anchor)
         await db.flush()
     return anchor
+
+
+# ======================================================================
+# 分类/人员关联
+# ======================================================================
+
+async def _sync_genres(db: AsyncSession, item_id: int, vod: dict[str, Any]) -> None:
+    """同步分类关联（类型、地区、语言作为 Genre 关联）"""
+    # 收集所有分类名称
+    genre_names: set[str] = set()
+
+    # 视频分类
+    for key in ("vod_class", "type_name"):
+        val = vod.get(key)
+        if val and isinstance(val, str) and val.strip():
+            genre_names.add(val.strip())
+
+    # 地区作为分类（如"日本"）
+    area = vod.get("vod_area")
+    if area and isinstance(area, str) and area.strip():
+        genre_names.add(area.strip())
+
+    # 语言作为分类（如"日语"）
+    lang = vod.get("vod_lang")
+    if lang and isinstance(lang, str) and lang.strip():
+        genre_names.add(lang.strip())
+
+    for name in genre_names:
+        await _ensure_genre_link(db, item_id, name)
+
+
+async def _ensure_genre_link(db: AsyncSession, item_id: int, genre_name: str) -> None:
+    """确保 Genre 类型的 MediaItem 和关联存在"""
+    # 查找或创建 Genre
+    result = await db.execute(
+        select(MediaItem).where(
+            MediaItem.Name == genre_name,
+            MediaItem.Type == MediaType.Genre,
+            not MediaItem.IsDeleted,
+        )
+    )
+    genre = result.scalar_one_or_none()
+    if not genre:
+        genre = MediaItem(Type=MediaType.Genre, Name=genre_name)
+        db.add(genre)
+        await db.flush()
+
+    # 查找或创建关联
+    link_result = await db.execute(
+        select(ItemLinks).where(
+            ItemLinks.ItemId == item_id,
+            ItemLinks.LinkedItemId == genre.Id,
+        )
+    )
+    if not link_result.scalar_one_or_none():
+        link = ItemLinks(ItemId=item_id, LinkedItemId=genre.Id)
+        db.add(link)
+
+
+async def _sync_persons(db: AsyncSession, item_id: int, vod: dict[str, Any]) -> None:
+    """同步人员关联（演员、导演、编剧）"""
+    person_fields = [
+        ("vod_actor", PersonType.Actor),
+        ("vod_director", PersonType.Director),
+        ("vod_writer", PersonType.Writer),
+    ]
+
+    for field_key, person_type in person_fields:
+        raw = vod.get(field_key)
+        if not raw or not isinstance(raw, str):
+            continue
+
+        # 苹果CMS可能用逗号分隔多人
+        names = [n.strip() for n in raw.replace("，", ",").split(",") if n.strip()]
+        for name in names:
+            await _ensure_person_link(db, item_id, name, person_type)
+
+
+async def _ensure_person_link(
+    db: AsyncSession, item_id: int, person_name: str, person_type: PersonType
+) -> None:
+    """确保 Person 类型的 MediaItem 和关联存在"""
+    # 查找或创建 Person
+    result = await db.execute(
+        select(MediaItem).where(
+            MediaItem.Name == person_name,
+            MediaItem.Type == MediaType.Person,
+            not MediaItem.IsDeleted,
+        )
+    )
+    person = result.scalar_one_or_none()
+    if not person:
+        person = MediaItem(Type=MediaType.Person, Name=person_name)
+        db.add(person)
+        await db.flush()
+
+    # 查找或创建关联
+    link_result = await db.execute(
+        select(ItemLinks).where(
+            ItemLinks.ItemId == item_id,
+            ItemLinks.LinkedItemId == person.Id,
+        )
+    )
+    existing_link = link_result.scalar_one_or_none()
+    if not existing_link:
+        link = ItemLinks(
+            ItemId=item_id,
+            LinkedItemId=person.Id,
+            PeopleType=person_type,
+        )
+        db.add(link)
+
+
+# ======================================================================
+# 时长转换
+# ======================================================================
+
+_TICKS_PER_SECOND = 10_000_000
+
+
+def _parse_duration_to_ticks(duration_str: str | None) -> int | None:
+    """将苹果CMS时长字符串（如 "00:29:23"）转换为 ticks。
+
+    格式支持：
+    - "HH:MM:SS" 或 "MM:SS"
+    - 秒数或毫秒数数字字符串
+
+    Returns:
+        ticks 整数，或 None（无法解析时）
+    """
+    if not duration_str:
+        return None
+
+    duration_str = str(duration_str).strip()
+    if not duration_str:
+        return None
+
+    try:
+        # 尝试 "HH:MM:SS" 格式
+        if ":" in duration_str:
+            parts = duration_str.split(":")
+            if len(parts) == 3:
+                h, m, s = int(parts[0]), int(parts[1]), int(parts[2])
+                total_seconds = h * 3600 + m * 60 + s
+            elif len(parts) == 2:
+                m, s = int(parts[0]), int(parts[1])
+                total_seconds = m * 60 + s
+            else:
+                return None
+            return total_seconds * _TICKS_PER_SECOND
+
+        # 纯数字当作秒
+        total_seconds = float(duration_str)
+        return int(total_seconds * _TICKS_PER_SECOND)
+
+    except (ValueError, TypeError):
+        return None
 
 
 # ======================================================================
@@ -691,7 +1068,7 @@ async def _auto_collect_task(source_id: int) -> None:
 # 工具函数
 # ======================================================================
 
-def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
+def _source_to_dict(cs: CollectionSource, total_count: int = 0) -> dict[str, Any]:
     """将 CollectionSource 转换为字典，兼容不同版本的数据库表结构"""
     return {
         "id": cs.Id,
@@ -702,6 +1079,7 @@ def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
         "interval_minutes": cs.IntervalMinutes,
         "sort_order": getattr(cs, 'SortOrder', 'time'),
         "last_max_item_id": getattr(cs, 'LastMaxItemId', 0),
+        "total_count": total_count,
         "last_collected_at": cs.LastCollectedAt.isoformat() if cs.LastCollectedAt else None,
         "last_status": cs.LastStatus,
         "last_error": cs.LastError,

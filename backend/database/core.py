@@ -142,6 +142,19 @@ async def init_db():
     """初始化数据库 - 异步方式创建表并自动修复缺失的列"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await _ensure_fts5(conn)
+        # FTS5 初始化失败不应阻止数据库正常工作
+        try:
+            await _ensure_fts5(conn)
+        except Exception as e:
+            logger.warning("FTS5 初始化失败（可忽略）: %s", e)
+            # 尝试修复：删除损坏的 FTS5 表和触发器
+            try:
+                await conn.execute(text("DROP TRIGGER IF EXISTS media_item_fts_ai"))
+                await conn.execute(text("DROP TRIGGER IF EXISTS media_item_fts_ad"))
+                await conn.execute(text("DROP TRIGGER IF EXISTS media_item_fts_au"))
+                await conn.execute(text("DROP TABLE IF EXISTS media_item_fts"))
+                logger.info("已清理损坏的 FTS5 对象")
+            except Exception as e2:
+                logger.warning("清理 FTS5 失败: %s", e2)
         # 自动检测并添加迁移中新增的列（兼容旧数据库）
         await _ensure_collection_columns(conn)

@@ -10,7 +10,14 @@ export const collectionAPI = {
   toggleSource: (id, data) => api.post(`/api/collection/sources/${id}/toggle`, data),
   // 操作
   testSource: (id) => api.post(`/api/collection/sources/${id}/test`),
-  triggerCollect: (id) => api.post(`/api/collection/sources/${id}/trigger`),
+  triggerCollect: (id, maxItems = null) => {
+    const data = {}
+    if (maxItems) data.max_items = maxItems
+    return api.post(`/api/collection/sources/${id}/trigger`, data)
+  },
+  stopCollect: (id) => api.post(`/api/collection/sources/${id}/stop`),
+  // 状态
+  getSourceStatus: (id) => api.get(`/api/collection/sources/${id}/status`),
   // 日志
   listLogs: (sourceId = null, limit = 50) => {
     const params = {}

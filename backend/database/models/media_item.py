@@ -161,7 +161,8 @@ class MediaItem(Base):
     SourceItemId = Column("SourceItemId", Integer, ForeignKey("MediaItems.Id", ondelete="SET NULL"), nullable=True, comment="来源或父级媒体项 ID")
 
     RunTimeTicks = Column("RunTimeTicks", BigInteger, nullable=True, comment="运行时长（Ticks）")
-    BirthPlace = Column("BirthPlace", String(500), nullable=True, comment="出生地")
+    BirthPlace = Column("BirthPlace", String(500), nullable=True, comment="出生地/地区")
+    OriginalLanguage = Column("OriginalLanguage", String(100), nullable=True, comment="原始语言")
     # ========== 关联关系 ==========
     Links = relationship("ItemLinks", back_populates="Item", cascade="all, delete-orphan", foreign_keys="ItemLinks.ItemId")
     LinkedItems = relationship("ItemLinks", back_populates="LinkedItem", cascade="all", foreign_keys="ItemLinks.LinkedItemId")

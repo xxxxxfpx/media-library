@@ -43,6 +43,11 @@ class SourceToggleRequest(BaseModel):
     auto_collect: bool | None = None
 
 
+class TriggerCollectRequest(BaseModel):
+    """触发采集请求"""
+    max_items: int | None = Field(default=None, ge=1, le=10000, description="最大采集数量，None表示全量")
+
+
 # ======================================================================
 # 路由
 # ======================================================================
@@ -148,12 +153,14 @@ async def test_source(
 @router.post("/sources/{source_id}/trigger")
 async def trigger_collect(
     source_id: int,
+    data: TriggerCollectRequest | None = None,
     user_id: int = Depends(get_admin_id),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """手动触发采集"""
     try:
-        result = await collection_service.trigger_collect(db, source_id, trigger_type="manual")
+        max_items = data.max_items if data else None
+        result = await collection_service.trigger_collect(db, source_id, trigger_type="manual", max_items=max_items)
         return result
     except ValueError as e:
         if "正在运行中" in str(e):
@@ -190,3 +197,43 @@ async def list_logs(
 ) -> list[dict[str, Any]]:
     """获取采集日志列表"""
     return await collection_service.list_logs(db, source_id=source_id, limit=limit)
+
+
+@router.get("/sources/{source_id}/status")
+async def get_source_status(
+    source_id: int,
+    user_id: int = Depends(get_admin_id),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """获取采集源实时状态（运行中任务的进度）"""
+    status = await collection_service.get_running_status(db, source_id)
+    if status is None:
+        # 获取最新历史状态
+        logs = await collection_service.list_logs(db, source_id=source_id, limit=1)
+        if logs:
+            log = logs[0]
+            return {
+                "status": log.get("status"),
+                "started_at": log.get("started_at"),
+                "finished_at": log.get("finished_at"),
+                "total": log.get("total_fetched", 0),
+                "new_count": log.get("new_count", 0),
+                "update_count": log.get("update_count", 0),
+                "error_count": log.get("error_count", 0),
+                "error_message": log.get("error_message"),
+            }
+        return {"status": "idle", "message": "暂无采集记录"}
+    return status
+
+
+@router.post("/sources/{source_id}/stop")
+async def stop_source_collect(
+    source_id: int,
+    user_id: int = Depends(get_admin_id),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """停止正在运行的采集任务"""
+    try:
+        return await collection_service.stop_collect(db, source_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
