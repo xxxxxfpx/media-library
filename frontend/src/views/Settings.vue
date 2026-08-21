@@ -371,7 +371,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useAppStore } from '@/store'
 import { guangYaPanAPI, userAPI, collectionAPI } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'

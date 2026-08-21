@@ -217,7 +217,7 @@ onUnmounted(() => {
   font-size: 20px;
   font-weight: bold;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: break-all;
   line-height: 1.3;
 }
 
