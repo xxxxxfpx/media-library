@@ -374,8 +374,9 @@ async function handleLogin() {
     margin: 0 !important;
     line-height: 1 !important;
     height: auto !important;
-    width: auto !important;
+    width: 64px !important;
     flex-shrink: 0;
+    text-align: right !important;
   }
 
   // 隐藏默认的必填星号（form-label-text 自定义了样式）
