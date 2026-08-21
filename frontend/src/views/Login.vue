@@ -45,9 +45,9 @@
         </div>
 
         <el-form ref="formRef" :model="form" :rules="rules" class="login-form" @submit.prevent="handleLogin">
-          <el-form-item prop="username">
+          <el-form-item prop="username" required>
             <template #label>
-              <span class="form-label-text">用户名</span>
+              <span class="form-label-text"><span class="required-star">*</span>用户名</span>
             </template>
             <el-input
               v-model="form.username"
@@ -62,9 +62,9 @@
             </el-input>
           </el-form-item>
 
-          <el-form-item prop="password">
+          <el-form-item prop="password" required>
             <template #label>
-              <span class="form-label-text">密码</span>
+              <span class="form-label-text"><span class="required-star">*</span>密码</span>
             </template>
             <el-input
               v-model="form.password"
@@ -369,17 +369,34 @@ async function handleLogin() {
   :deep(.el-form-item__label) {
     float: none !important;
     padding-right: 0 !important;
-    margin-bottom: 8px !important;
+    padding-bottom: 6px !important;
+    line-height: 1.5 !important;
+    height: auto !important;
+  }
+
+  // 隐藏默认的必填星号（form-label-text 自定义了样式）
+  :deep(.el-form-item.is-required > .el-form-item__label::before) {
+    display: none !important;
   }
 
   :deep(.el-form-item__content) {
     margin-left: 0 !important;
+    line-height: 0 !important;
   }
 
   .form-label-text {
     font-size: 0.8125rem;
     font-weight: 500;
     color: var(--color-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .required-star {
+    color: var(--el-color-danger);
+    font-size: 0.8125rem;
+    line-height: 1;
   }
 
   :deep(.el-input__wrapper) {
