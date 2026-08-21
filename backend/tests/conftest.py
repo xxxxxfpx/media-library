@@ -17,6 +17,10 @@ os.environ['CONFIG_PATH'] = os.path.join(os.path.dirname(__file__), '..', 'env.y
 # 添加项目根目录到 sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# 确保数据库目录存在（CI 环境可能不存在）
+db_dir = Path(__file__).parent.parent / "data" / "database"
+db_dir.mkdir(parents=True, exist_ok=True)
+
 from httpx import ASGITransport, AsyncClient, Timeout
 from sqlalchemy import text
 
