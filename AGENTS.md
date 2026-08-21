@@ -44,6 +44,7 @@
 - `frontend/.env`、`backend/env.yaml` 和 `secrets/config.yaml` 均为本地覆盖，不要提交。
 - 提交信息遵循 `{type}({keyword}):{中文摘要}`，随后每行一条中文修改说明；除非用户要求，不要自行提交或修改 git 历史。
 - **推送后必须检查 GitHub Actions 状态**：每次 `git push` 完成后，立即查看 GitHub Actions 工作流运行结果，确保 CI 和 Docker Deploy 成功；若失败需排查并修复后重新推送。
+- **GitHub Actions 轮询间隔不得超过 5 秒**：使用 `gh run list` 或 `gh run view` 轮询检查工作流状态时，等待间隔（`Start-Sleep`）不得超过 5 秒，避免长时间等待导致错过状态变化。
 
 ## High-Value References
 
