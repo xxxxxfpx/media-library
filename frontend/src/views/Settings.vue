@@ -796,9 +796,7 @@ async function toggleSource(id, data) {
   background: transparent;
   color: var(--color-text-tertiary, #909399);
   border: none;
-  padding: 0;
-  flex: none;
-  min-width: 0;
+  padding: 8px 0;
 }
 
 .test-samples {
