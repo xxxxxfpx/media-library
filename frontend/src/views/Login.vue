@@ -44,7 +44,7 @@
           <p class="card-subtitle">登录以继续探索</p>
         </div>
 
-        <el-form ref="formRef" :model="form" :rules="rules" class="login-form" label-width="72px" @submit.prevent="handleLogin">
+        <el-form ref="formRef" :model="form" :rules="rules" class="login-form" @submit.prevent="handleLogin">
           <el-form-item prop="username" required>
             <template #label>
               <span class="form-label-text"><span class="required-star">*</span>用户名</span>
@@ -363,17 +363,19 @@ async function handleLogin() {
 // ===== 表单 =====
 .login-form {
   :deep(.el-form-item) {
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+    display: flex !important;
+    align-items: center !important;
   }
 
   :deep(.el-form-item__label) {
     float: none !important;
-    padding-right: 0 !important;
-    padding-bottom: 6px !important;
-    line-height: 1.5 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1 !important;
     height: auto !important;
-    width: 72px !important;
-    text-align: right !important;
+    width: auto !important;
+    flex-shrink: 0;
   }
 
   // 隐藏默认的必填星号（form-label-text 自定义了样式）
@@ -382,8 +384,9 @@ async function handleLogin() {
   }
 
   :deep(.el-form-item__content) {
-    margin-left: 72px !important;
+    margin-left: 6px !important;
     line-height: 0 !important;
+    flex: 1;
   }
 
   .form-label-text {
@@ -393,6 +396,7 @@ async function handleLogin() {
     display: inline-flex;
     align-items: center;
     gap: 2px;
+    white-space: nowrap;
   }
 
   .required-star {
