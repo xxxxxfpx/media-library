@@ -114,28 +114,60 @@ async def _ensure_fts5(conn) -> None:
 
 
 async def _ensure_collection_columns(conn) -> None:
-    """确保 CollectionSources 表包含所有必需的列（兼容旧数据库）"""
+    """确保所有表包含 ORM 模型定义的列（兼容旧数据库，自动修复缺失列）"""
     from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import schema as sa_schema
 
     try:
         inspector = sa_inspect(conn)
-        if "CollectionSources" not in inspector.get_table_names():
-            return
+        db_tables = set(inspector.get_table_names())
 
-        columns = {c["name"] for c in inspector.get_columns("CollectionSources")}
+        # 遍历 ORM 模型中所有表，对比数据库实际列
+        for orm_table in Base.metadata.sorted_tables:
+            table_name = orm_table.name
+            if table_name not in db_tables:
+                continue
 
-        # 需要确保存在的列及其默认值
-        missing_columns = {
-            "SortOrder": "TEXT DEFAULT 'time'",
-            "LastMaxItemId": "INTEGER DEFAULT 0",
-        }
+            db_columns = {c["name"] for c in inspector.get_columns(table_name)}
+            added_count = 0
 
-        for col_name, col_def in missing_columns.items():
-            if col_name not in columns:
-                await conn.execute(text(f"ALTER TABLE CollectionSources ADD COLUMN {col_name} {col_def}"))
-                logger.info(f"自动添加缺失的列: CollectionSources.{col_name}")
+            for column in orm_table.columns:
+                col_name = column.name
+                if col_name in db_columns:
+                    continue
+
+                # 构建列定义
+                col_type = column.type.compile(dialect=conn.dialect)
+                col_def = f'"{col_name}" {col_type}'
+                if column.default is not None:
+                    col_default = column.default.arg
+                    if isinstance(col_default, str):
+                        col_def += f" DEFAULT '{col_default}'"
+                    else:
+                        col_def += f" DEFAULT {col_default}"
+                if column.nullable:
+                    col_def += " NULL"
+                else:
+                    col_def += " NOT NULL"
+
+                try:
+                    await conn.execute(
+                        text(f'ALTER TABLE "{table_name}" ADD COLUMN {col_def}')
+                    )
+                    logger.info("自动添加缺失的列: %s.%s", table_name, col_name)
+                    added_count += 1
+                except Exception as add_err:
+                    logger.warning(
+                        "添加列 %s.%s 失败（可忽略）: %s",
+                        table_name,
+                        col_name,
+                        add_err,
+                    )
+
+            if added_count > 0:
+                logger.info("表 %s 共添加 %d 个缺失列", table_name, added_count)
     except Exception as e:
-        logger.warning(f"检测/修复 CollectionSources 列失败（可忽略）: {e}")
+        logger.warning("检测/修复缺失列失败（可忽略）: %s", e)
 
 
 async def init_db():
