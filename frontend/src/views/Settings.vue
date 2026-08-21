@@ -564,7 +564,9 @@ async function loadSources() {
   try {
     collectionSources.value = await collectionAPI.listSources()
   } catch (e) {
-    ElMessage.error('加载采集源失败')
+    const msg = e?.response?.data?.detail || e?.message || '未知错误'
+    console.error('加载采集源失败:', e)
+    ElMessage.error(`加载采集源失败: ${msg}`)
   } finally {
     sourcesLoading.value = false
   }
