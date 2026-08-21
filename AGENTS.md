@@ -43,6 +43,7 @@
 - `ruff` 不随 venv 保证存在；本地需要时先安装，再执行 `ruff check app database tests`。
 - `frontend/.env`、`backend/env.yaml` 和 `secrets/config.yaml` 均为本地覆盖，不要提交。
 - 提交信息遵循 `{type}({keyword}):{中文摘要}`，随后每行一条中文修改说明；除非用户要求，不要自行提交或修改 git 历史。
+- **推送后必须检查 GitHub Actions 状态**：每次 `git push` 完成后，立即查看 GitHub Actions 工作流运行结果，确保 CI 和 Docker Deploy 成功；若失败需排查并修复后重新推送。
 
 ## High-Value References
 

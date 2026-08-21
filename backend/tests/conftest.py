@@ -10,6 +10,11 @@ import sys
 from pathlib import Path
 
 import pytest
+from httpx import ASGITransport, AsyncClient, Timeout
+from sqlalchemy import text
+
+from app.main import app
+from database.core import AsyncSessionLocal, Base, engine
 
 # 设置环境变量指向测试配置文件
 os.environ['CONFIG_PATH'] = os.path.join(os.path.dirname(__file__), '..', 'env.yaml')
@@ -20,12 +25,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # 确保数据库目录存在（CI 环境可能不存在）
 db_dir = Path(__file__).parent.parent / "data" / "database"
 db_dir.mkdir(parents=True, exist_ok=True)
-
-from httpx import ASGITransport, AsyncClient, Timeout
-from sqlalchemy import text
-
-from app.main import app
-from database.core import AsyncSessionLocal, Base, engine
 
 # ==================== Fixtures ====================
 
