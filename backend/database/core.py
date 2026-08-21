@@ -116,7 +116,6 @@ async def _ensure_fts5(conn) -> None:
 async def _ensure_collection_columns(conn) -> None:
     """确保所有表包含 ORM 模型定义的列（兼容旧数据库，自动修复缺失列）"""
     from sqlalchemy import inspect as sa_inspect
-    from sqlalchemy import schema as sa_schema
 
     try:
         inspector = sa_inspect(conn)
