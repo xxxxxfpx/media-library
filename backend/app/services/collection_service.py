@@ -692,6 +692,7 @@ async def _auto_collect_task(source_id: int) -> None:
 # ======================================================================
 
 def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
+    """将 CollectionSource 转换为字典，兼容不同版本的数据库表结构"""
     return {
         "id": cs.Id,
         "name": cs.Name,
@@ -699,8 +700,8 @@ def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
         "enabled": cs.Enabled,
         "auto_collect": cs.AutoCollect,
         "interval_minutes": cs.IntervalMinutes,
-        "sort_order": cs.SortOrder,
-        "last_max_item_id": cs.LastMaxItemId,
+        "sort_order": getattr(cs, 'SortOrder', 'time'),
+        "last_max_item_id": getattr(cs, 'LastMaxItemId', 0),
         "last_collected_at": cs.LastCollectedAt.isoformat() if cs.LastCollectedAt else None,
         "last_status": cs.LastStatus,
         "last_error": cs.LastError,

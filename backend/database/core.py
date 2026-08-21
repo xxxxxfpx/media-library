@@ -16,6 +16,7 @@ Database Core - 数据库核心配置
 """
 
 import json
+import logging
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import event, text
@@ -23,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from config import config
 from database.fts_ddl import FTS5_CREATE_SQL
+
+logger = logging.getLogger(__name__)
 
 # 构建数据库URL
 if config.database.type == "sqlite":
@@ -110,8 +113,35 @@ async def _ensure_fts5(conn) -> None:
         await conn.execute(text(statement))
 
 
+async def _ensure_collection_columns(conn) -> None:
+    """确保 CollectionSources 表包含所有必需的列（兼容旧数据库）"""
+    from sqlalchemy import inspect as sa_inspect
+
+    try:
+        inspector = sa_inspect(conn)
+        if "CollectionSources" not in inspector.get_table_names():
+            return
+
+        columns = {c["name"] for c in inspector.get_columns("CollectionSources")}
+
+        # 需要确保存在的列及其默认值
+        missing_columns = {
+            "SortOrder": "TEXT DEFAULT 'time'",
+            "LastMaxItemId": "INTEGER DEFAULT 0",
+        }
+
+        for col_name, col_def in missing_columns.items():
+            if col_name not in columns:
+                await conn.execute(text(f"ALTER TABLE CollectionSources ADD COLUMN {col_name} {col_def}"))
+                logger.info(f"自动添加缺失的列: CollectionSources.{col_name}")
+    except Exception as e:
+        logger.warning(f"检测/修复 CollectionSources 列失败（可忽略）: {e}")
+
+
 async def init_db():
-    """初始化数据库 - 异步方式创建表"""
+    """初始化数据库 - 异步方式创建表并自动修复缺失的列"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _ensure_fts5(conn)
+        # 自动检测并添加迁移中新增的列（兼容旧数据库）
+        await _ensure_collection_columns(conn)

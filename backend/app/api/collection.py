@@ -1,5 +1,6 @@
 """采集管理 API - 苹果CMS V10 采集源配置与采集执行"""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_admin_id, get_db_session
 from app.services import collection_service
 from app.services.maccms_client import MaccmsError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/collection", tags=["collection"])
 
@@ -50,7 +53,11 @@ async def list_sources(
     db: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     """获取所有采集源列表"""
-    return await collection_service.list_sources(db)
+    try:
+        return await collection_service.list_sources(db)
+    except Exception as e:
+        logger.exception("获取采集源列表失败")
+        raise HTTPException(status_code=500, detail=f"获取采集源列表失败: {str(e)}")
 
 
 @router.post("/sources")
