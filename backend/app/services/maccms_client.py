@@ -151,21 +151,66 @@ class MaccmsClient:
                 break
             pg += 1
 
+    def iter_by_id_range(
+        self, start_id: int = 1, end_id: int | None = None, batch_size: int = 50
+    ) -> Iterator[dict[str, Any]]:
+        """按 ID 范围直接遍历，不依赖翻页。
+
+        通过 ac=detail&ids=N,M,... 直接请求指定 ID 范围的详情。
+        缺失的 ID 会被自动跳过，已存在的 ID 直接返回完整详情。
+
+        优势：
+        - 不依赖分页顺序，不存在页面位移问题
+        - 可断点续传，从 start_id 继续
+        - 逻辑简单可靠
+
+        Args:
+            start_id: 起始 ID（包含）
+            end_id: 结束 ID（包含），None 则自动探测最大 ID
+            batch_size: 每批请求的 ID 数量
+
+        Yields:
+            每条视频详情字典
+        """
+        if end_id is None:
+            # 先探测最大 ID
+            first = self.list(pg=1, order="id")
+            items = first.get("list", [])
+            if not items:
+                return
+            end_id = int(items[0].get("vod_id", 0))
+            logger.info("探测到最大 vod_id=%s", end_id)
+
+        current = start_id
+        while current <= end_id:
+            batch_end = min(current + batch_size - 1, end_id)
+            ids = list(range(current, batch_end + 1))
+            ids_str = ",".join(str(i) for i in ids)
+
+            try:
+                data = self._get({"ac": "detail", "ids": ids_str})
+                details = data.get("list", [])
+                if details:
+                    yield from details
+            except MaccmsError:
+                logger.warning("iter_by_id_range: 批次 %d-%d 失败，跳过", current, batch_end)
+
+            current = batch_end + 1
+
     def iter_by_id(
         self, since_id: int = 0, max_pages: int = 500
     ) -> Iterator[dict[str, Any]]:
-        """基于 ID 游标的稳定遍历。
+        """基于 ID 游标的稳定遍历（分页模式，适用于增量小数据量）。
 
-        使用 order=id 降序排列（苹果CMS默认），最新数据在第1页。
-        通过 since_id 游标实现增量采集，只返回 vod_id > since_id 的数据。
-        降序遍历保证：新数据永远在前面，页面内容不会因新数据插入而位移。
+        使用 order=id 降序排列，最新数据在第1页。
+        通过 since_id 游标实现增量采集，遇到 vod_id <= since_id 立即停止。
 
         Args:
             since_id: 上次采集到的最大 vod_id，0 表示全量采集
             max_pages: 最大翻页数（安全阀）
 
         Yields:
-            每条新的 vod 列表记录的字典
+            每条视频详情字典
         """
         max_seen = since_id
         pg = 1
@@ -176,7 +221,6 @@ class MaccmsClient:
             if not items:
                 break
 
-            # 降序：遍历到第一个 vod_id <= since_id 时停止
             stop = False
             for item in items:
                 vid = item.get("vod_id", 0)

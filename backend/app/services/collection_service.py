@@ -315,14 +315,19 @@ def _do_collect_sync(
 ) -> tuple[list[dict[str, Any]], int, int]:
     """同步抓取苹果CMS数据（在线程池中执行，避免阻塞事件循环）。
 
-    优先使用 ID 游标遍历（order=id 降序 + since_id），保证页面稳定：
-    新数据永远在前面，已遍历的旧数据页面内容不会位移。
-    若采集源无历史记录（last_max_item_id=0），自动执行全量采集。
+    统一使用 iter_by_id_range 按 ID 范围遍历：
+    - 全量采集（last_max_item_id=0）：从 ID=1 开始遍历到当前最大值
+    - 增量采集（last_max_item_id>0）：从 last_max_item_id+1 开始遍历到当前最大值
+
+    优势：
+    - 不依赖分页顺序，稳定可靠
+    - 可断点续传
+    - 直接获取完整详情，无需二次请求
 
     Args:
         base_url: 采集源API基础URL
-        h: 增量小时数（仅用于时间排序的辅助，ID游标为主）
-        order: 排序方式（仅用于日志标记，实际遍历始终用ID游标）
+        h: 增量小时数（保留参数）
+        order: 排序方式（保留参数）
         last_max_item_id: 上次遍历到的最大vod_id（游标）
 
     Returns:
@@ -333,21 +338,21 @@ def _do_collect_sync(
     max_item_id = last_max_item_id
 
     try:
-        # 始终使用 ID 游标遍历（稳定，不会因新数据导致页面位移）
-        vod_ids: list[int] = []
-        for item in client.iter_by_id(since_id=last_max_item_id):
+        start_id = last_max_item_id + 1
+        if last_max_item_id == 0:
+            logger.info("全量采集: 使用ID范围遍历, start_id=1")
+        else:
+            logger.info("增量采集: start_id=%s", start_id)
+
+        details: list[dict[str, Any]] = []
+        for item in client.iter_by_id_range(start_id=start_id):
             total_fetched += 1
             vid = item.get("vod_id", 0)
-            if vid:
-                vod_ids.append(vid)
-                if vid > max_item_id:
-                    max_item_id = vid
+            if vid > max_item_id:
+                max_item_id = vid
+            details.append(item)
 
-        if not vod_ids:
-            return [], total_fetched, max_item_id
-
-        # 批量获取详情
-        details = client.detail_batch(vod_ids)
+        logger.info("采集完成: 获取%s条, 最大ID=%s", total_fetched, max_item_id)
         return details, total_fetched, max_item_id
 
     finally:
