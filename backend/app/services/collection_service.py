@@ -545,7 +545,8 @@ def start_scheduler() -> None:
 
     _scheduler = AsyncIOScheduler(
         jobstores={"default": MemoryJobStore()},
-        timezone="utc",
+        # 使用 datetime.timezone.utc 对象，避免 Docker slim 镜像中 zoneinfo 缺数据
+        timezone=timezone.utc,
     )
     _scheduler.start()
     logger.info("采集调度器已启动")

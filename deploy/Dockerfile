@@ -18,6 +18,9 @@ RUN npm run build
 # ── 阶段 2：打包后端 + 前端静态资源 ──
 FROM python:3.12-slim AS runtime
 
+# 安装 tzdata 以支持 APScheduler 等需要时区数据库的库
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+
 ARG APP_VERSION
 ENV APP_VERSION=${APP_VERSION:-unknown}
 
