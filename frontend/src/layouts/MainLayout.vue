@@ -335,13 +335,13 @@ function handleCommand(command) {
               color 0.3s ease,
               border-color 0.3s ease,
               box-shadow 0.3s ease;
-  box-shadow: 0 2px 8px var(--imm-overlay);
+  box-shadow: 0 1px 3px var(--imm-overlay);
 
   &:hover {
     background: var(--imm-accent);
     color: var(--color-text-inverse);
     border-color: var(--imm-accent);
-    box-shadow: 0 2px 8px var(--imm-overlay);
+    box-shadow: 0 1px 4px var(--imm-overlay);
   }
 }
 
