@@ -3,7 +3,7 @@
 # - 若已挂载 secrets/config.yaml 则直接使用
 # - 否则根据环境变量生成 secrets/config.yaml（避免启动守卫因 secret_key 为空拒绝启动）
 # - 若 APP_SECRET_KEY / APP_ADMIN_PASSWORD 未设置，则自动生成随机值并持久化
-# - 启动前自动执行 Alembic 数据库迁移
+# - 启动前自动执行数据库迁移和表结构修复
 set -e
 
 SECRETS_FILE="${SECRETS_PATH:-/app/secrets/config.yaml}"
@@ -45,13 +45,50 @@ else
     echo "[entrypoint] 已存在 ${SECRETS_FILE}，沿用现有配置"
 fi
 
-# ── 3. 执行 Alembic 数据库迁移 ──
-echo "[entrypoint] 执行数据库迁移..."
+# ── 3. 直接用 SQL 修复旧数据库缺失的列（兼容 alembic 版本不匹配的情况） ──
+DB_PATH="/app/data/database/media.db"
+if [ -f "$DB_PATH" ]; then
+    echo "[entrypoint] 检测到现有数据库，检查并修复缺失的列..."
+    
+    # 修复 CollectionSources 表
+    python -c "
+import sqlite3
+conn = sqlite3.connect('$DB_PATH')
+cursor = conn.cursor()
+
+# 检查 CollectionSources 表是否存在
+cursor.execute(\"SELECT name FROM sqlite_master WHERE type='table' AND name='CollectionSources'\")
+if cursor.fetchone():
+    # 检查并添加 SortOrder 列
+    cursor.execute(\"PRAGMA table_info(CollectionSources)\")
+    columns = [col[1] for col in cursor.fetchall()]
+    
+    if 'SortOrder' not in columns:
+        print('[entrypoint] 为 CollectionSources 添加 SortOrder 列...')
+        cursor.execute(\"ALTER TABLE CollectionSources ADD COLUMN SortOrder TEXT DEFAULT 'time'\")
+        cursor.execute(\"UPDATE CollectionSources SET SortOrder = 'time' WHERE SortOrder IS NULL\")
+    
+    if 'LastMaxItemId' not in columns:
+        print('[entrypoint] 为 CollectionSources 添加 LastMaxItemId 列...')
+        cursor.execute(\"ALTER TABLE CollectionSources ADD COLUMN LastMaxItemId INTEGER DEFAULT 0\")
+        cursor.execute(\"UPDATE CollectionSources SET LastMaxItemId = 0 WHERE LastMaxItemId IS NULL\")
+    
+    print('[entrypoint] CollectionSources 表检查完成')
+else:
+    print('[entrypoint] CollectionSources 表不存在，将由应用创建')
+
+conn.commit()
+conn.close()
+" 2>&1 || echo "[entrypoint] ⚠️ 数据库修复脚本执行失败"
+fi
+
+# ── 4. 执行 Alembic 数据库迁移（如果 alembic_version 匹配） ──
+echo "[entrypoint] 尝试执行数据库迁移..."
 cd /app
-if python -m alembic -c database/alembic.ini upgrade head; then
+if python -m alembic -c database/alembic.ini upgrade head 2>/dev/null; then
     echo "[entrypoint] 数据库迁移完成"
 else
-    echo "[entrypoint] ⚠️ 数据库迁移失败，将继续启动（表结构可能不完整）"
+    echo "[entrypoint] ⚠️ Alembic 迁移失败（可能是版本不匹配），继续启动..."
 fi
 
 exec "$@"
