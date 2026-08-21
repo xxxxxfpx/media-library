@@ -205,16 +205,19 @@
       <el-table :data="collectionSources" v-loading="sourcesLoading" stripe size="small" class="source-table">
         <el-table-column prop="name" label="名称" width="100" />
         <el-table-column prop="base_url" label="API地址" show-overflow-tooltip min-width="200" />
-        <el-table-column label="开关" width="120" align="center">
+        <el-table-column label="启用" width="70" align="center">
           <template #default="{ row }">
-            <div class="switch-group">
-              <el-tooltip content="启用采集源" placement="top">
-                <el-switch v-model="row.enabled" size="small" @change="(val) => toggleSource(row.id, { enabled: val })" />
-              </el-tooltip>
-              <el-tooltip content="自动采集" placement="top">
-                <el-switch v-model="row.auto_collect" size="small" @change="(val) => toggleSource(row.id, { auto_collect: val })" />
-              </el-tooltip>
-            </div>
+            <el-switch v-model="row.enabled" size="small" @change="(val) => toggleSource(row.id, { enabled: val })" />
+          </template>
+        </el-table-column>
+        <el-table-column label="自动采集" width="80" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.auto_collect"
+              size="small"
+              :disabled="!row.enabled"
+              @change="(val) => toggleSource(row.id, { auto_collect: val })"
+            />
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80" align="center">
@@ -790,9 +793,10 @@ async function toggleSource(id, data) {
 }
 
 .test-pending {
-  background: var(--el-color-info-light-9, #f4f4f5);
-  color: var(--el-color-info, #909399);
-  border: 1px dashed var(--el-color-info-light-5, #d3d4d6);
+  background: transparent;
+  color: var(--color-text-tertiary, #909399);
+  border: none;
+  padding: 8px 0;
 }
 
 .test-samples {
@@ -905,14 +909,6 @@ async function toggleSource(id, data) {
   .col-muted {
     color: var(--color-text-tertiary);
     font-size: 12px;
-  }
-
-  // 开关组
-  .switch-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    justify-content: center;
   }
 
   // 操作按钮组 - 禁止换行，横向展开
