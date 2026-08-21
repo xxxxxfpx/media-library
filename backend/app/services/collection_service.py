@@ -245,8 +245,8 @@ async def _run_collected(source_id: int, log_id: int) -> None:
 
             # 在线程池中执行阻塞的HTTP请求
             loop = asyncio.get_running_loop()
-            vod_details, total_fetched = await loop.run_in_executor(
-                None, _do_collect_sync, str(cs.BaseUrl), h, cs.SortOrder
+            vod_details, total_fetched, max_item_id = await loop.run_in_executor(
+                None, _do_collect_sync, str(cs.BaseUrl), h, cs.SortOrder, cs.LastMaxItemId
             )
 
             # 入库在异步上下文执行
@@ -278,6 +278,8 @@ async def _run_collected(source_id: int, log_id: int) -> None:
             cs.LastCollectedAt = datetime.now(timezone.utc)
             cs.LastStatus = "success"
             cs.LastError = None
+            if max_item_id > cs.LastMaxItemId:
+                cs.LastMaxItemId = max_item_id
             cs.UpdatedAt = datetime.now(timezone.utc)
             await db.commit()
 
@@ -309,35 +311,44 @@ def _do_collect_sync(
     base_url: str,
     h: int | None,
     order: str | None = None,
-) -> tuple[list[dict[str, Any]], int]:
+    last_max_item_id: int = 0,
+) -> tuple[list[dict[str, Any]], int, int]:
     """同步抓取苹果CMS数据（在线程池中执行，避免阻塞事件循环）。
+
+    优先使用 ID 游标遍历（order=id 降序 + since_id），保证页面稳定：
+    新数据永远在前面，已遍历的旧数据页面内容不会位移。
+    若采集源无历史记录（last_max_item_id=0），自动执行全量采集。
 
     Args:
         base_url: 采集源API基础URL
-        h: 增量小时数，None则全量
-        order: 排序方式
+        h: 增量小时数（仅用于时间排序的辅助，ID游标为主）
+        order: 排序方式（仅用于日志标记，实际遍历始终用ID游标）
+        last_max_item_id: 上次遍历到的最大vod_id（游标）
 
     Returns:
-        (vod_details_list, total_fetched_count)
+        (vod_details_list, total_fetched_count, max_item_id_seen)
     """
     client = MaccmsClient(base_url)
     total_fetched = 0
+    max_item_id = last_max_item_id
 
     try:
-        # 1. 拉取列表
+        # 始终使用 ID 游标遍历（稳定，不会因新数据导致页面位移）
         vod_ids: list[int] = []
-        for item in client.iter_incremental(h=h, order=order):
+        for item in client.iter_by_id(since_id=last_max_item_id):
             total_fetched += 1
-            vid = item.get("vod_id")
+            vid = item.get("vod_id", 0)
             if vid:
                 vod_ids.append(vid)
+                if vid > max_item_id:
+                    max_item_id = vid
 
         if not vod_ids:
-            return [], total_fetched
+            return [], total_fetched, max_item_id
 
-        # 2. 批量获取详情
+        # 批量获取详情
         details = client.detail_batch(vod_ids)
-        return details, total_fetched
+        return details, total_fetched, max_item_id
 
     finally:
         client.close()
@@ -661,6 +672,7 @@ def _source_to_dict(cs: CollectionSource) -> dict[str, Any]:
         "auto_collect": cs.AutoCollect,
         "interval_minutes": cs.IntervalMinutes,
         "sort_order": cs.SortOrder,
+        "last_max_item_id": cs.LastMaxItemId,
         "last_collected_at": cs.LastCollectedAt.isoformat() if cs.LastCollectedAt else None,
         "last_status": cs.LastStatus,
         "last_error": cs.LastError,

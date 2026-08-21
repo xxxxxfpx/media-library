@@ -151,6 +151,50 @@ class MaccmsClient:
                 break
             pg += 1
 
+    def iter_by_id(
+        self, since_id: int = 0, max_pages: int = 500
+    ) -> Iterator[dict[str, Any]]:
+        """基于 ID 游标的稳定遍历。
+
+        使用 order=id 降序排列（苹果CMS默认），最新数据在第1页。
+        通过 since_id 游标实现增量采集，只返回 vod_id > since_id 的数据。
+        降序遍历保证：新数据永远在前面，页面内容不会因新数据插入而位移。
+
+        Args:
+            since_id: 上次采集到的最大 vod_id，0 表示全量采集
+            max_pages: 最大翻页数（安全阀）
+
+        Yields:
+            每条新的 vod 列表记录的字典
+        """
+        max_seen = since_id
+        pg = 1
+
+        while pg <= max_pages:
+            data = self.list(pg=pg, order="id")
+            items = data.get("list", [])
+            if not items:
+                break
+
+            # 降序：遍历到第一个 vod_id <= since_id 时停止
+            stop = False
+            for item in items:
+                vid = item.get("vod_id", 0)
+                if vid <= since_id:
+                    stop = True
+                    break
+                if vid > max_seen:
+                    max_seen = vid
+                yield item
+
+            if stop:
+                break
+
+            pagecount = int(data.get("pagecount", 1))
+            if pg >= pagecount:
+                break
+            pg += 1
+
     def parse_play_urls(self, vod_detail: dict[str, Any]) -> list[dict[str, Any]]:
         """解析 vod_play_from/vod_play_url 为结构化数据。
 
