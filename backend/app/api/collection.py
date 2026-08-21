@@ -10,7 +10,7 @@ from app.api.deps import get_admin_id, get_db_session
 from app.services import collection_service
 from app.services.maccms_client import MaccmsError
 
-router = APIRouter(prefix="/collection", tags=["collection"])
+router = APIRouter(prefix="/api/collection", tags=["collection"])
 
 
 # ======================================================================

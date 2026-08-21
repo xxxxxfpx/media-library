@@ -370,18 +370,24 @@ onMounted(async () => {
     autoplay.value = localStorage.getItem('video_autoplay') === 'true'
     defaultMuted.value = localStorage.getItem('video_default_muted') === 'true'
     if (settings.auto_sync_interval) syncInterval.value = settings.auto_sync_interval * 1000
-    if (store.isAdmin) {
+  } catch {
+    // 获取设置失败时使用默认值，静默忽略
+  }
+
+  if (store.isAdmin) {
+    // 加载光鸭配置
+    try {
       const config = await guangYaPanAPI.getConfig()
       guangYaPanConfig.value = config
       guangYaPanForm.value.client_id = config.client_id || ''
       guangYaPanForm.value.device_id = config.device_id || ''
       guangYaPanForm.value.default_parent_id = config.default_parent_id || ''
-      // 加载采集源
-      await loadSources()
-      await loadLogs()
+    } catch {
+      // 光鸭配置加载失败不影响其他功能
     }
-  } catch {
-    // 获取设置失败时使用默认值，静默忽略
+    // 加载采集源
+    await loadSources()
+    await loadLogs()
   }
 })
 
